@@ -1,14 +1,172 @@
 import { useState, useRef } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2, Volume2, VolumeX, X, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile, useDeletePost } from "../hooks/useQueries";
-import { DEMO_POSTS } from "../data/demo";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile, useDeletePost, useGetComments, useAddComment } from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { toast } from "sonner";
 import type { Principal } from "@icp-sdk/core/principal";
+
+// ─── CommentAuthorRow ─────────────────────────────────────────────────────────
+function CommentAuthorRow({ author }: { author: Principal }) {
+  const { data: profile } = useGetProfile(author);
+  const displayName = profile?.displayName ?? truncatePrincipal(author.toString());
+  const avatarUrl = profile?.avatarUrl ?? "";
+  const authorKey = author.toString();
+
+  return (
+    <div className="flex gap-2 items-start">
+      <Avatar className="w-7 h-7 shrink-0 border border-white/20">
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+        <AvatarFallback className="text-[10px] bg-white/10 text-white">
+          {displayName.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <Link
+          to="/profile/$userId"
+          params={{ userId: authorKey }}
+          className="text-xs font-semibold text-white/90 hover:underline underline-offset-2"
+        >
+          {displayName}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ─── ReelsCommentsPanel ───────────────────────────────────────────────────────
+interface ReelsCommentsPanelProps {
+  postId: string;
+  onClose: () => void;
+}
+
+function ReelsCommentsPanel({ postId, onClose }: ReelsCommentsPanelProps) {
+  const [text, setText] = useState("");
+  const addComment = useAddComment();
+  const { data: comments, isLoading } = useGetComments(postId);
+
+  const handleSubmit = () => {
+    if (!text.trim()) return;
+    addComment.mutate(
+      { postId, content: text.trim() },
+      {
+        onSuccess: () => {
+          setText("");
+          toast.success("Comment added");
+        },
+        onError: () => toast.error("Failed to add comment"),
+      }
+    );
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close comments"
+        className="fixed inset-0 z-40"
+        style={{ background: "oklch(0 0 0 / 0.6)" }}
+        onClick={onClose}
+      />
+
+      {/* Slide-up panel */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
+        style={{
+          background: "oklch(0.14 0.01 260)",
+          border: "1px solid oklch(1 0 0 / 0.12)",
+          borderBottom: "none",
+          maxHeight: "70vh",
+          animation: "slideUpPanel 0.28s cubic-bezier(0.32, 0.72, 0, 1) both",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-4 py-3 shrink-0"
+          style={{ borderBottom: "1px solid oklch(1 0 0 / 0.1)" }}
+        >
+          <span className="text-white font-semibold text-base">Comments</span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close comments"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: "oklch(1 0 0 / 0.08)" }}
+          >
+            <X size={16} color="white" />
+          </button>
+        </div>
+
+        {/* Comments list */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4" style={{ overscrollBehavior: "contain" }}>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 size={22} className="animate-spin" style={{ color: "oklch(var(--orange))" }} />
+            </div>
+          ) : comments && comments.length > 0 ? (
+            comments.map((c) => (
+              <div key={c.id} className="flex gap-2">
+                <CommentAuthorRow author={c.author} />
+                <div className="flex-1 min-w-0 -mt-0.5">
+                  <span className="text-[10px] text-white/40">{timeAgo(c.timestamp)}</span>
+                  <p className="text-sm text-white/85 mt-0.5 break-words">{c.content}</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-center py-6 text-white/40 text-sm">No comments yet. Be the first!</p>
+          )}
+        </div>
+
+        {/* Input area */}
+        <div
+          className="flex gap-2 px-3 py-3 shrink-0"
+          style={{ borderTop: "1px solid oklch(1 0 0 / 0.1)" }}
+        >
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Add a comment..."
+            className="min-h-[44px] max-h-[100px] resize-none text-sm text-white placeholder:text-white/30"
+            style={{
+              background: "oklch(1 0 0 / 0.07)",
+              border: "1px solid oklch(1 0 0 / 0.15)",
+              color: "white",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+          />
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!text.trim() || addComment.isPending}
+            className="self-end shrink-0"
+            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+          >
+            {addComment.isPending ? <Loader2 size={14} className="animate-spin" /> : "Post"}
+          </Button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideUpPanel {
+          from { transform: translateY(100%); opacity: 0.6; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+      `}</style>
+    </>
+  );
+}
 
 // ─── ReelAuthorInfo ──────────────────────────────────────────────────────────
 interface ReelAuthorInfoProps {
@@ -101,11 +259,12 @@ function ReelMedia({ mediaUrl, postId, postType, isMuted, videoRef, onTimeUpdate
 
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
-  const { data: posts } = useGetAllPosts();
+  const { data: posts, isLoading } = useGetAllPosts();
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -113,7 +272,7 @@ export function ReelsPage() {
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
-  const displayPosts = posts && posts.length > 0 ? posts : DEMO_POSTS;
+  const displayPosts = posts ?? [];
 
   const handleTimeUpdate = (postId: string, pct: number) => {
     setProgress((prev) => ({ ...prev, [postId]: pct }));
@@ -169,6 +328,26 @@ export function ReelsPage() {
           <ChevronLeft size={20} className="text-white" />
         </div>
       </Link>
+
+      {commentPostId && (
+        <ReelsCommentsPanel
+          postId={commentPostId}
+          onClose={() => setCommentPostId(null)}
+        />
+      )}
+
+      {!isLoading && displayPosts.length === 0 && (
+        <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+          <Film size={48} className="text-white/30 mb-4" />
+          <h3 className="text-white font-display text-xl font-bold mb-2">No Reels Yet</h3>
+          <p className="text-white/50 text-sm mb-6">Upload your first video reel to get started.</p>
+          <Link to="/create">
+            <Button style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}>
+              Upload Reel
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {displayPosts.map((post) => {
         const serverLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
@@ -253,7 +432,9 @@ export function ReelsPage() {
 
               <button
                 type="button"
+                onClick={() => setCommentPostId(post.id)}
                 className="flex flex-col items-center gap-1"
+                aria-label="Open comments"
               >
                 <div
                   className="w-11 h-11 rounded-full flex items-center justify-center"
