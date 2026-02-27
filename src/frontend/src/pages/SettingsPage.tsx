@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, User, MapPin, FileText, Camera, ImagePlus } from "lucide-react";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,8 +47,9 @@ export function SettingsPage() {
   }, [profile, initialized]);
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     setAvatarUploading(true);
     setAvatarProgress(0);
     try {
@@ -64,8 +66,9 @@ export function SettingsPage() {
   };
 
   const handleBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     setBannerUploading(true);
     setBannerProgress(0);
     try {

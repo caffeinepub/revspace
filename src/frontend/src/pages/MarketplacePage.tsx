@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { ShoppingBag, MapPin, Plus, Loader2, CheckCircle, ImagePlus, X, User, MessageCircle } from "lucide-react";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,9 +215,10 @@ function CreateListingModal({ open, onClose }: { open: boolean; onClose: () => v
   const createListing = useCreateListing();
   const uploadFile = useUploadFile();
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));

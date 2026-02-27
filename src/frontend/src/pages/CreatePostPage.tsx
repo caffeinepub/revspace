@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Image, Video, Film, X, Loader2, Upload, ImagePlus, Tag } from "lucide-react";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -43,9 +44,14 @@ export function CreatePostPage() {
   const currentType = POST_TYPES.find((t) => t.value === postType)!;
   const isVideo = postType === "Video" || postType === "Reel";
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let selected = e.target.files?.[0];
     if (!selected) return;
+
+    // Convert HEIC/HEIF to JPEG so browsers can display and upload it
+    if (!selected.type.startsWith("video/")) {
+      selected = await convertHeicToJpeg(selected);
+    }
 
     // Revoke previous preview URL
     if (previewUrl) URL.revokeObjectURL(previewUrl);

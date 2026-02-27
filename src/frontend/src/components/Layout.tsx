@@ -17,6 +17,8 @@ import {
   Menu,
   X,
   Film,
+  Wrench,
+  Info,
 } from "lucide-react";
 import { useMyNotifications } from "../hooks/useQueries";
 
@@ -33,7 +35,9 @@ const ALL_NAV_ITEMS = [
   { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { to: "/clubs", label: "Car Clubs", icon: Users },
   { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { to: "/mechanics", label: "Mechanics", icon: Wrench },
   { to: "/shop", label: "Performance Shop", icon: Store },
+  { to: "/about", label: "About RevSpace", icon: Info },
   { to: "/messages", label: "Messages", icon: MessageCircle },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/profile", label: "Profile", icon: User },

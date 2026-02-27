@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Calendar, MapPin, Users, Plus, Loader2, Trash2, Camera, ImagePlus, X, ZoomIn } from "lucide-react";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,8 +74,9 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
   };
 
   const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     setIsUploadingPhoto(true);
     setPhotoUploadPct(0);
     try {
@@ -308,8 +310,9 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
   const uploadFile = useUploadFile();
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     setIsUploadingCover(true);
     setCoverUploadPct(0);
     try {

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Play } from "lucide-react";
+import { useState, useRef } from "react";
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Play, Volume2, VolumeX } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +41,20 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const [likeCount, setLikeCount] = useState(post.likes.length);
 
   const liked = optimisticLiked !== null ? optimisticLiked : hasLiked;
+
+  const [videoMuted, setVideoMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Directly set the DOM property since React's muted prop isn't always reliable
+  const handleVideoMuteToggle = () => {
+    setVideoMuted((m) => {
+      const next = !m;
+      if (videoRef.current) {
+        videoRef.current.muted = next;
+      }
+      return next;
+    });
+  };
 
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
@@ -115,9 +129,10 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
           {isVideoPost ? (
             <video
               key={post.mediaUrls[0]}
+              ref={videoRef}
               src={post.mediaUrls[0]}
               autoPlay
-              muted
+              muted={videoMuted}
               loop
               playsInline
               className="feed-image aspect-[4/3] w-full object-cover"
@@ -133,14 +148,28 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
             />
           )}
           {isVideoPost && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ background: "oklch(0 0 0 / 0.4)" }}
-              >
-                <Play size={22} className="text-white ml-1" fill="white" />
+            <>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ background: "oklch(0 0 0 / 0.4)" }}
+                >
+                  <Play size={22} className="text-white ml-1" fill="white" />
+                </div>
               </div>
-            </div>
+              <button
+                type="button"
+                aria-label={videoMuted ? "Unmute video" : "Mute video"}
+                onClick={handleVideoMuteToggle}
+                className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: "oklch(0 0 0 / 0.55)" }}
+              >
+                {videoMuted
+                  ? <VolumeX size={18} color="white" />
+                  : <Volume2 size={18} color="white" />
+                }
+              </button>
+            </>
           )}
         </div>
       )}

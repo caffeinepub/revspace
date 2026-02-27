@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2, Volume2, VolumeX, X, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -280,6 +280,13 @@ export function ReelsPage() {
     ? allPosts
     : allPosts.filter((p) => p.topic === selectedTopic);
 
+  // Sync muted state directly on video DOM elements (React prop alone isn't always reliable)
+  useEffect(() => {
+    videoRefs.current.forEach((video) => {
+      video.muted = isMuted;
+    });
+  }, [isMuted]);
+
   const handleTimeUpdate = (postId: string, pct: number) => {
     setProgress((prev) => ({ ...prev, [postId]: pct }));
   };
@@ -468,7 +475,7 @@ export function ReelsPage() {
                     : <Volume2 size={22} color="white" />
                   }
                 </div>
-                <span className="text-white text-xs">{isMuted ? "Sound" : "Muted"}</span>
+                <span className="text-white text-xs">{isMuted ? "Muted" : "Sound"}</span>
               </button>
 
               <button

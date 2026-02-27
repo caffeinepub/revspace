@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Plus, Car, Wrench, Trash2, Loader2, ImagePlus } from "lucide-react";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -111,9 +112,10 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const addCar = useAddCar();
   const uploadFile = useUploadFile();
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));

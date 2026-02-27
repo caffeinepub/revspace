@@ -18,11 +18,22 @@ export function useUploadFile() {
     onProgress?: (pct: number) => void
   ): Promise<string> => {
     const config = await loadConfig();
-    // Always create an authenticated agent when identity is available
-    const agentOptions = identity
-      ? { host: config.backend_host, identity }
-      : { host: config.backend_host };
-    const agent = new HttpAgent(agentOptions);
+
+    // Build the agent the same way config.ts does so root keys and identity are correct
+    const agent = new HttpAgent({
+      host: config.backend_host,
+      ...(identity ? { identity } : {}),
+    });
+
+    // Fetch root key in local/dev environments (matches config.ts behaviour)
+    if (config.backend_host?.includes("localhost")) {
+      try {
+        await agent.fetchRootKey();
+      } catch (err) {
+        console.warn("Unable to fetch root key for storage agent", err);
+      }
+    }
+
     const storageClient = new StorageClient(
       config.bucket_name,
       config.storage_gateway_url,

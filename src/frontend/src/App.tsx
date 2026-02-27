@@ -20,6 +20,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { ShopPage } from "./pages/ShopPage";
+import { MechanicsPage } from "./pages/MechanicsPage";
+import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
 
 const LoadingSpinner = () => (
   <div
@@ -187,6 +189,18 @@ const shopRoute = createRoute({
   component: ShopPage,
 });
 
+const mechanicsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mechanics",
+  component: MechanicsPage,
+});
+
+const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/about",
+  component: RevSpaceInfoPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -203,6 +217,8 @@ const routeTree = rootRoute.addChildren([
   userProfileRoute,
   leaderboardRoute,
   shopRoute,
+  mechanicsRoute,
+  aboutRoute,
 ]);
 
 const router = createRouter({ routeTree });
