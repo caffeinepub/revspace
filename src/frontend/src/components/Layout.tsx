@@ -349,12 +349,42 @@ function Sidebar() {
   );
 }
 
+// ─── BullBoostBanner ─────────────────────────────────────────────────────────
+export function BullBoostBanner() {
+  return (
+    <a
+      href="https://bullboostperformance.com/?ref=xprbexxu"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-0 left-0 right-0 z-[200] flex items-center justify-center gap-3 px-4 py-2 transition-opacity duration-200 hover:opacity-90 active:opacity-80"
+      style={{
+        background: "linear-gradient(90deg, #000 0%, #0a0a0a 40%, #111 60%, #000 100%)",
+        borderTop: "1px solid oklch(var(--orange) / 0.4)",
+        minHeight: 52,
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.6), 0 -1px 0 oklch(var(--orange) / 0.2)",
+      }}
+    >
+      <img
+        src="/assets/uploads/z86GgQCwZ7Hm4-1.png"
+        alt="Bull Boost Performance"
+        style={{ height: 36, maxWidth: 200, objectFit: "contain" }}
+      />
+      <span
+        className="text-xs font-semibold tracking-wider uppercase hidden sm:inline"
+        style={{ color: "oklch(var(--orange-bright))", letterSpacing: "0.1em" }}
+      >
+        bullboostperformance.com →
+      </span>
+    </a>
+  );
+}
+
 export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="main-content">
+      <main className="main-content" style={{ paddingBottom: 60 }}>
         {children}
       </main>
     </div>

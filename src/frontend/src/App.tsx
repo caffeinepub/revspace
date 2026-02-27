@@ -4,7 +4,7 @@ import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { LoginScreen } from "./components/LoginScreen";
-import { Layout } from "./components/Layout";
+import { Layout, BullBoostBanner } from "./components/Layout";
 import { FeedPage } from "./pages/FeedPage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { ReelsPage } from "./pages/ReelsPage";
@@ -218,6 +218,7 @@ export default function App() {
     <>
       <RouterProvider router={router} />
       <Toaster position="top-center" theme="dark" />
+      <BullBoostBanner />
     </>
   );
 }

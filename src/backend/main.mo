@@ -1,4 +1,4 @@
-import Migration "migration";
+
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
@@ -15,7 +15,7 @@ import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
 // Specify migration module and function in the with clause
-(with migration = Migration.run)
+
 actor {
   // -----------------------------------
   // Types Module (all custom types)
