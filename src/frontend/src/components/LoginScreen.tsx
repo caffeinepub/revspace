@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
@@ -8,13 +8,27 @@ interface LoginScreenProps {
 
 export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const { login, isLoggingIn, identity } = useInternetIdentity();
+  // Keep a ref so the effect always has the latest callback without re-firing
+  const onLoginSuccessRef = useRef(onLoginSuccess);
+  onLoginSuccessRef.current = onLoginSuccess;
 
-  // When identity appears after clicking Login, notify parent
+  // When identity appears AFTER clicking Login (popup flow), notify parent.
+  // This does NOT fire on mount for returning users — they use the button instead.
   useEffect(() => {
-    if (identity && onLoginSuccess) {
-      onLoginSuccess();
+    if (identity) {
+      onLoginSuccessRef.current?.();
     }
-  }, [identity, onLoginSuccess]);
+  }, [identity]);
+
+  const handleClick = () => {
+    if (identity) {
+      // Returning user: already authenticated, skip the II popup
+      onLoginSuccess?.();
+    } else {
+      // New login: open Internet Identity popup
+      login();
+    }
+  };
 
   return (
     <div
@@ -45,7 +59,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       {/* Login button at bottom */}
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-6">
         <Button
-          onClick={login}
+          onClick={handleClick}
           disabled={isLoggingIn}
           className="w-full h-14 text-lg font-bold rounded-2xl mb-4"
           style={{
@@ -59,6 +73,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
               Connecting...
             </div>
+          ) : identity ? (
+            "Continue to RevSpace"
           ) : (
             "Login to Site"
           )}

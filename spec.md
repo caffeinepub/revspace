@@ -1,38 +1,23 @@
 # RevSpace
 
 ## Current State
-- Reels are uploaded as video files via the blob-storage system (StorageClient).
-- The ReelsPage renders videos using an HTML `<video>` element with `autoPlay`, `muted`, and `loop` -- sound is permanently muted with no toggle.
-- The CreatePostPage has no file size or duration limits enforced in the UI; it accepts any `video/*` file.
-- Videos display full-screen in a snap-scroll layout.
-- The backend stores post data (mediaUrls as strings) -- no duration metadata is persisted, only URLs.
-- Scalability is handled by the ICP platform and Caffeine blob-storage infrastructure natively.
+Full car enthusiast social platform with Feed, Reels, Garage, Events, Marketplace, Clubs, Leaderboard, Shop, Messages, Notifications, Profile, and Settings pages. Backend uses stable storage for all data (profiles, posts, reels, messages, etc.). Frontend uses Internet Identity for auth.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Sound toggle button on each reel (mute/unmute, defaulting to muted on first view).
-- Video progress bar at the bottom of each reel showing playback position.
-- File size guidance in CreatePostPage for Reel type (e.g., "Up to ~500MB recommended for 10-minute videos").
-- A "10 min max" label in the Reel upload UI.
-- Duration validation warning in CreatePostPage: if the selected video's duration exceeds 600 seconds (10 min), show a warning toast but still allow upload (server handles limits).
+- Auto-detect already-authenticated returning users on the LoginScreen and bypass the ICP popup immediately
+- On the LoginScreen, if the user's identity is already valid (from local storage), the "Login to Site" button should instantly pass them through without showing the ICP popup
 
 ### Modify
-- ReelsPage: Remove `muted` attribute from the video element; replace with a controlled `muted` state toggled by a new sound button.
-- ReelsPage: Add a sound icon button (Volume2 / VolumeX) to the right-side action panel.
-- ReelsPage: Add a thin progress bar at the very bottom of each reel card that updates as the video plays.
-- CreatePostPage: Add duration check after file selection for Reel post type.
+- `LoginScreen.tsx`: Check if identity already exists when component mounts; if so, call `onLoginSuccess` immediately (skip the ICP popup). Show a "Continue" button state for already-authenticated users vs "Login to Site" for new logins
+- `App.tsx` `AuthGate`: Improve logic so that when `identity` is already present at init time (returning user), `onLoginSuccess` is triggered correctly even before the button is clicked
+- `useInternetIdentity.ts` `login()`: Currently errors with "User is already authenticated" for returning users -- the LoginScreen should detect this case and skip calling `login()` entirely
 
 ### Remove
-- Nothing removed.
+- Nothing removed
 
 ## Implementation Plan
-1. Update `ReelsPage.tsx`:
-   - Add `videoRef` per reel (use a Map or individual refs with a key-based approach).
-   - Use a single global `isMuted` state (all reels start muted, user toggles globally, consistent with TikTok/Instagram UX).
-   - Replace hardcoded `muted` prop with the `isMuted` state.
-   - Add Volume2/VolumeX icon button to each reel's action panel.
-   - Add an `<input type="range">` or a div-based progress bar synced to `timeupdate` events using `onTimeUpdate` handler.
-2. Update `CreatePostPage.tsx`:
-   - After file selection, if postType === "Reel", read `videoElement.duration` and warn if > 600s.
-   - Update the helper text to mention "Up to 10 minutes".
+1. In `LoginScreen.tsx`: Read `identity` from `useInternetIdentity`. If `identity` already exists (returning user), show a "Continue" button that just calls `onLoginSuccess()` directly (no ICP popup). If no identity, show the normal "Login to Site" button that calls `login()`.
+2. In `App.tsx` `AuthGate`: The `loggedInThisLoad` approach is fine. Ensure the initial `useEffect` in `LoginScreen` still handles the case where identity becomes available after the component mounts.
+3. This ensures returning users don't get stuck and their saved profile/data loads correctly from the backend stable storage.
