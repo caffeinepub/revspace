@@ -1,0 +1,290 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* RevSpace Dark Theme - Motorsport Industrial */
+    --background: 0.1 0.005 240;
+    --foreground: 0.95 0.005 240;
+    --card: 0.13 0.006 240;
+    --card-foreground: 0.95 0.005 240;
+    --popover: 0.15 0.006 240;
+    --popover-foreground: 0.95 0.005 240;
+
+    /* Fiery orange primary */
+    --primary: 0.68 0.22 38;
+    --primary-foreground: 0.08 0.005 240;
+
+    /* Steel secondary */
+    --secondary: 0.2 0.008 240;
+    --secondary-foreground: 0.85 0.005 240;
+
+    --muted: 0.18 0.006 240;
+    --muted-foreground: 0.55 0.01 240;
+
+    /* Ember accent */
+    --accent: 0.22 0.008 240;
+    --accent-foreground: 0.95 0.005 240;
+
+    /* Destructive red */
+    --destructive: 0.58 0.24 27;
+    --destructive-foreground: 0.95 0 0;
+
+    --border: 0.22 0.008 240;
+    --input: 0.2 0.008 240;
+    --ring: 0.65 0.2 40;
+
+    /* Chart colors */
+    --chart-1: 0.65 0.2 40;
+    --chart-2: 0.58 0.24 27;
+    --chart-3: 0.7 0.15 60;
+    --chart-4: 0.55 0.18 250;
+    --chart-5: 0.68 0.15 150;
+
+    /* Sidebar */
+    --sidebar: 0.08 0.005 240;
+    --sidebar-foreground: 0.95 0.005 240;
+    --sidebar-primary: 0.65 0.2 40;
+    --sidebar-primary-foreground: 0.08 0.005 240;
+    --sidebar-accent: 0.18 0.008 240;
+    --sidebar-accent-foreground: 0.95 0.005 240;
+    --sidebar-border: 0.22 0.008 240;
+    --sidebar-ring: 0.65 0.2 40;
+
+    /* Custom RevSpace tokens */
+    --orange: 0.68 0.22 38;
+    --orange-bright: 0.75 0.24 42;
+    --orange-dim: 0.45 0.15 40;
+    --ember: 0.58 0.24 27;
+    --steel: 0.35 0.01 240;
+    --steel-light: 0.55 0.01 240;
+    --carbon: 0.08 0.005 240;
+    --surface: 0.13 0.006 240;
+    --surface-raised: 0.17 0.007 240;
+    --surface-elevated: 0.22 0.008 240;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .display {
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer components {
+  .revspace-logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+
+  .nav-tab {
+    @apply flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors;
+  }
+
+  .post-card {
+    @apply bg-card border border-border rounded-lg overflow-hidden;
+  }
+
+  .action-btn {
+    @apply flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;
+  }
+
+  .action-btn.liked {
+    color: oklch(var(--ember));
+  }
+
+  .garage-card {
+    @apply relative overflow-hidden rounded-lg aspect-square cursor-pointer;
+  }
+
+  .badge-orange {
+    background: oklch(var(--orange) / 0.2);
+    color: oklch(var(--orange-bright));
+    border: 1px solid oklch(var(--orange) / 0.3);
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+  }
+
+  .badge-ember {
+    background: oklch(var(--ember) / 0.2);
+    color: oklch(0.75 0.18 27);
+    border: 1px solid oklch(var(--ember) / 0.3);
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+  }
+
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around px-2 py-2;
+    background: oklch(var(--carbon) / 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid oklch(var(--border));
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-0.5 text-[10px] font-medium transition-all cursor-pointer min-w-[52px] py-1 px-2 rounded-lg;
+    color: oklch(var(--steel));
+  }
+
+  .bottom-nav-item.active {
+    color: oklch(var(--orange-bright));
+  }
+
+  .bottom-nav-item.post-btn {
+    background: oklch(var(--orange));
+    color: oklch(var(--carbon));
+    @apply rounded-xl p-2;
+    box-shadow: 0 0 20px oklch(var(--orange) / 0.4);
+  }
+
+  .sidebar-nav {
+    @apply hidden md:flex flex-col gap-1 p-4 w-64 fixed top-0 left-0 h-full z-40 overflow-y-auto;
+    background: oklch(var(--carbon));
+    border-right: 1px solid oklch(var(--border));
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer;
+    color: oklch(var(--steel-light));
+  }
+
+  .sidebar-item:hover {
+    background: oklch(var(--surface));
+    color: oklch(var(--foreground));
+  }
+
+  .sidebar-item.active {
+    background: oklch(var(--orange) / 0.15);
+    color: oklch(var(--orange-bright));
+  }
+
+  .main-content {
+    @apply pt-14 md:pt-0 md:pl-64;
+    min-height: 100vh;
+  }
+
+  .main-content-inner {
+    @apply max-w-[600px] mx-auto lg:max-w-none;
+  }
+
+  .skeleton-pulse {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  .stripe-accent {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stripe-accent::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      oklch(var(--orange) / 0.06) 50%,
+      transparent 60%
+    );
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 200%; }
+  }
+
+  .page-header {
+    @apply sticky top-0 z-30 flex items-center justify-between px-4 py-3;
+    background: oklch(var(--carbon) / 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid oklch(var(--border));
+  }
+
+  .feed-image {
+    @apply w-full object-cover;
+    background: oklch(var(--surface));
+  }
+
+  .reel-card {
+    @apply relative w-full snap-start;
+    height: 100svh;
+  }
+
+  .message-bubble-me {
+    background: oklch(var(--orange));
+    color: oklch(var(--carbon));
+    @apply rounded-2xl rounded-br-sm px-4 py-2 text-sm max-w-[75%] ml-auto;
+  }
+
+  .message-bubble-other {
+    @apply rounded-2xl rounded-bl-sm px-4 py-2 text-sm max-w-[75%] bg-secondary text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-orange {
+    color: oklch(var(--orange-bright));
+  }
+
+  .bg-orange {
+    background: oklch(var(--orange));
+  }
+
+  .text-ember {
+    color: oklch(0.75 0.18 27);
+  }
+
+  .text-steel {
+    color: oklch(var(--steel-light));
+  }
+
+  .border-orange {
+    border-color: oklch(var(--orange));
+  }
+
+  .glow-orange {
+    box-shadow: 0 0 20px oklch(var(--orange) / 0.3);
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .neon-glow {
+    box-shadow: 0 0 20px oklch(0.65 0.25 290 / 0.5), 0 0 40px oklch(0.65 0.25 290 / 0.2);
+  }
+
+  .tag-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .urban-overlay {
+    background: linear-gradient(135deg, oklch(0 0 0 / 0.7) 0%, oklch(0.08 0.02 290 / 0.5) 100%);
+  }
+}
