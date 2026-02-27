@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Car } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
-import { useGetAllPosts } from "../hooks/useQueries";
+import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,36 @@ import { toast } from "sonner";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
+import type { Principal } from "@icp-sdk/core/principal";
+
+function CommentAuthor({ author }: { author: Principal }) {
+  const { data: profile } = useGetProfile(author);
+  const displayName = profile?.displayName ?? truncatePrincipal(author.toString());
+  const avatarUrl = profile?.avatarUrl ?? "";
+  const authorKey = author.toString();
+
+  return (
+    <div className="flex gap-2">
+      <Avatar className="w-7 h-7 shrink-0">
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+        <AvatarFallback className="text-[10px]">
+          {displayName.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div>
+        <div className="flex items-baseline gap-2">
+          <Link
+            to="/profile/$userId"
+            params={{ userId: authorKey }}
+            className="text-xs font-semibold hover:underline underline-offset-2"
+          >
+            {displayName}
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CommentsDialog({
   postId,
@@ -52,26 +82,16 @@ function CommentsDialog({
         <div className="max-h-72 overflow-y-auto space-y-3 py-2">
           {isLoading ? (
             <div className="text-center py-4 text-steel text-sm">Loading...</div>
-          ) : comments && comments.length > 0 ? (
-            comments.map((c) => {
-              const authorLabel = truncatePrincipal(c.author.toString());
-              return (
-                <div key={c.id} className="flex gap-2">
-                  <Avatar className="w-7 h-7 shrink-0">
-                    <AvatarFallback className="text-[10px]">
-                      {authorLabel.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-semibold">{authorLabel}</span>
-                      <span className="text-[10px] text-steel">{timeAgo(c.timestamp)}</span>
-                    </div>
-                    <p className="text-sm text-foreground">{c.content}</p>
-                  </div>
+          ) :           comments && comments.length > 0 ? (
+            comments.map((c) => (
+              <div key={c.id} className="flex gap-2">
+                <CommentAuthor author={c.author} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-steel">{timeAgo(c.timestamp)}</span>
+                  <p className="text-sm text-foreground">{c.content}</p>
                 </div>
-              );
-            })
+              </div>
+            ))
           ) : (
             <p className="text-center py-4 text-steel text-sm">No comments yet. Be the first!</p>
           )}

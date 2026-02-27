@@ -36,9 +36,22 @@ export function CreatePostPage() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
 
     setFile(selected);
-    setPreviewUrl(URL.createObjectURL(selected));
+    const objectUrl = URL.createObjectURL(selected);
+    setPreviewUrl(objectUrl);
     setUploadProgress(null);
-  }, [previewUrl]);
+
+    // For Reels: warn if video is over 10 minutes
+    if (postType === "Reel") {
+      const tempVideo = document.createElement("video");
+      tempVideo.src = objectUrl;
+      tempVideo.onloadedmetadata = () => {
+        if (tempVideo.duration > 600) {
+          toast.warning("Video is over 10 minutes — it may be trimmed or rejected on upload");
+        }
+        URL.revokeObjectURL(tempVideo.src);
+      };
+    }
+  }, [previewUrl, postType]);
 
   const clearFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -218,7 +231,9 @@ export function CreatePostPage() {
                     {isVideo ? "Upload Video" : "Upload Photo"}
                   </p>
                   <p className="text-xs text-steel mt-0.5">
-                    Tap to browse {isVideo ? "videos" : "images"} from your device
+                    {postType === "Reel"
+                      ? "Up to 10 minutes · MP4/MOV recommended"
+                      : `Tap to browse ${isVideo ? "videos" : "images"} from your device`}
                   </p>
                 </div>
               </button>

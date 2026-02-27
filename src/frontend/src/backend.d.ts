@@ -139,6 +139,7 @@ export interface backendInterface {
     rsvpEvent(eventId: string): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     sendMessage(receiver: Principal, content: string): Promise<string>;
+    sendNotificationToUser(targetUser: Principal, notifType: string, message: string, relatedId: string): Promise<string>;
     unfollowUser(user: Principal): Promise<void>;
     unlikePost(postId: string): Promise<void>;
     unrsvpEvent(eventId: string): Promise<void>;

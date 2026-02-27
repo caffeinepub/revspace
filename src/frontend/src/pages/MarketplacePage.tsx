@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
-import { ShoppingBag, MapPin, Plus, Loader2, CheckCircle, ImagePlus, X } from "lucide-react";
+import { ShoppingBag, MapPin, Plus, Loader2, CheckCircle, ImagePlus, X, User, MessageCircle } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,11 +8,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAllListings, useCreateListing, useMarkListingSold, useDeleteListing, useUploadFile } from "../hooks/useQueries";
+import { useAllListings, useCreateListing, useMarkListingSold, useDeleteListing, useUploadFile, useGetProfile } from "../hooks/useQueries";
 import { formatPrice, truncatePrincipal } from "../utils/format";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import type { Listing } from "../backend.d";
+import type { Principal } from "@icp-sdk/core/principal";
 import { toast } from "sonner";
+
+// Helper component: shows seller's display name on listing cards
+function SellerName({ seller }: { seller: Principal }) {
+  const { data: profile } = useGetProfile(seller);
+  const displayName = profile?.displayName?.trim() || truncatePrincipal(seller.toString());
+
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <User size={9} className="text-steel shrink-0" />
+      <span className="text-[10px] text-steel truncate">{displayName}</span>
+    </div>
+  );
+}
 
 const CATEGORIES = ["All", "Cars", "Parts", "Accessories"];
 const CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"];
@@ -26,12 +41,19 @@ const CONDITION_COLORS: Record<string, string> = {
 
 function ListingDetailModal({ listing, open, onClose }: { listing: Listing; open: boolean; onClose: () => void }) {
   const { identity } = useInternetIdentity();
+  const navigate = useNavigate();
   const myPrincipal = identity?.getPrincipal().toString();
   const isOwner = myPrincipal === listing.seller.toString();
   const markSold = useMarkListingSold();
   const deleteListing = useDeleteListing();
   const sellerKey = listing.seller.toString();
-  const sellerName = truncatePrincipal(sellerKey);
+  const { data: sellerProfile } = useGetProfile(listing.seller);
+  const sellerName = sellerProfile?.displayName?.trim() || truncatePrincipal(sellerKey);
+
+  const goToSellerChat = () => {
+    onClose();
+    navigate({ to: "/messages", search: { recipient: sellerKey } });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -80,30 +102,54 @@ function ListingDetailModal({ listing, open, onClose }: { listing: Listing; open
 
           <p className="text-sm text-foreground leading-relaxed">{listing.description}</p>
 
-          <div
-            className="flex items-center gap-2 p-3 rounded-lg"
-            style={{ background: "oklch(var(--surface-elevated))" }}
-          >
+          {isOwner ? (
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+              className="flex items-center gap-2 p-3 rounded-lg"
+              style={{ background: "oklch(var(--surface-elevated))" }}
             >
-              {sellerName.slice(0, 2).toUpperCase()}
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+              >
+                {sellerName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate">{sellerName}</p>
+                <p className="text-[10px] text-steel">Seller (you)</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold">{sellerName}</p>
-              <p className="text-[10px] text-steel">Seller</p>
-            </div>
-          </div>
+          ) : (
+            <button
+              type="button"
+              className="flex items-center gap-2 p-3 rounded-lg w-full text-left cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ background: "oklch(var(--surface-elevated))" }}
+              onClick={goToSellerChat}
+            >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+              >
+                {sellerName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate">{sellerName}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-[10px] text-steel">Seller</p>
+                  <MessageCircle size={10} className="text-orange" />
+                </div>
+              </div>
+            </button>
+          )}
         </div>
 
         {!listing.isSold && !isOwner && (
           <Button
             type="button"
             className="w-full"
-            onClick={() => toast.success("Message sent to seller!")}
+            onClick={goToSellerChat}
             style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
           >
+            <MessageCircle size={14} className="mr-2" />
             Contact Seller
           </Button>
         )}
@@ -492,6 +538,7 @@ export function MarketplacePage() {
                     <MapPin size={9} className="text-steel" />
                     <span className="text-[10px] text-steel truncate">{listing.location}</span>
                   </div>
+                  <SellerName seller={listing.seller} />
                 </div>
               </button>
             ))}

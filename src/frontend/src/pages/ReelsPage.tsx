@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2, Volume2, VolumeX } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,13 +35,13 @@ function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
   const avatarUrl = profile?.avatarUrl ?? "";
 
   return (
-    <div className="flex items-center gap-2 mb-3">
+    <Link to="/profile/$userId" params={{ userId: authorKey }} className="flex items-center gap-2 mb-3 group">
       <Avatar className="w-9 h-9 border-2 border-white">
         {avatarUrl ? <AvatarImage src={avatarUrl} /> : null}
         <AvatarFallback className="text-xs">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
       </Avatar>
-      <p className="text-white text-sm font-semibold">{displayName}</p>
-    </div>
+      <p className="text-white text-sm font-semibold group-hover:underline underline-offset-2">{displayName}</p>
+    </Link>
   );
 }
 
@@ -50,9 +50,12 @@ interface ReelMediaProps {
   mediaUrl: string | undefined;
   postId: string;
   postType: string;
+  isMuted: boolean;
+  videoRef?: (el: HTMLVideoElement | null) => void;
+  onTimeUpdate?: (postId: string, progress: number) => void;
 }
 
-function ReelMedia({ mediaUrl, postId, postType }: ReelMediaProps) {
+function ReelMedia({ mediaUrl, postId, postType, isMuted, videoRef, onTimeUpdate }: ReelMediaProps) {
   if (!mediaUrl) {
     return (
       <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#111" }}>
@@ -67,12 +70,20 @@ function ReelMedia({ mediaUrl, postId, postType }: ReelMediaProps) {
     return (
       <video
         key={mediaUrl}
+        ref={videoRef}
         src={mediaUrl}
         autoPlay
-        muted
+        muted={isMuted}
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
+        onTimeUpdate={(e) => {
+          const video = e.currentTarget;
+          if (video.duration > 0) {
+            const pct = (video.currentTime / video.duration) * 100;
+            onTimeUpdate?.(postId, pct);
+          }
+        }}
       >
         <track kind="captions" />
       </video>
@@ -95,11 +106,18 @@ export function ReelsPage() {
   const myPrincipal = identity?.getPrincipal().toString();
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
   const displayPosts = posts && posts.length > 0 ? posts : DEMO_POSTS;
+
+  const handleTimeUpdate = (postId: string, pct: number) => {
+    setProgress((prev) => ({ ...prev, [postId]: pct }));
+  };
 
   const handleLike = (postId: string, currentlyLiked: boolean) => {
     if (!myPrincipal) {
@@ -121,7 +139,6 @@ export function ReelsPage() {
 
   const handleDelete = (postId: string) => {
     if (confirmDeleteId === postId) {
-      // Second tap — actually delete
       deletePostMutation.mutate(postId, {
         onSuccess: () => {
           toast.success("Reel deleted");
@@ -133,9 +150,7 @@ export function ReelsPage() {
         },
       });
     } else {
-      // First tap — ask for confirmation
       setConfirmDeleteId(postId);
-      // Auto-cancel after 3 seconds
       setTimeout(() => setConfirmDeleteId((cur) => (cur === postId ? null : cur)), 3000);
     }
   };
@@ -158,6 +173,7 @@ export function ReelsPage() {
       {displayPosts.map((post) => {
         const serverLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
         const liked = likedPosts.has(post.id) || serverLiked;
+        const postProgress = progress[post.id] ?? 0;
 
         return (
           <div
@@ -170,6 +186,15 @@ export function ReelsPage() {
                 mediaUrl={post.mediaUrls[0]}
                 postId={post.id}
                 postType={post.postType}
+                isMuted={isMuted}
+                videoRef={(el) => {
+                  if (el) {
+                    videoRefs.current.set(post.id, el);
+                  } else {
+                    videoRefs.current.delete(post.id);
+                  }
+                }}
+                onTimeUpdate={handleTimeUpdate}
               />
               <div
                 className="absolute inset-0"
@@ -189,6 +214,25 @@ export function ReelsPage() {
 
             {/* Right actions */}
             <div className="absolute right-3 bottom-24 flex flex-col items-center gap-5">
+              {/* Sound toggle */}
+              <button
+                type="button"
+                onClick={() => setIsMuted((m) => !m)}
+                className="flex flex-col items-center gap-1"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center"
+                  style={{ background: "oklch(0 0 0 / 0.4)" }}
+                >
+                  {isMuted
+                    ? <VolumeX size={22} color="white" />
+                    : <Volume2 size={22} color="white" />
+                  }
+                </div>
+                <span className="text-white text-xs">{isMuted ? "Sound" : "Muted"}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleLike(post.id, liked)}
@@ -263,6 +307,20 @@ export function ReelsPage() {
                   </span>
                 </button>
               )}
+            </div>
+
+            {/* Playback progress bar */}
+            <div
+              className="absolute bottom-0 left-0 right-0"
+              style={{ height: "3px", background: "oklch(1 0 0 / 0.15)" }}
+            >
+              <div
+                className="h-full transition-all duration-200"
+                style={{
+                  width: `${postProgress}%`,
+                  background: "oklch(var(--orange, 0.7 0.18 40))",
+                }}
+              />
             </div>
           </div>
         );

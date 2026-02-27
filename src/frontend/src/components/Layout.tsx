@@ -176,6 +176,30 @@ function MobileNav() {
           })}
         </div>
 
+        {/* Ad banner */}
+        <div className="px-4 pb-2">
+          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "oklch(var(--steel))" }}>
+            Sponsored
+          </p>
+          <a
+            href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-lg overflow-hidden transition-all duration-200 hover:opacity-90 hover:scale-[1.02] cursor-pointer"
+            style={{
+              border: "1px solid oklch(var(--border))",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            }}
+          >
+            <img
+              src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
+              alt="JDM Store - Parts and Accessories"
+              className="w-full object-contain"
+              style={{ height: 90, background: "#000" }}
+            />
+          </a>
+        </div>
+
         <div className="px-4 py-4 text-[11px]" style={{ color: "oklch(var(--steel))" }}>
           <p>© 2026 RevSpace</p>
           <p>
@@ -256,8 +280,32 @@ function Sidebar() {
         })}
       </div>
 
+      {/* Ad banner */}
+      <div className="mt-auto pt-4 px-3 pb-2">
+        <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "oklch(var(--steel))" }}>
+          Sponsored
+        </p>
+        <a
+          href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-lg overflow-hidden transition-all duration-200 hover:opacity-90 hover:scale-[1.02] cursor-pointer"
+          style={{
+            border: "1px solid oklch(var(--border))",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+        >
+          <img
+            src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
+            alt="JDM Store - Parts and Accessories"
+            className="w-full object-contain"
+            style={{ height: 90, background: "#000" }}
+          />
+        </a>
+      </div>
+
       {/* Footer */}
-      <div className="mt-auto pt-4 px-3 text-[11px] text-steel">
+      <div className="pt-2 px-3 text-[11px] text-steel">
         <p>© 2026 RevSpace</p>
         <p>
           Built with ❤️ using{" "}

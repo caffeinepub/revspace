@@ -1,13 +1,13 @@
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
+import Text "mo:core/Text";
+import Nat "mo:core/Nat";
+import Int "mo:core/Int";
 import Map "mo:core/Map";
 import List "mo:core/List";
 import Set "mo:core/Set";
-import Text "mo:core/Text";
 import Array "mo:core/Array";
-import Nat "mo:core/Nat";
-
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
@@ -188,28 +188,27 @@ actor {
     };
   };
 
-  // -----------------------------------
-  // Storage (all persistent data)
-  // -----------------------------------
-  // Include storage for filepath system
+  //-----------------------------------
+  // Storage and Auth Integration
+  //-----------------------------------
   include MixinStorage();
 
   // Authorization State
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Storage maps for all entities
-  let posts = Map.empty<Text, Types.Post>();
-  let comments = Map.empty<Text, Types.Comment>();
-  let profiles = Map.empty<Principal, Types.Profile>();
-  let cars = Map.empty<Text, Types.Car>();
-  let events = Map.empty<Text, Types.Event>();
-  let listings = Map.empty<Text, Types.Listing>();
-  let clubs = Map.empty<Text, Types.Club>();
-  let notifications = Map.empty<Text, Types.Notification>();
-  let messages = Map.empty<Text, Types.Message>();
-  let follows = Map.empty<Principal, Set.Set<Principal>>();
-  let followers = Map.empty<Principal, Set.Set<Principal>>();
+  // Persistent Stable Maps using component stableMap
+  stable let posts = Map.empty<Text, Types.Post>();
+  stable let comments = Map.empty<Text, Types.Comment>();
+  stable let profiles = Map.empty<Principal, Types.Profile>();
+  stable let cars = Map.empty<Text, Types.Car>();
+  stable let events = Map.empty<Text, Types.Event>();
+  stable let listings = Map.empty<Text, Types.Listing>();
+  stable let clubs = Map.empty<Text, Types.Club>();
+  stable let notifications = Map.empty<Text, Types.Notification>();
+  stable let messages = Map.empty<Text, Types.Message>();
+  stable let follows = Map.empty<Principal, Set.Set<Principal>>();
+  stable let followers = Map.empty<Principal, Set.Set<Principal>>();
 
   // -----------------------------------
   // Utils
@@ -246,10 +245,10 @@ actor {
   };
 
   public query ({ caller }) func getPostsByUser(user : Principal) : async [Types.PostView] {
-    let allPosts = posts.values().toList<Types.Post>();
+    let allPosts = posts.values().toArray();
     allPosts.filter(
       func(p) { p.author == user }
-    ).toArray().map(func(post) { Mappers.postToView(post) });
+    ).map(func(post) { Mappers.postToView(post) });
   };
 
   public shared ({ caller }) func likePost(postId : Text) : async () {
@@ -261,6 +260,9 @@ actor {
       case (?post) {
         post.likes.add(caller);
         posts.add(postId, post);
+        if (post.author != caller) {
+          let _ = pushNotification(post.author, "like", "Someone liked your post", postId);
+        };
       };
     };
   };
@@ -296,18 +298,20 @@ actor {
       case (?post) {
         post.comments.add(id);
         posts.add(postId, post);
+        if (post.author != caller) {
+          let _ = pushNotification(post.author, "comment", "Someone commented on your post", postId);
+        };
       };
     };
     id;
   };
 
   public query ({ caller }) func getCommentsForPost(postId : Text) : async [Types.Comment] {
-    comments.values().toList<Types.Comment>().filter(
+    comments.values().toArray().filter(
       func(c) { c.postId == postId }
-    ).toArray();
+    );
   };
 
-  // New deletePost function
   public shared ({ caller }) func deletePost(postId : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can delete posts");
@@ -315,14 +319,16 @@ actor {
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?post) {
-        if (post.author != caller) { Runtime.trap("You do not own this post") };
+        if (post.author != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this post");
+        };
         posts.remove(postId);
       };
     };
   };
 
   // -----------------------------------
-  // USER PROFILES (Required Interface)
+  // USER PROFILES
   // -----------------------------------
   public shared ({ caller }) func saveCallerUserProfile(profile : Types.Profile) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -339,13 +345,10 @@ actor {
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?Types.Profile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
+    // Public function - anyone can view any user's profile
     profiles.get(user);
   };
 
-  // Legacy profile functions (kept for backward compatibility)
   public shared ({ caller }) func updateProfile(displayName : Text, bio : Text, avatarUrl : Text, location : Text, bannerUrl : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update profiles");
@@ -368,6 +371,7 @@ actor {
   };
 
   public query ({ caller }) func getProfile(user : Principal) : async ?Types.Profile {
+    // Public function - anyone can view any user's profile
     profiles.get(user);
   };
 
@@ -398,17 +402,16 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view their garage");
     };
-    let allCars = cars.values().toList<Types.Car>();
-    allCars.filter(
+    cars.values().toArray().filter(
       func(c) { c.owner == caller }
-    ).toArray();
+    );
   };
 
   public query ({ caller }) func getGarageByUser(user : Principal) : async [Types.Car] {
-    let allCars = cars.values().toList<Types.Car>();
-    allCars.filter(
+    // Public function - anyone can view any user's garage
+    cars.values().toArray().filter(
       func(c) { c.owner == user }
-    ).toArray();
+    );
   };
 
   public shared ({ caller }) func removeCar(carId : Text) : async () {
@@ -418,7 +421,9 @@ actor {
     switch (cars.get(carId)) {
       case (null) { Runtime.trap("Car not found") };
       case (?car) {
-        if (car.owner != caller) { Runtime.trap("You do not own this car") };
+        if (car.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this car");
+        };
         cars.remove(carId);
       };
     };
@@ -513,10 +518,9 @@ actor {
   };
 
   public query ({ caller }) func listAllListings() : async [Types.Listing] {
-    let allListings = listings.values().toList<Types.Listing>();
-    allListings.filter(
+    listings.values().toArray().filter(
       func(l) { not l.isSold }
-    ).toArray();
+    );
   };
 
   public shared ({ caller }) func markListingSold(listingId : Text) : async () {
@@ -526,7 +530,9 @@ actor {
     switch (listings.get(listingId)) {
       case (null) { Runtime.trap("Listing not found") };
       case (?listing) {
-        if (listing.seller != caller) { Runtime.trap("You do not own this listing") };
+        if (listing.seller != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this listing");
+        };
         let updatedListing : Types.Listing = { listing with isSold = true };
         listings.add(listingId, updatedListing);
       };
@@ -540,7 +546,9 @@ actor {
     switch (listings.get(listingId)) {
       case (null) { Runtime.trap("Listing not found") };
       case (?listing) {
-        if (listing.seller != caller) { Runtime.trap("You do not own this listing") };
+        if (listing.seller != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this listing");
+        };
         listings.remove(listingId);
       };
     };
@@ -615,6 +623,9 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can follow others");
     };
+    if (caller == user) {
+      Runtime.trap("Cannot follow yourself");
+    };
     let followingList = switch (follows.get(caller)) {
       case (null) {
         let set = Set.empty<Principal>();
@@ -634,6 +645,8 @@ actor {
       case (?existing) { existing };
     };
     followersList.add(caller);
+
+    let _ = pushNotification(user, "follow", "Someone started following you", caller.toText());
   };
 
   public shared ({ caller }) func unfollowUser(user : Principal) : async () {
@@ -641,14 +654,14 @@ actor {
       Runtime.trap("Unauthorized: Only users can unfollow others");
     };
     switch (follows.get(caller)) {
-      case (null) { Runtime.trap("You are not following anyone") };
+      case (null) { /* No-op: not following anyone */ };
       case (?followingList) {
         followingList.remove(user);
       };
     };
 
     switch (followers.get(user)) {
-      case (null) { Runtime.trap("User has no followers") };
+      case (null) { /* No-op: user has no followers */ };
       case (?followersList) {
         followersList.remove(caller);
       };
@@ -700,14 +713,35 @@ actor {
     id;
   };
 
+  public shared ({ caller }) func sendNotificationToUser(targetUser : Principal, notifType : Text, message : Text, relatedId : Text) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can send notifications");
+    };
+    pushNotification(targetUser, notifType, message, relatedId);
+  };
+
+  func pushNotification(targetUser : Principal, notifType : Text, message : Text, relatedId : Text) : Text {
+    let id = generateId("NOTIF");
+    let notification : Types.Notification = {
+      id;
+      user = targetUser;
+      notifType;
+      message;
+      relatedId;
+      isRead = false;
+      timestamp = Time.now();
+    };
+    notifications.add(id, notification);
+    id;
+  };
+
   public query ({ caller }) func listMyNotifications() : async [Types.Notification] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view notifications");
     };
-    let userNotifs = notifications.values().toList<Types.Notification>().filter(
+    notifications.values().toArray().filter(
       func(n) { n.user == caller }
     );
-    userNotifs.toArray();
   };
 
   public shared ({ caller }) func markNotificationRead(notificationId : Text) : async () {
@@ -717,7 +751,9 @@ actor {
     switch (notifications.get(notificationId)) {
       case (null) { Runtime.trap("Notification not found") };
       case (?notification) {
-        if (notification.user != caller) { Runtime.trap("You do not own this notification") };
+        if (notification.user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this notification");
+        };
         let updatedNotification : Types.Notification = { notification with isRead = true };
         notifications.add(notificationId, updatedNotification);
       };
@@ -741,6 +777,7 @@ actor {
       timestamp = Time.now();
     };
     messages.add(id, message);
+    let _ = pushNotification(receiver, "message", "You have a new message", id);
     id;
   };
 
@@ -763,11 +800,10 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view messages");
     };
-    messages.values().toList<Types.Message>().filter(
+    messages.values().toArray().filter(
       func(m) {
         (m.sender == caller and m.receiver == user) or (m.sender == user and m.receiver == caller)
       }
-    ).toArray();
+    );
   };
 };
-

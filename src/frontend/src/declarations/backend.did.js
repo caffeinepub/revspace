@@ -235,6 +235,11 @@ export const idlService = IDL.Service({
   'rsvpEvent' : IDL.Func([IDL.Text], [], []),
   'saveCallerUserProfile' : IDL.Func([Profile], [], []),
   'sendMessage' : IDL.Func([IDL.Principal, IDL.Text], [IDL.Text], []),
+  'sendNotificationToUser' : IDL.Func(
+      [IDL.Principal, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Text],
+      [],
+    ),
   'unfollowUser' : IDL.Func([IDL.Principal], [], []),
   'unlikePost' : IDL.Func([IDL.Text], [], []),
   'unrsvpEvent' : IDL.Func([IDL.Text], [], []),
@@ -483,6 +488,11 @@ export const idlFactory = ({ IDL }) => {
     'rsvpEvent' : IDL.Func([IDL.Text], [], []),
     'saveCallerUserProfile' : IDL.Func([Profile], [], []),
     'sendMessage' : IDL.Func([IDL.Principal, IDL.Text], [IDL.Text], []),
+    'sendNotificationToUser' : IDL.Func(
+        [IDL.Principal, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
     'unfollowUser' : IDL.Func([IDL.Principal], [], []),
     'unlikePost' : IDL.Func([IDL.Text], [], []),
     'unrsvpEvent' : IDL.Func([IDL.Text], [], []),

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Trophy } from "lucide-react";
-import { useGetAllPosts } from "../hooks/useQueries";
+import { Link } from "@tanstack/react-router";
+import { Principal } from "@icp-sdk/core/principal";
+import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
 import { truncatePrincipal } from "../utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type SortMode = "posts" | "likes";
 
@@ -38,6 +41,112 @@ const MEDAL_COLORS = [
   { bg: "oklch(0.75 0.05 240)", text: "oklch(0.15 0.02 240)", label: "Silver" },
   { bg: "oklch(0.65 0.12 45)", text: "oklch(0.15 0.04 45)", label: "Bronze" },
 ];
+
+interface LeaderRowUserInfoProps {
+  entry: LeaderEntry;
+  rank: number;
+  sortMode: SortMode;
+  maxValue: number;
+}
+
+function LeaderRowUserInfo({ entry, rank, sortMode, maxValue }: LeaderRowUserInfoProps) {
+  const principal = (() => {
+    try { return Principal.fromText(entry.principal); } catch { return undefined; }
+  })();
+  const { data: profile, isLoading } = useGetProfile(principal);
+
+  const displayName = profile?.displayName ?? truncatePrincipal(entry.principal);
+  const avatarUrl = profile?.avatarUrl ?? "";
+  const value = sortMode === "posts" ? entry.postCount : entry.likeCount;
+  const barWidth = maxValue > 0 ? Math.max(4, Math.round((value / maxValue) * 100)) : 4;
+  const isTop3 = rank <= 3;
+
+  return (
+    <div
+      className="relative flex items-center gap-3 p-3 rounded-xl overflow-hidden transition-all"
+      style={{
+        background: "oklch(var(--surface))",
+        border: isTop3
+          ? `1px solid ${MEDAL_COLORS[rank - 1].bg}`
+          : "1px solid oklch(var(--border))",
+        boxShadow: isTop3
+          ? `0 0 12px ${MEDAL_COLORS[rank - 1].bg}30`
+          : "none",
+      }}
+    >
+      {/* Progress bar background */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          width: `${barWidth}%`,
+          background: isTop3
+            ? `${MEDAL_COLORS[rank - 1].bg}18`
+            : "oklch(var(--orange) / 0.06)",
+          transition: "width 0.5s ease",
+        }}
+      />
+
+      {/* Rank */}
+      <RankBadge rank={rank} />
+
+      {/* User info — clickable link */}
+      <Link
+        to="/profile/$userId"
+        params={{ userId: entry.principal }}
+        className="flex-1 min-w-0 relative flex items-center gap-2 group"
+      >
+        {isLoading ? (
+          <>
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1">
+              <Skeleton className="h-3 w-28 rounded" />
+              <Skeleton className="h-2 w-20 rounded" />
+            </div>
+          </>
+        ) : (
+          <>
+            <Avatar className="w-8 h-8 shrink-0">
+              {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+              <AvatarFallback className="text-[10px]" style={{ background: "oklch(var(--surface-elevated))" }}>
+                {displayName.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate group-hover:underline underline-offset-2">
+                {displayName}
+              </p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
+                  {entry.postCount} {entry.postCount === 1 ? "post" : "posts"}
+                </span>
+                <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
+                  ♥ {entry.likeCount} {entry.likeCount === 1 ? "like" : "likes"}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+      </Link>
+
+      {/* Score */}
+      <div className="text-right relative shrink-0">
+        <p
+          className="text-lg font-black font-display"
+          style={{
+            color: isTop3
+              ? MEDAL_COLORS[rank - 1].bg
+              : "oklch(var(--orange-bright))",
+          }}
+        >
+          {value}
+        </p>
+        <p className="text-[10px]" style={{ color: "oklch(var(--steel))" }}>
+          {sortMode === "posts" ? "posts" : "likes"}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank <= 3) {
@@ -150,71 +259,14 @@ export function LeaderboardPage() {
         ) : (
           sorted.map((entry, idx) => {
             const rank = idx + 1;
-            const value = sortMode === "posts" ? entry.postCount : entry.likeCount;
-            const barWidth = maxValue > 0 ? Math.max(4, Math.round((value / maxValue) * 100)) : 4;
-            const isTop3 = rank <= 3;
-
             return (
-              <div
+              <LeaderRowUserInfo
                 key={entry.principal}
-                className="relative flex items-center gap-3 p-3 rounded-xl overflow-hidden transition-all"
-                style={{
-                  background: isTop3 ? "oklch(var(--surface))" : "oklch(var(--surface))",
-                  border: isTop3
-                    ? `1px solid ${MEDAL_COLORS[rank - 1].bg}`
-                    : "1px solid oklch(var(--border))",
-                  boxShadow: isTop3
-                    ? `0 0 12px ${MEDAL_COLORS[rank - 1].bg}30`
-                    : "none",
-                }}
-              >
-                {/* Progress bar background */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    width: `${barWidth}%`,
-                    background: isTop3
-                      ? `${MEDAL_COLORS[rank - 1].bg}18`
-                      : "oklch(var(--orange) / 0.06)",
-                    transition: "width 0.5s ease",
-                  }}
-                />
-
-                {/* Rank */}
-                <RankBadge rank={rank} />
-
-                {/* User info */}
-                <div className="flex-1 min-w-0 relative">
-                  <p className="text-sm font-semibold text-foreground font-mono truncate">
-                    {truncatePrincipal(entry.principal)}
-                  </p>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
-                      {entry.postCount} {entry.postCount === 1 ? "post" : "posts"}
-                    </span>
-                    <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
-                      ♥ {entry.likeCount} {entry.likeCount === 1 ? "like" : "likes"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Score */}
-                <div className="text-right relative shrink-0">
-                  <p
-                    className="text-lg font-black font-display"
-                    style={{
-                      color: isTop3
-                        ? MEDAL_COLORS[rank - 1].bg
-                        : "oklch(var(--orange-bright))",
-                    }}
-                  >
-                    {value}
-                  </p>
-                  <p className="text-[10px]" style={{ color: "oklch(var(--steel))" }}>
-                    {sortMode === "posts" ? "posts" : "likes"}
-                  </p>
-                </div>
-              </div>
+                entry={entry}
+                rank={rank}
+                sortMode={sortMode}
+                maxValue={maxValue}
+              />
             );
           })
         )}

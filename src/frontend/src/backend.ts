@@ -239,6 +239,7 @@ export interface backendInterface {
     rsvpEvent(eventId: string): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     sendMessage(receiver: Principal, content: string): Promise<string>;
+    sendNotificationToUser(targetUser: Principal, notifType: string, message: string, relatedId: string): Promise<string>;
     unfollowUser(user: Principal): Promise<void>;
     unlikePost(postId: string): Promise<void>;
     unrsvpEvent(eventId: string): Promise<void>;
@@ -930,6 +931,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.sendMessage(arg0, arg1);
+            return result;
+        }
+    }
+    async sendNotificationToUser(arg0: Principal, arg1: string, arg2: string, arg3: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.sendNotificationToUser(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.sendNotificationToUser(arg0, arg1, arg2, arg3);
             return result;
         }
     }

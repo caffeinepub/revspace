@@ -555,6 +555,16 @@ export function useMarkNotificationRead() {
   });
 }
 
+export function useSendNotificationToUser() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({ targetUser, notifType, message, relatedId }: { targetUser: Principal; notifType: string; message: string; relatedId: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.sendNotificationToUser(targetUser, notifType, message, relatedId);
+    },
+  });
+}
+
 // ========================
 // Messages
 // ========================

@@ -1,30 +1,38 @@
 # RevSpace
 
 ## Current State
-- Reels page shows all posts with video/image media; no delete functionality exists for posts
-- Marketplace page has a delete button in the listing detail modal, but it does not work reliably (backend `deleteListing` exists and is wired, but error handling/state management may silently fail)
-- Backend has `deleteListing` but no `deletePost` function
+- Reels are uploaded as video files via the blob-storage system (StorageClient).
+- The ReelsPage renders videos using an HTML `<video>` element with `autoPlay`, `muted`, and `loop` -- sound is permanently muted with no toggle.
+- The CreatePostPage has no file size or duration limits enforced in the UI; it accepts any `video/*` file.
+- Videos display full-screen in a snap-scroll layout.
+- The backend stores post data (mediaUrls as strings) -- no duration metadata is persisted, only URLs.
+- Scalability is handled by the ICP platform and Caffeine blob-storage infrastructure natively.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `deletePost` function in Motoko backend (only the post author can delete their own post)
-- `useDeletePost` hook in `useQueries.ts`
-- Delete button in ReelsPage for the signed-in user's own reels (shown as a trash icon in the action buttons column)
+- Sound toggle button on each reel (mute/unmute, defaulting to muted on first view).
+- Video progress bar at the bottom of each reel showing playback position.
+- File size guidance in CreatePostPage for Reel type (e.g., "Up to ~500MB recommended for 10-minute videos").
+- A "10 min max" label in the Reel upload UI.
+- Duration validation warning in CreatePostPage: if the selected video's duration exceeds 600 seconds (10 min), show a warning toast but still allow upload (server handles limits).
 
 ### Modify
-- Marketplace `ListingDetailModal`: improve the delete flow with better error messaging, ensure the delete button is only shown when the user is the listing owner, and the mutation errors are surfaced correctly
+- ReelsPage: Remove `muted` attribute from the video element; replace with a controlled `muted` state toggled by a new sound button.
+- ReelsPage: Add a sound icon button (Volume2 / VolumeX) to the right-side action panel.
+- ReelsPage: Add a thin progress bar at the very bottom of each reel card that updates as the video plays.
+- CreatePostPage: Add duration check after file selection for Reel post type.
 
 ### Remove
-- Nothing removed
+- Nothing removed.
 
 ## Implementation Plan
-1. Add `deletePost` to `main.mo` — checks caller is post author, removes from `posts` map
-2. Regenerate `backend.d.ts` to include `deletePost(postId: string): Promise<void>`
-3. Add `useDeletePost` mutation hook to `useQueries.ts`
-4. In `ReelsPage.tsx`, add a trash icon button in the right-action column, visible only when `post.author.toString() === myPrincipal`; on click, confirm and call `deletePost`, then invalidate posts query
-5. In `MarketplacePage.tsx`, add `onError` toast for delete mutation so failures are visible to the user
-
-## UX Notes
-- Delete on reels: show a small trash icon button in the right action stack; confirm with a simple inline state (no modal needed, just a tap-to-confirm approach)
-- Marketplace: the delete already works in code, so the fix is ensuring error states are surfaced and the modal closes correctly on success
+1. Update `ReelsPage.tsx`:
+   - Add `videoRef` per reel (use a Map or individual refs with a key-based approach).
+   - Use a single global `isMuted` state (all reels start muted, user toggles globally, consistent with TikTok/Instagram UX).
+   - Replace hardcoded `muted` prop with the `isMuted` state.
+   - Add Volume2/VolumeX icon button to each reel's action panel.
+   - Add an `<input type="range">` or a div-based progress bar synced to `timeupdate` events using `onTimeUpdate` handler.
+2. Update `CreatePostPage.tsx`:
+   - After file selection, if postType === "Reel", read `videoElement.duration` and warn if > 600s.
+   - Update the helper text to mention "Up to 10 minutes".

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Play } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PostView } from "../backend.d";
@@ -76,7 +77,7 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     <article className="post-card animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+        <Link to="/profile/$userId" params={{ userId: authorKey }} className="flex items-center gap-3 group">
           <Avatar className="w-9 h-9">
             {profileLoading ? (
               <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
@@ -96,13 +97,13 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
               {profileLoading ? (
                 <Skeleton className="w-24 h-3" />
               ) : (
-                <span className="text-sm font-semibold text-foreground">{displayName}</span>
+                <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">{displayName}</span>
               )}
               <PostTypeBadge type={post.postType} />
             </div>
             <span className="text-xs text-steel">{timeAgo(post.timestamp)}</span>
           </div>
-        </div>
+        </Link>
         <button type="button" className="text-steel hover:text-foreground transition-colors p-1">
           <MoreHorizontal size={18} />
         </button>

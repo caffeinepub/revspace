@@ -5,61 +5,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMyNotifications, useMarkNotificationRead } from "../hooks/useQueries";
 import { timeAgo } from "../utils/format";
 import { toast } from "sonner";
-import type { Notification } from "../backend.d";
-
-const DEMO_NOTIFICATIONS: Notification[] = [
-  {
-    id: "n1",
-    notifType: "like",
-    message: "Alex Reyes liked your post",
-    isRead: false,
-    timestamp: BigInt(Date.now() - 5 * 60 * 1000) * BigInt(1_000_000),
-    relatedId: "post-1",
-    user: { toString: () => "user-1" } as unknown as import("@icp-sdk/core/principal").Principal,
-  },
-  {
-    id: "n2",
-    notifType: "comment",
-    message: "Jordan Kim commented: \"Absolutely insane build! What's the HP?\"",
-    isRead: false,
-    timestamp: BigInt(Date.now() - 20 * 60 * 1000) * BigInt(1_000_000),
-    relatedId: "post-1",
-    user: { toString: () => "user-2" } as unknown as import("@icp-sdk/core/principal").Principal,
-  },
-  {
-    id: "n3",
-    notifType: "follow",
-    message: "Sam Torres started following you",
-    isRead: false,
-    timestamp: BigInt(Date.now() - 2 * 60 * 60 * 1000) * BigInt(1_000_000),
-    relatedId: "user-3",
-    user: { toString: () => "user-3" } as unknown as import("@icp-sdk/core/principal").Principal,
-  },
-  {
-    id: "n4",
-    notifType: "event",
-    message: "New event near you: SoCal Cars & Coffee — March Edition",
-    isRead: true,
-    timestamp: BigInt(Date.now() - 5 * 60 * 60 * 1000) * BigInt(1_000_000),
-    relatedId: "event-1",
-    user: { toString: () => "user-1" } as unknown as import("@icp-sdk/core/principal").Principal,
-  },
-  {
-    id: "n5",
-    notifType: "like",
-    message: "Maya Chen and 4 others liked your post",
-    isRead: true,
-    timestamp: BigInt(Date.now() - 12 * 60 * 60 * 1000) * BigInt(1_000_000),
-    relatedId: "post-2",
-    user: { toString: () => "user-4" } as unknown as import("@icp-sdk/core/principal").Principal,
-  },
-];
 
 const NOTIF_ICONS: Record<string, ReactElement> = {
   like: <Heart size={16} style={{ color: "oklch(0.75 0.18 27)" }} fill="oklch(0.75 0.18 27)" />,
   comment: <MessageCircle size={16} style={{ color: "oklch(0.65 0.18 240)" }} />,
   follow: <UserPlus size={16} style={{ color: "oklch(0.65 0.2 40)" }} />,
   event: <Calendar size={16} style={{ color: "oklch(0.65 0.18 150)" }} />,
+  message: <MessageCircle size={16} style={{ color: "oklch(0.6 0.18 220)" }} />,
 };
 
 const NOTIF_BG: Record<string, string> = {
@@ -67,13 +19,14 @@ const NOTIF_BG: Record<string, string> = {
   comment: "oklch(0.5 0.18 240 / 0.15)",
   follow: "oklch(var(--orange) / 0.15)",
   event: "oklch(0.55 0.18 150 / 0.15)",
+  message: "oklch(0.5 0.18 220 / 0.15)",
 };
 
 export function NotificationsPage() {
   const { data: notifications, isLoading } = useMyNotifications();
   const markRead = useMarkNotificationRead();
 
-  const displayNotifs = notifications && notifications.length > 0 ? notifications : DEMO_NOTIFICATIONS;
+  const displayNotifs = notifications ?? [];
   const unreadCount = displayNotifs.filter((n) => !n.isRead).length;
 
   const handleMarkAllRead = () => {

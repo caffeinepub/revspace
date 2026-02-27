@@ -176,6 +176,10 @@ export interface _SERVICE {
   'rsvpEvent' : ActorMethod<[string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[Profile], undefined>,
   'sendMessage' : ActorMethod<[Principal, string], string>,
+  'sendNotificationToUser' : ActorMethod<
+    [Principal, string, string, string],
+    string
+  >,
   'unfollowUser' : ActorMethod<[Principal], undefined>,
   'unlikePost' : ActorMethod<[string], undefined>,
   'unrsvpEvent' : ActorMethod<[string], undefined>,
