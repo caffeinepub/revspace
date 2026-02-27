@@ -1,21 +1,27 @@
 // Demo seed data for display when backend returns empty results
-import type { PostView, Car, EventView, Listing, ClubView } from "../backend.d";
+import type { Car, ClubView, EventView, Listing, PostView } from "../backend.d";
 
 // Helper to create a fake Principal-like object for demo
-const fakePrincipal = (seed: string) => ({
-  toString: () => seed,
-  toText: () => seed,
-  isAnonymous: () => false,
-} as unknown as import("@icp-sdk/core/principal").Principal);
+const fakePrincipal = (seed: string) =>
+  ({
+    toString: () => seed,
+    toText: () => seed,
+    isAnonymous: () => false,
+  }) as unknown as import("@icp-sdk/core/principal").Principal;
 
 export const DEMO_POSTS: PostView[] = [
   {
     id: "post-1",
     postType: "Photo",
     topic: "",
-    content: "Just dropped the new aero kit on the STI 🔥 Track day ready. She's been sitting for 3 weeks while I ran the cage and now she finally gets to breathe.",
+    content:
+      "Just dropped the new aero kit on the STI 🔥 Track day ready. She's been sitting for 3 weeks while I ran the cage and now she finally gets to breathe.",
     author: fakePrincipal("user-1"),
-    likes: [fakePrincipal("user-2"), fakePrincipal("user-3"), fakePrincipal("user-4")],
+    likes: [
+      fakePrincipal("user-2"),
+      fakePrincipal("user-3"),
+      fakePrincipal("user-4"),
+    ],
     timestamp: BigInt(Date.now() - 2 * 60 * 60 * 1000) * BigInt(1_000_000),
     mediaUrls: ["https://picsum.photos/seed/car1/800/600"],
     comments: ["c1", "c2"],
@@ -24,7 +30,8 @@ export const DEMO_POSTS: PostView[] = [
     id: "post-2",
     postType: "Video",
     topic: "Track Day",
-    content: "First pull on the dyno after the E85 tune. 487whp 🥺 Dreams do come true.",
+    content:
+      "First pull on the dyno after the E85 tune. 487whp 🥺 Dreams do come true.",
     author: fakePrincipal("user-2"),
     likes: [fakePrincipal("user-1"), fakePrincipal("user-3")],
     timestamp: BigInt(Date.now() - 5 * 60 * 60 * 1000) * BigInt(1_000_000),
@@ -35,9 +42,16 @@ export const DEMO_POSTS: PostView[] = [
     id: "post-3",
     postType: "Photo",
     topic: "",
-    content: "Sunrise run through the canyons. Nothing hits different than canyon roads at 6am with no traffic. The R35 was singing.",
+    content:
+      "Sunrise run through the canyons. Nothing hits different than canyon roads at 6am with no traffic. The R35 was singing.",
     author: fakePrincipal("user-3"),
-    likes: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-5"), fakePrincipal("user-6"), fakePrincipal("user-7")],
+    likes: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-2"),
+      fakePrincipal("user-5"),
+      fakePrincipal("user-6"),
+      fakePrincipal("user-7"),
+    ],
     timestamp: BigInt(Date.now() - 12 * 60 * 60 * 1000) * BigInt(1_000_000),
     mediaUrls: ["https://picsum.photos/seed/car3/800/600"],
     comments: [],
@@ -46,7 +60,8 @@ export const DEMO_POSTS: PostView[] = [
     id: "post-4",
     postType: "Photo",
     topic: "",
-    content: "Carbon fibre wing installation complete. 3 weeks of waiting was worth it. The stance is unreal now.",
+    content:
+      "Carbon fibre wing installation complete. 3 weeks of waiting was worth it. The stance is unreal now.",
     author: fakePrincipal("user-4"),
     likes: [fakePrincipal("user-1")],
     timestamp: BigInt(Date.now() - 24 * 60 * 60 * 1000) * BigInt(1_000_000),
@@ -57,21 +72,65 @@ export const DEMO_POSTS: PostView[] = [
     id: "post-5",
     postType: "Reel",
     topic: "Stance",
-    content: "Interior restomod vibes 🎶 New alcantara everything. Suede dash, seats, pillars. The OEM+ dream.",
+    content:
+      "Interior restomod vibes 🎶 New alcantara everything. Suede dash, seats, pillars. The OEM+ dream.",
     author: fakePrincipal("user-5"),
-    likes: [fakePrincipal("user-2"), fakePrincipal("user-3"), fakePrincipal("user-6")],
+    likes: [
+      fakePrincipal("user-2"),
+      fakePrincipal("user-3"),
+      fakePrincipal("user-6"),
+    ],
     timestamp: BigInt(Date.now() - 2 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
     mediaUrls: ["https://picsum.photos/seed/car5/800/600"],
     comments: [],
   },
 ];
 
-export const DEMO_PROFILES: Record<string, { displayName: string; avatarUrl: string; bio: string; location: string; bannerUrl: string }> = {
-  "user-1": { displayName: "Alex Reyes", avatarUrl: "https://picsum.photos/seed/avatar1/80/80", bio: "STI owner. Track addict. Coffee runs on 93 octane.", location: "Los Angeles, CA", bannerUrl: "https://picsum.photos/seed/banner1/1200/400" },
-  "user-2": { displayName: "Jordan Kim", avatarUrl: "https://picsum.photos/seed/avatar2/80/80", bio: "EVO IX | Dyno queen 🔧", location: "Seattle, WA", bannerUrl: "https://picsum.photos/seed/banner2/1200/400" },
-  "user-3": { displayName: "Sam Torres", avatarUrl: "https://picsum.photos/seed/avatar3/80/80", bio: "R35 GTR build. NPC by day, racer by night.", location: "Dallas, TX", bannerUrl: "https://picsum.photos/seed/banner3/1200/400" },
-  "user-4": { displayName: "Maya Chen", avatarUrl: "https://picsum.photos/seed/avatar4/80/80", bio: "FD chassis collector | Always building something", location: "Phoenix, AZ", bannerUrl: "https://picsum.photos/seed/banner4/1200/400" },
-  "user-5": { displayName: "Chris Park", avatarUrl: "https://picsum.photos/seed/avatar5/80/80", bio: "Interior fabricator | Alcantara wizard", location: "Miami, FL", bannerUrl: "https://picsum.photos/seed/banner5/1200/400" },
+export const DEMO_PROFILES: Record<
+  string,
+  {
+    displayName: string;
+    avatarUrl: string;
+    bio: string;
+    location: string;
+    bannerUrl: string;
+  }
+> = {
+  "user-1": {
+    displayName: "Alex Reyes",
+    avatarUrl: "https://picsum.photos/seed/avatar1/80/80",
+    bio: "STI owner. Track addict. Coffee runs on 93 octane.",
+    location: "Los Angeles, CA",
+    bannerUrl: "https://picsum.photos/seed/banner1/1200/400",
+  },
+  "user-2": {
+    displayName: "Jordan Kim",
+    avatarUrl: "https://picsum.photos/seed/avatar2/80/80",
+    bio: "EVO IX | Dyno queen 🔧",
+    location: "Seattle, WA",
+    bannerUrl: "https://picsum.photos/seed/banner2/1200/400",
+  },
+  "user-3": {
+    displayName: "Sam Torres",
+    avatarUrl: "https://picsum.photos/seed/avatar3/80/80",
+    bio: "R35 GTR build. NPC by day, racer by night.",
+    location: "Dallas, TX",
+    bannerUrl: "https://picsum.photos/seed/banner3/1200/400",
+  },
+  "user-4": {
+    displayName: "Maya Chen",
+    avatarUrl: "https://picsum.photos/seed/avatar4/80/80",
+    bio: "FD chassis collector | Always building something",
+    location: "Phoenix, AZ",
+    bannerUrl: "https://picsum.photos/seed/banner4/1200/400",
+  },
+  "user-5": {
+    displayName: "Chris Park",
+    avatarUrl: "https://picsum.photos/seed/avatar5/80/80",
+    bio: "Interior fabricator | Alcantara wizard",
+    location: "Miami, FL",
+    bannerUrl: "https://picsum.photos/seed/banner5/1200/400",
+  },
 };
 
 export const DEMO_CARS: Car[] = [
@@ -81,8 +140,16 @@ export const DEMO_CARS: Car[] = [
     model: "WRX STI",
     year: "2006",
     color: "World Rally Blue",
-    description: "Full built motor, E85, cage, suspension overhaul. Track-only build.",
-    modifications: ["Full cage", "Wiseco pistons", "ACL bearings", "Injector Dynamics ID1050X", "PERRIN suspension", "Öhlins coilovers"],
+    description:
+      "Full built motor, E85, cage, suspension overhaul. Track-only build.",
+    modifications: [
+      "Full cage",
+      "Wiseco pistons",
+      "ACL bearings",
+      "Injector Dynamics ID1050X",
+      "PERRIN suspension",
+      "Öhlins coilovers",
+    ],
     imageUrls: ["https://picsum.photos/seed/garage1/600/400"],
     owner: fakePrincipal("user-1"),
   },
@@ -93,7 +160,12 @@ export const DEMO_CARS: Car[] = [
     year: "2006",
     color: "Rally Red",
     description: "High-power built EVO. Street/strip combo.",
-    modifications: ["Evo X head", "Precision 6262", "Flex fuel kit", "6-speed sequential"],
+    modifications: [
+      "Evo X head",
+      "Precision 6262",
+      "Flex fuel kit",
+      "6-speed sequential",
+    ],
     imageUrls: ["https://picsum.photos/seed/garage2/600/400"],
     owner: fakePrincipal("user-2"),
   },
@@ -104,7 +176,12 @@ export const DEMO_CARS: Car[] = [
     year: "2012",
     color: "Pearl White",
     description: "Alpha 10 build. AMS stage 3 trans.",
-    modifications: ["AMS Alpha 10 turbo kit", "R35 stage 3 trans", "Carbonetics clutch", "HKS GT1000+"],
+    modifications: [
+      "AMS Alpha 10 turbo kit",
+      "R35 stage 3 trans",
+      "Carbonetics clutch",
+      "HKS GT1000+",
+    ],
     imageUrls: ["https://picsum.photos/seed/garage3/600/400"],
     owner: fakePrincipal("user-3"),
   },
@@ -115,7 +192,12 @@ export const DEMO_CARS: Car[] = [
     year: "1993",
     color: "Vintage Red",
     description: "Bridgeport 13B-T with sequential. Street legal rocket ship.",
-    modifications: ["13B bridgeport", "T88 sequential", "Haltech ECU", "Custom chassis"],
+    modifications: [
+      "13B bridgeport",
+      "T88 sequential",
+      "Haltech ECU",
+      "Custom chassis",
+    ],
     imageUrls: ["https://picsum.photos/seed/garage4/600/400"],
     owner: fakePrincipal("user-4"),
   },
@@ -125,22 +207,29 @@ export const DEMO_EVENTS: EventView[] = [
   {
     id: "event-1",
     title: "SoCal Cars & Coffee — March Edition",
-    description: "Monthly morning meetup at the Porsche Experience Center lot. All makes welcome, JDM heavy as always. Bring your builds, no revving in the lot.",
+    description:
+      "Monthly morning meetup at the Porsche Experience Center lot. All makes welcome, JDM heavy as always. Bring your builds, no revving in the lot.",
     location: "Porsche Experience Center, Carson, CA",
     eventDate: BigInt(Date.now() + 7 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
     coverImageUrl: "https://picsum.photos/seed/event1/800/400",
     category: "Meetup",
     maxAttendees: BigInt(500),
-    attendees: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-3")],
+    attendees: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-2"),
+      fakePrincipal("user-3"),
+    ],
     creator: fakePrincipal("user-1"),
     photos: [],
   },
   {
     id: "event-2",
     title: "Time Attack — Buttonwillow Round 3",
-    description: "Open track time attack. Novice/Intermediate/Expert runs. Tech inspection opens at 6am. Gates at 5:30.",
+    description:
+      "Open track time attack. Novice/Intermediate/Expert runs. Tech inspection opens at 6am. Gates at 5:30.",
     location: "Buttonwillow Raceway, Buttonwillow, CA",
-    eventDate: BigInt(Date.now() + 14 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
+    eventDate:
+      BigInt(Date.now() + 14 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
     coverImageUrl: "https://picsum.photos/seed/event2/800/400",
     category: "Track",
     maxAttendees: BigInt(80),
@@ -151,20 +240,27 @@ export const DEMO_EVENTS: EventView[] = [
   {
     id: "event-3",
     title: "JDM Legends Showcase 2026",
-    description: "The biggest JDM car show on the West Coast. Hundreds of builds, vendor alley, and live fabrication demos. Judges' Choice awards.",
+    description:
+      "The biggest JDM car show on the West Coast. Hundreds of builds, vendor alley, and live fabrication demos. Judges' Choice awards.",
     location: "Del Mar Fairgrounds, Del Mar, CA",
-    eventDate: BigInt(Date.now() + 21 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
+    eventDate:
+      BigInt(Date.now() + 21 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
     coverImageUrl: "https://picsum.photos/seed/event3/800/400",
     category: "Show",
     maxAttendees: BigInt(2000),
-    attendees: [fakePrincipal("user-1"), fakePrincipal("user-4"), fakePrincipal("user-5")],
+    attendees: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-4"),
+      fakePrincipal("user-5"),
+    ],
     creator: fakePrincipal("user-3"),
     photos: [],
   },
   {
     id: "event-4",
     title: "Mountain Pass Cruise — Big Bear",
-    description: "30-car convoy cruise up to Big Bear Lake. Meet at the Shell in Redlands, coffee stop at the top. All cars welcome.",
+    description:
+      "30-car convoy cruise up to Big Bear Lake. Meet at the Shell in Redlands, coffee stop at the top. All cars welcome.",
     location: "Redlands, CA → Big Bear Lake, CA",
     eventDate: BigInt(Date.now() + 3 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
     coverImageUrl: "https://picsum.photos/seed/event4/800/400",
@@ -180,7 +276,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-1",
     title: "2002 Subaru WRX Wagon — 5-speed swap done",
-    description: "Hawkeye WRX with a clean 5-speed swap, TMIC, BC coilovers, 3-port boost solenoid. 120k miles, clean title.",
+    description:
+      "Hawkeye WRX with a clean 5-speed swap, TMIC, BC coilovers, 3-port boost solenoid. 120k miles, clean title.",
     price: BigInt(12500),
     category: "Cars",
     condition: "Good",
@@ -192,7 +289,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-2",
     title: "Tomei Expreme Ti Catback — EVO 8/9",
-    description: "Used for one season. Minor tip discoloration, sounds amazing. Selling because I went full straight pipe.",
+    description:
+      "Used for one season. Minor tip discoloration, sounds amazing. Selling because I went full straight pipe.",
     price: BigInt(850),
     category: "Parts",
     condition: "Good",
@@ -204,7 +302,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-3",
     title: "Bride Zeta III Bucket Seat — Black/Red",
-    description: "Genuine Bride. Some wear on the bolster, everything structurally perfect. Original certification card included.",
+    description:
+      "Genuine Bride. Some wear on the bolster, everything structurally perfect. Original certification card included.",
     price: BigInt(1200),
     category: "Accessories",
     condition: "Fair",
@@ -216,7 +315,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-4",
     title: "2009 Nissan 370Z — Track prepared",
-    description: "370Z Nismo with roll bar, Stoptech brakes, BC coilovers, Nismo intake. No AC. Ready for HPDE.",
+    description:
+      "370Z Nismo with roll bar, Stoptech brakes, BC coilovers, Nismo intake. No AC. Ready for HPDE.",
     price: BigInt(18000),
     category: "Cars",
     condition: "Good",
@@ -228,7 +328,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-5",
     title: "GReddy Spec-LS Coilovers — Universal 5-bolt",
-    description: "Full set, used 1 season. Adjustable height and damping. Great for street builds.",
+    description:
+      "Full set, used 1 season. Adjustable height and damping. Great for street builds.",
     price: BigInt(650),
     category: "Parts",
     condition: "Good",
@@ -240,7 +341,8 @@ export const DEMO_LISTINGS: Listing[] = [
   {
     id: "listing-6",
     title: "RAYS Volk Racing TE37SL — 18x9.5 +22",
-    description: "Set of 4. Gold colorway. Very minor curb rash on one wheel. No cracks or bends.",
+    description:
+      "Set of 4. Gold colorway. Very minor curb rash on one wheel. No cracks or bends.",
     price: BigInt(2800),
     category: "Parts",
     condition: "Good",
@@ -255,16 +357,23 @@ export const DEMO_CLUBS: ClubView[] = [
   {
     id: "club-1",
     name: "JDM Underground",
-    description: "For the purists. All JDM builds welcome. Track-focused culture, no ricers.",
+    description:
+      "For the purists. All JDM builds welcome. Track-focused culture, no ricers.",
     category: "JDM",
     coverImageUrl: "https://picsum.photos/seed/club1/800/400",
     creator: fakePrincipal("user-1"),
-    members: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-3"), fakePrincipal("user-5")],
+    members: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-2"),
+      fakePrincipal("user-3"),
+      fakePrincipal("user-5"),
+    ],
   },
   {
     id: "club-2",
     name: "All-Motor Society",
-    description: "NA or nothing. Dedicated to naturally aspirated builds and driving purity.",
+    description:
+      "NA or nothing. Dedicated to naturally aspirated builds and driving purity.",
     category: "NA",
     coverImageUrl: "https://picsum.photos/seed/club2/800/400",
     creator: fakePrincipal("user-3"),
@@ -273,20 +382,30 @@ export const DEMO_CLUBS: ClubView[] = [
   {
     id: "club-3",
     name: "Desert Runners",
-    description: "Southwest crew. Canyon runs, desert highways, and weekend track events.",
+    description:
+      "Southwest crew. Canyon runs, desert highways, and weekend track events.",
     category: "Lifestyle",
     coverImageUrl: "https://picsum.photos/seed/club3/800/400",
     creator: fakePrincipal("user-4"),
-    members: [fakePrincipal("user-1"), fakePrincipal("user-4"), fakePrincipal("user-5")],
+    members: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-4"),
+      fakePrincipal("user-5"),
+    ],
   },
   {
     id: "club-4",
     name: "Boost Addicts",
-    description: "Turbo builds only. If you're not boosted, you're in the wrong place.",
+    description:
+      "Turbo builds only. If you're not boosted, you're in the wrong place.",
     category: "Turbocharged",
     coverImageUrl: "https://picsum.photos/seed/club4/800/400",
     creator: fakePrincipal("user-2"),
-    members: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-5")],
+    members: [
+      fakePrincipal("user-1"),
+      fakePrincipal("user-2"),
+      fakePrincipal("user-5"),
+    ],
   },
   {
     id: "club-5",
@@ -300,7 +419,8 @@ export const DEMO_CLUBS: ClubView[] = [
   {
     id: "club-6",
     name: "Stance Nation SoCal",
-    description: "Fitment over function. Showcase builds, static drops, and the art of stance.",
+    description:
+      "Fitment over function. Showcase builds, static drops, and the art of stance.",
     category: "Stance",
     coverImageUrl: "https://picsum.photos/seed/club6/800/400",
     creator: fakePrincipal("user-1"),

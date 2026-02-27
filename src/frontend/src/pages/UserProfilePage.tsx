@@ -1,26 +1,36 @@
-import { useState } from "react";
-import { MapPin, ArrowLeft, Grid3X3, Car, Info, UserPlus, UserCheck, MessageCircle, Loader2 } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Principal } from "@icp-sdk/core/principal";
+import { useNavigate } from "@tanstack/react-router";
 import {
-  useGetProfile,
-  useGetPostsByUser,
+  ArrowLeft,
+  Car,
+  Grid3X3,
+  Info,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { FollowListModal } from "../components/FollowListModal";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useFollowUser,
   useGarageByUser,
   useGetFollowers,
   useGetFollowing,
+  useGetPostsByUser,
+  useGetProfile,
   useIsFollowing,
-  useFollowUser,
   useUnfollowUser,
 } from "../hooks/useQueries";
 import { getInitials, truncatePrincipal } from "../utils/format";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { Principal } from "@icp-sdk/core/principal";
-import { toast } from "sonner";
-import { FollowListModal } from "../components/FollowListModal";
 
 interface UserProfilePageProps {
   userId: string;
@@ -42,17 +52,23 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
 
   const isOwnProfile = myPrincipalStr === userId;
 
-  const { data: profile, isLoading: profileLoading } = useGetProfile(targetPrincipal);
-  const { data: posts, isLoading: postsLoading } = useGetPostsByUser(targetPrincipal);
-  const { data: garage, isLoading: garageLoading } = useGarageByUser(targetPrincipal);
+  const { data: profile, isLoading: profileLoading } =
+    useGetProfile(targetPrincipal);
+  const { data: posts, isLoading: postsLoading } =
+    useGetPostsByUser(targetPrincipal);
+  const { data: garage, isLoading: garageLoading } =
+    useGarageByUser(targetPrincipal);
   const { data: followers } = useGetFollowers(targetPrincipal);
   const { data: following } = useGetFollowing(targetPrincipal);
-  const { data: isFollowing, isLoading: isFollowingLoading } = useIsFollowing(targetPrincipal);
+  const { data: isFollowing, isLoading: isFollowingLoading } =
+    useIsFollowing(targetPrincipal);
 
   const followUser = useFollowUser();
   const unfollowUser = useUnfollowUser();
   const [followPending, setFollowPending] = useState(false);
-  const [followListMode, setFollowListMode] = useState<"followers" | "following" | null>(null);
+  const [followListMode, setFollowListMode] = useState<
+    "followers" | "following" | null
+  >(null);
 
   const displayName = profile?.displayName || truncatePrincipal(userId);
   const avatarUrl = profile?.avatarUrl ?? "";
@@ -161,12 +177,18 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
           ) : (
             <div
               className="w-full h-full"
-              style={{ background: "linear-gradient(135deg, oklch(var(--carbon)) 0%, oklch(var(--surface)) 50%, oklch(var(--orange) / 0.15) 100%)" }}
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(var(--carbon)) 0%, oklch(var(--surface)) 50%, oklch(var(--orange) / 0.15) 100%)",
+              }}
             />
           )}
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, transparent 50%, oklch(var(--background)) 100%)" }}
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent 50%, oklch(var(--background)) 100%)",
+            }}
           />
         </div>
 
@@ -179,7 +201,10 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
             <Avatar className="w-20 h-20">
               <AvatarImage src={avatarUrl} />
               <AvatarFallback
-                style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+                style={{
+                  background: "oklch(var(--orange))",
+                  color: "oklch(var(--carbon))",
+                }}
                 className="text-xl font-bold"
               >
                 {getInitials(displayName)}
@@ -260,7 +285,9 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
             </div>
 
             {bio && (
-              <p className="text-sm text-foreground mt-2 leading-relaxed">{bio}</p>
+              <p className="text-sm text-foreground mt-2 leading-relaxed">
+                {bio}
+              </p>
             )}
 
             {/* Stats */}
@@ -279,7 +306,9 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
                 <p className="font-display text-xl font-bold text-foreground group-hover:text-orange transition-colors">
                   {followers?.length ?? 0}
                 </p>
-                <p className="text-xs text-steel group-hover:text-orange transition-colors">Followers</p>
+                <p className="text-xs text-steel group-hover:text-orange transition-colors">
+                  Followers
+                </p>
               </button>
               <button
                 type="button"
@@ -289,7 +318,9 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
                 <p className="font-display text-xl font-bold text-foreground group-hover:text-orange transition-colors">
                   {following?.length ?? 0}
                 </p>
-                <p className="text-xs text-steel group-hover:text-orange transition-colors">Following</p>
+                <p className="text-xs text-steel group-hover:text-orange transition-colors">
+                  Following
+                </p>
               </button>
             </div>
           </>
@@ -319,7 +350,7 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
         <TabsContent value="posts">
           {postsLoading ? (
             <div className="grid grid-cols-3 gap-1">
-              {(["p1","p2","p3","p4","p5","p6"]).map((k) => (
+              {["p1", "p2", "p3", "p4", "p5", "p6"].map((k) => (
                 <Skeleton key={k} className="aspect-square" />
               ))}
             </div>
@@ -331,15 +362,23 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
               >
                 <Grid3X3 size={24} className="text-steel" />
               </div>
-              <p className="text-foreground font-semibold text-sm">No posts yet</p>
+              <p className="text-foreground font-semibold text-sm">
+                No posts yet
+              </p>
               <p className="text-steel text-xs mt-1">
-                {isOwnProfile ? "Share your first build, car meet, or drive" : "This user hasn't posted anything yet"}
+                {isOwnProfile
+                  ? "Share your first build, car meet, or drive"
+                  : "This user hasn't posted anything yet"}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1">
               {displayPosts.map((post) => (
-                <div key={post.id} className="relative aspect-square overflow-hidden group cursor-pointer" style={{ borderRadius: "4px" }}>
+                <div
+                  key={post.id}
+                  className="relative aspect-square overflow-hidden group cursor-pointer"
+                  style={{ borderRadius: "4px" }}
+                >
                   {post.mediaUrls[0] ? (
                     post.postType === "Video" || post.postType === "Reel" ? (
                       <video
@@ -362,14 +401,18 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
                       className="w-full h-full flex items-center justify-center p-2"
                       style={{ background: "oklch(var(--surface))" }}
                     >
-                      <p className="text-xs text-steel text-center line-clamp-3">{post.content}</p>
+                      <p className="text-xs text-steel text-center line-clamp-3">
+                        {post.content}
+                      </p>
                     </div>
                   )}
                   <div
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     style={{ background: "oklch(0 0 0 / 0.5)" }}
                   >
-                    <span className="text-white text-xs">♥ {post.likes.length}</span>
+                    <span className="text-white text-xs">
+                      ♥ {post.likes.length}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -380,7 +423,7 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
         <TabsContent value="garage">
           {garageLoading ? (
             <div className="grid grid-cols-2 gap-3">
-              {(["g1","g2"]).map((k) => (
+              {["g1", "g2"].map((k) => (
                 <Skeleton key={k} className="h-40 rounded-lg" />
               ))}
             </div>
@@ -392,9 +435,13 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
               >
                 <Car size={24} className="text-steel" />
               </div>
-              <p className="text-foreground font-semibold text-sm">Empty Garage</p>
+              <p className="text-foreground font-semibold text-sm">
+                Empty Garage
+              </p>
               <p className="text-steel text-xs mt-1">
-                {isOwnProfile ? "Add your first car to showcase your build" : "This user hasn't added any cars yet"}
+                {isOwnProfile
+                  ? "Add your first car to showcase your build"
+                  : "This user hasn't added any cars yet"}
               </p>
             </div>
           ) : (
@@ -445,26 +492,37 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
         <TabsContent value="about">
           <div
             className="rounded-lg p-4 space-y-3"
-            style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+            style={{
+              background: "oklch(var(--surface))",
+              border: "1px solid oklch(var(--border))",
+            }}
           >
             <div>
-              <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">Display Name</p>
+              <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">
+                Display Name
+              </p>
               <p className="text-sm text-foreground">{displayName}</p>
             </div>
             {bio && (
               <div>
-                <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">Bio</p>
+                <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">
+                  Bio
+                </p>
                 <p className="text-sm text-foreground">{bio}</p>
               </div>
             )}
             {location && (
               <div>
-                <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">Location</p>
+                <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">
+                  Location
+                </p>
                 <p className="text-sm text-foreground">{location}</p>
               </div>
             )}
             <div>
-              <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">Principal ID</p>
+              <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">
+                Principal ID
+              </p>
               <p className="text-xs text-steel font-mono break-all">{userId}</p>
             </div>
           </div>
@@ -474,7 +532,12 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-6">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

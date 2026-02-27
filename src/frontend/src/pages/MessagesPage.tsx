@@ -1,27 +1,85 @@
-import { useState, useRef } from "react";
-import { MessageCircle, Send, ArrowLeft, Loader2, Plus, UserSearch } from "lucide-react";
-import { useSearch } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Principal } from "@icp-sdk/core/principal";
+import { Principal as PrincipalCls } from "@icp-sdk/core/principal";
+import { useSearch } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Loader2,
+  MessageCircle,
+  Plus,
+  Send,
+  UserSearch,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetConversations,
   useGetMessages,
+  useGetProfile,
+  useMyProfile,
   useSendMessage,
+  useSendNotificationToUser,
 } from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import type { Principal } from "@icp-sdk/core/principal";
-import { Principal as PrincipalCls } from "@icp-sdk/core/principal";
-import { toast } from "sonner";
+
+function ConversationItem({
+  principal,
+  onSelect,
+}: {
+  principal: Principal;
+  onSelect: (p: Principal) => void;
+}) {
+  const { data: profile } = useGetProfile(principal);
+  const key = principal.toString();
+  const name = profile?.displayName ?? truncatePrincipal(key);
+  const initial = name.slice(0, 2).toUpperCase();
+
+  return (
+    <button
+      key={key}
+      type="button"
+      className="flex items-center gap-3 px-4 py-3.5 w-full text-left hover:bg-surface transition-colors"
+      onClick={() => onSelect(principal)}
+    >
+      <Avatar className="w-12 h-12 shrink-0">
+        {profile?.avatarUrl ? (
+          <img
+            src={profile.avatarUrl}
+            alt={name}
+            className="w-full h-full object-cover rounded-full"
+          />
+        ) : null}
+        <AvatarFallback
+          style={{
+            background: "oklch(var(--surface-elevated))",
+            color: "oklch(var(--orange-bright))",
+          }}
+          className="font-bold text-sm"
+        >
+          {initial}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm text-foreground">{name}</p>
+        <p className="text-xs text-steel truncate mt-0.5">
+          Tap to view conversation
+        </p>
+      </div>
+      <MessageCircle size={14} className="text-steel shrink-0" />
+    </button>
+  );
+}
 
 function ConversationList({
   conversations,
@@ -32,33 +90,13 @@ function ConversationList({
 }) {
   return (
     <div className="divide-y divide-border">
-      {conversations.map((convo) => {
-        const key = convo.toString();
-        const name = truncatePrincipal(key);
-
-        return (
-          <button
-            key={key}
-            type="button"
-            className="flex items-center gap-3 px-4 py-3.5 w-full text-left hover:bg-surface transition-colors"
-            onClick={() => onSelect(convo)}
-          >
-            <Avatar className="w-12 h-12 shrink-0">
-              <AvatarFallback
-                style={{ background: "oklch(var(--surface-elevated))", color: "oklch(var(--orange-bright))" }}
-                className="font-bold text-sm"
-              >
-                {name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-foreground font-mono">{name}</p>
-              <p className="text-xs text-steel truncate mt-0.5">Tap to view conversation</p>
-            </div>
-            <MessageCircle size={14} className="text-steel shrink-0" />
-          </button>
-        );
-      })}
+      {conversations.map((convo) => (
+        <ConversationItem
+          key={convo.toString()}
+          principal={convo}
+          onSelect={onSelect}
+        />
+      ))}
     </div>
   );
 }
@@ -76,7 +114,13 @@ function ChatView({
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: messages, isLoading } = useGetMessages(recipient);
   const sendMessage = useSendMessage();
-  const name = truncatePrincipal(recipient.toString());
+  const sendNotification = useSendNotificationToUser();
+  const { data: recipientProfile } = useGetProfile(recipient);
+  const { data: myProfile } = useMyProfile();
+
+  const recipientName =
+    recipientProfile?.displayName ?? truncatePrincipal(recipient.toString());
+  const senderName = myProfile?.displayName ?? truncatePrincipal(myPrincipal);
 
   const displayMessages = messages ?? [];
 
@@ -84,17 +128,29 @@ function ChatView({
   const prevCountRef = useRef(0);
   if (prevCountRef.current !== displayMessages.length) {
     prevCountRef.current = displayMessages.length;
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      50,
+    );
   }
 
   const handleSend = () => {
     if (!text.trim()) return;
+    const content = text.trim();
     sendMessage.mutate(
-      { receiver: recipient, content: text.trim() },
+      { receiver: recipient, content },
       {
-        onSuccess: () => setText(""),
+        onSuccess: () => {
+          setText("");
+          sendNotification.mutate({
+            targetUser: recipient,
+            notifType: "message",
+            message: `${senderName} sent you a message`,
+            relatedId: "",
+          });
+        },
         onError: () => toast.error("Failed to send message"),
-      }
+      },
     );
   };
 
@@ -103,18 +159,25 @@ function ChatView({
       {/* Header */}
       <div className="page-header shrink-0">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={onBack} className="text-steel hover:text-foreground">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-steel hover:text-foreground"
+          >
             <ArrowLeft size={20} />
           </button>
           <Avatar className="w-8 h-8">
             <AvatarFallback
-              style={{ background: "oklch(var(--orange) / 0.2)", color: "oklch(var(--orange-bright))" }}
+              style={{
+                background: "oklch(var(--orange) / 0.2)",
+                color: "oklch(var(--orange-bright))",
+              }}
               className="text-xs font-bold"
             >
-              {name.slice(0, 2).toUpperCase()}
+              {recipientName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <p className="font-semibold text-sm font-mono">{name}</p>
+          <p className="font-semibold text-sm">{recipientName}</p>
         </div>
       </div>
 
@@ -134,19 +197,32 @@ function ChatView({
             >
               <MessageCircle size={24} className="text-steel" />
             </div>
-            <p className="text-foreground font-semibold text-sm">No messages yet</p>
-            <p className="text-steel text-xs mt-1">Say hello and start the conversation!</p>
+            <p className="text-foreground font-semibold text-sm">
+              No messages yet
+            </p>
+            <p className="text-steel text-xs mt-1">
+              Say hello and start the conversation!
+            </p>
           </div>
         ) : (
           displayMessages.map((msg) => {
             const isMine = msg.sender.toString() === myPrincipal;
             return (
-              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+              <div
+                key={msg.id}
+                className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+              >
                 <div>
-                  <div className={isMine ? "message-bubble-me" : "message-bubble-other"}>
+                  <div
+                    className={
+                      isMine ? "message-bubble-me" : "message-bubble-other"
+                    }
+                  >
                     {msg.content}
                   </div>
-                  <p className={`text-[10px] text-steel mt-0.5 ${isMine ? "text-right" : "text-left"}`}>
+                  <p
+                    className={`text-[10px] text-steel mt-0.5 ${isMine ? "text-right" : "text-left"}`}
+                  >
                     {timeAgo(msg.timestamp)}
                   </p>
                 </div>
@@ -171,7 +247,10 @@ function ChatView({
           onChange={(e) => setText(e.target.value)}
           placeholder="Message..."
           className="flex-1 text-sm"
-          style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}
+          style={{
+            background: "oklch(var(--surface))",
+            borderColor: "oklch(var(--border))",
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -184,7 +263,10 @@ function ChatView({
           onClick={handleSend}
           disabled={!text.trim() || sendMessage.isPending}
           size="icon"
-          style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+          style={{
+            background: "oklch(var(--orange))",
+            color: "oklch(var(--carbon))",
+          }}
         >
           {sendMessage.isPending ? (
             <Loader2 size={16} className="animate-spin" />
@@ -231,7 +313,10 @@ function NewChatDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-sm w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="font-display text-lg flex items-center gap-2">
@@ -247,13 +332,26 @@ function NewChatDialog({
             </Label>
             <Input
               value={principalInput}
-              onChange={(e) => { setPrincipalInput(e.target.value); setError(""); }}
+              onChange={(e) => {
+                setPrincipalInput(e.target.value);
+                setError("");
+              }}
               placeholder="xxxxx-xxxxx-xxxxx-..."
               className="font-mono text-xs"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: error ? "oklch(var(--destructive))" : "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: error
+                  ? "oklch(var(--destructive))"
+                  : "oklch(var(--border))",
+              }}
             />
             {error && (
-              <p className="text-xs mt-1" style={{ color: "oklch(var(--destructive))" }}>{error}</p>
+              <p
+                className="text-xs mt-1"
+                style={{ color: "oklch(var(--destructive))" }}
+              >
+                {error}
+              </p>
             )}
             <p className="text-xs text-steel mt-1.5">
               Ask the user to share their Principal ID from their profile page.
@@ -263,7 +361,10 @@ function NewChatDialog({
           <Button
             type="submit"
             className="w-full font-bold"
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             Start Conversation
           </Button>
@@ -310,7 +411,10 @@ export function MessagesPage() {
           type="button"
           size="sm"
           onClick={() => setShowNewChat(true)}
-          style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+          style={{
+            background: "oklch(var(--orange))",
+            color: "oklch(var(--carbon))",
+          }}
         >
           <Plus size={14} className="mr-1" />
           New Chat
@@ -319,7 +423,7 @@ export function MessagesPage() {
 
       {isLoading ? (
         <div className="divide-y divide-border">
-          {(["c1","c2","c3"]).map((k) => (
+          {["c1", "c2", "c3"].map((k) => (
             <div key={k} className="flex items-center gap-3 px-4 py-3.5">
               <Skeleton className="w-12 h-12 rounded-full shrink-0" />
               <div className="flex-1 space-y-1.5">
@@ -337,14 +441,19 @@ export function MessagesPage() {
           >
             <MessageCircle size={28} className="text-steel" />
           </div>
-          <p className="text-foreground font-semibold text-sm">No conversations yet</p>
+          <p className="text-foreground font-semibold text-sm">
+            No conversations yet
+          </p>
           <p className="text-steel text-xs mt-1 mb-6">
             Find someone to chat with by tapping the button below
           </p>
           <Button
             type="button"
             onClick={() => setShowNewChat(true)}
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             <Plus size={14} className="mr-2" />
             Start a Conversation
@@ -360,7 +469,12 @@ export function MessagesPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

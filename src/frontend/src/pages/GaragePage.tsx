@@ -1,18 +1,32 @@
-import { useState, useRef } from "react";
-import { Plus, Car, Wrench, Trash2, Loader2, ImagePlus } from "lucide-react";
-import { convertHeicToJpeg } from "../lib/convertHeic";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useMyGarage, useAddCar, useRemoveCar, useUploadFile } from "../hooks/useQueries";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Car, ImagePlus, Loader2, Plus, Trash2, Wrench } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Car as CarType } from "../backend.d";
+import {
+  useAddCar,
+  useMyGarage,
+  useRemoveCar,
+  useUploadFile,
+} from "../hooks/useQueries";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 
-function CarDetailModal({ car, open, onClose }: { car: CarType; open: boolean; onClose: () => void }) {
+function CarDetailModal({
+  car,
+  open,
+  onClose,
+}: { car: CarType; open: boolean; onClose: () => void }) {
   const removeCar = useRemoveCar();
 
   const handleRemove = () => {
@@ -29,7 +43,10 @@ function CarDetailModal({ car, open, onClose }: { car: CarType; open: boolean; o
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
@@ -47,10 +64,21 @@ function CarDetailModal({ car, open, onClose }: { car: CarType; open: boolean; o
 
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Badge style={{ background: "oklch(var(--orange) / 0.2)", color: "oklch(var(--orange-bright))", border: "1px solid oklch(var(--orange) / 0.3)" }}>
+            <Badge
+              style={{
+                background: "oklch(var(--orange) / 0.2)",
+                color: "oklch(var(--orange-bright))",
+                border: "1px solid oklch(var(--orange) / 0.3)",
+              }}
+            >
               {car.color}
             </Badge>
-            <Badge variant="outline" className="text-xs border-border text-steel">{car.year}</Badge>
+            <Badge
+              variant="outline"
+              className="text-xs border-border text-steel"
+            >
+              {car.year}
+            </Badge>
           </div>
 
           {car.description && (
@@ -61,11 +89,16 @@ function CarDetailModal({ car, open, onClose }: { car: CarType; open: boolean; o
             <div>
               <div className="flex items-center gap-1.5 mb-2">
                 <Wrench size={13} className="text-orange" />
-                <p className="text-xs font-semibold text-steel uppercase tracking-wider">Modifications</p>
+                <p className="text-xs font-semibold text-steel uppercase tracking-wider">
+                  Modifications
+                </p>
               </div>
               <ul className="space-y-1">
                 {car.modifications.map((mod, i) => (
-                  <li key={`mod-${car.id}-${i}`} className="text-sm text-foreground flex items-center gap-2">
+                  <li
+                    key={`mod-${car.id}-${i}`}
+                    className="text-sm text-foreground flex items-center gap-2"
+                  >
                     <span className="w-1 h-1 rounded-full bg-orange shrink-0" />
                     {mod}
                   </li>
@@ -94,7 +127,10 @@ function CarDetailModal({ car, open, onClose }: { car: CarType; open: boolean; o
   );
 }
 
-function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AddCarModal({
+  open,
+  onClose,
+}: { open: boolean; onClose: () => void }) {
   const [form, setForm] = useState({
     make: "",
     model: "",
@@ -122,7 +158,14 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   };
 
   const resetForm = () => {
-    setForm({ make: "", model: "", year: "", color: "", description: "", modificationsText: "" });
+    setForm({
+      make: "",
+      model: "",
+      year: "",
+      color: "",
+      description: "",
+      modificationsText: "",
+    });
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
     setImagePreview(null);
@@ -143,7 +186,9 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       setIsUploading(true);
       setUploadProgress(0);
       try {
-        const url = await uploadFile(imageFile, (pct) => setUploadProgress(pct));
+        const url = await uploadFile(imageFile, (pct) =>
+          setUploadProgress(pct),
+        );
         imageUrls = [url];
       } catch {
         toast.error("Failed to upload image");
@@ -172,20 +217,33 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           onClose();
         },
         onError: () => toast.error("Failed to add car"),
-      }
+      },
     );
   };
 
   const isBusy = isUploading || addCar.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetForm(); onClose(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          resetForm();
+          onClose();
+        }
+      }}
+    >
       <DialogContent
         className="max-w-md w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Add Car to Garage</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Add Car to Garage
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -194,20 +252,30 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <Label className="text-xs text-steel mb-1 block">Make *</Label>
               <Input
                 value={form.make}
-                onChange={(e) => setForm((f) => ({ ...f, make: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, make: e.target.value }))
+                }
                 placeholder="Subaru"
                 required
-                style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             </div>
             <div>
               <Label className="text-xs text-steel mb-1 block">Model *</Label>
               <Input
                 value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, model: e.target.value }))
+                }
                 placeholder="WRX STI"
                 required
-                style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             </div>
           </div>
@@ -217,19 +285,29 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <Label className="text-xs text-steel mb-1 block">Year *</Label>
               <Input
                 value={form.year}
-                onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, year: e.target.value }))
+                }
                 placeholder="2006"
                 required
-                style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             </div>
             <div>
               <Label className="text-xs text-steel mb-1 block">Color</Label>
               <Input
                 value={form.color}
-                onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, color: e.target.value }))
+                }
                 placeholder="WR Blue"
-                style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             </div>
           </div>
@@ -238,21 +316,33 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             <Label className="text-xs text-steel mb-1 block">Description</Label>
             <Textarea
               value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
               placeholder="Tell us about your build..."
               className="min-h-[70px] resize-none text-sm"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
           <div>
-            <Label className="text-xs text-steel mb-1 block">Modifications (one per line)</Label>
+            <Label className="text-xs text-steel mb-1 block">
+              Modifications (one per line)
+            </Label>
             <Textarea
               value={form.modificationsText}
-              onChange={(e) => setForm((f) => ({ ...f, modificationsText: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, modificationsText: e.target.value }))
+              }
               placeholder={"Coilovers\nCatback exhaust\nIntake"}
               className="min-h-[80px] resize-none text-sm font-mono"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
@@ -275,7 +365,12 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                 />
                 <button
                   type="button"
-                  onClick={() => { if (imagePreview) URL.revokeObjectURL(imagePreview); setImageFile(null); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                  onClick={() => {
+                    if (imagePreview) URL.revokeObjectURL(imagePreview);
+                    setImageFile(null);
+                    setImagePreview(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
                   className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white"
                   style={{ background: "oklch(0 0 0 / 0.6)" }}
                 >
@@ -301,14 +396,23 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-steel">Uploading...</span>
-                  <span className="text-xs font-semibold" style={{ color: "oklch(var(--orange))" }}>
+                  <span
+                    className="text-xs font-semibold"
+                    style={{ color: "oklch(var(--orange))" }}
+                  >
                     {Math.round(uploadProgress)}%
                   </span>
                 </div>
-                <div className="h-1 rounded-full overflow-hidden" style={{ background: "oklch(var(--surface-elevated))" }}>
+                <div
+                  className="h-1 rounded-full overflow-hidden"
+                  style={{ background: "oklch(var(--surface-elevated))" }}
+                >
                   <div
                     className="h-full rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%`, background: "oklch(var(--orange))" }}
+                    style={{
+                      width: `${uploadProgress}%`,
+                      background: "oklch(var(--orange))",
+                    }}
                   />
                 </div>
               </div>
@@ -319,12 +423,21 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             type="submit"
             disabled={isBusy || !form.make || !form.model || !form.year}
             className="w-full"
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             {isUploading ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" />Uploading photo...</>
+              <>
+                <Loader2 size={14} className="mr-2 animate-spin" />
+                Uploading photo...
+              </>
             ) : addCar.isPending ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" />Adding...</>
+              <>
+                <Loader2 size={14} className="mr-2 animate-spin" />
+                Adding...
+              </>
             ) : (
               <>Add to Garage</>
             )}
@@ -350,7 +463,10 @@ export function GaragePage() {
           type="button"
           size="sm"
           onClick={() => setShowAddModal(true)}
-          style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+          style={{
+            background: "oklch(var(--orange))",
+            color: "oklch(var(--carbon))",
+          }}
         >
           <Plus size={14} className="mr-1" />
           Add Car
@@ -360,7 +476,7 @@ export function GaragePage() {
       <div className="p-4">
         {isLoading ? (
           <div className="grid grid-cols-2 gap-4">
-            {(["g1","g2","g3","g4"]).map((k) => (
+            {["g1", "g2", "g3", "g4"].map((k) => (
               <Skeleton key={k} className="h-52 rounded-xl" />
             ))}
           </div>
@@ -372,12 +488,19 @@ export function GaragePage() {
             >
               <Car size={28} className="text-steel" />
             </div>
-            <h3 className="font-display text-xl font-bold mb-2">Empty Garage</h3>
-            <p className="text-steel text-sm mb-6">Add your first car to showcase your build.</p>
+            <h3 className="font-display text-xl font-bold mb-2">
+              Empty Garage
+            </h3>
+            <p className="text-steel text-sm mb-6">
+              Add your first car to showcase your build.
+            </p>
             <Button
               type="button"
               onClick={() => setShowAddModal(true)}
-              style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+              style={{
+                background: "oklch(var(--orange))",
+                color: "oklch(var(--carbon))",
+              }}
             >
               <Plus size={14} className="mr-2" />
               Add First Car
@@ -390,12 +513,18 @@ export function GaragePage() {
                 key={car.id}
                 type="button"
                 className="relative overflow-hidden rounded-xl cursor-pointer group text-left w-full"
-                style={{ border: "1px solid oklch(var(--border))", background: "oklch(var(--surface))" }}
+                style={{
+                  border: "1px solid oklch(var(--border))",
+                  background: "oklch(var(--surface))",
+                }}
                 onClick={() => setSelectedCar(car)}
               >
                 <div className="relative overflow-hidden">
                   <img
-                    src={car.imageUrls[0] ?? `https://picsum.photos/seed/${car.id}/400/300`}
+                    src={
+                      car.imageUrls[0] ??
+                      `https://picsum.photos/seed/${car.id}/400/300`
+                    }
                     alt={`${car.year} ${car.make} ${car.model}`}
                     className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -445,7 +574,12 @@ export function GaragePage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

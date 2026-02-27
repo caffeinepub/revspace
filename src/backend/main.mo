@@ -1,4 +1,3 @@
-
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
@@ -14,12 +13,10 @@ import MixinStorage "blob-storage/Mixin";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
-// Specify migration module and function in the with clause
-
 actor {
-  // -----------------------------------
-  // Types Module (all custom types)
-  // -----------------------------------
+  //-----------------------------
+  // Types
+  //-----------------------------
   module Types {
     public type Post = {
       id : Text;
@@ -156,6 +153,22 @@ actor {
       follower : Principal;
       following : Principal;
     };
+
+    public type UserRole = {
+      #admin;
+      #user;
+      #guest;
+    };
+
+    public type UserWithRole = {
+      principal : Principal;
+      role : UserRole;
+    };
+
+    public type ProfileWithPrincipal = {
+      principal : Principal;
+      profile : Profile;
+    };
   };
 
   // Helper functions for converting to View objects
@@ -206,7 +219,7 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Persistent Stable Maps using component stableMap
+  // Persistent Stable Maps
   let posts = Map.empty<Text, Types.Post>();
   let comments = Map.empty<Text, Types.Comment>();
   let profiles = Map.empty<Principal, Types.Profile>();
@@ -227,6 +240,114 @@ actor {
     prefix # "_" # time;
   };
 
+  // -----------------------------------
+  // ADMIN FUNCTIONS
+  // -----------------------------------
+  // Returns array of {principal, role} for every registered user
+  public query ({ caller }) func adminGetAllUsers() : async [Types.UserWithRole] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+
+    let allEntries = accessControlState.userRoles.entries().toArray();
+    allEntries.map(
+      func((principal, role)) {
+        {
+          principal;
+          role = switch (role) {
+            case (#admin) { #admin };
+            case (#user) { #user };
+            case (#guest) { #guest };
+          };
+        };
+      }
+    );
+  };
+
+  // Return array of {principal, Profile} for all profiles
+  public query ({ caller }) func adminGetAllProfiles() : async [Types.ProfileWithPrincipal] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let allEntries = profiles.entries().toArray();
+    allEntries.map(
+      func((principal, profile)) {
+        {
+          principal;
+          profile;
+        };
+      }
+    );
+  };
+
+  // Delete profile by principal
+  public shared ({ caller }) func adminDeleteProfile(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    if (not profiles.containsKey(user)) {
+      Runtime.trap("Profile does not exist");
+    };
+    profiles.remove(user);
+  };
+
+  // Delete any post by ID (admin bypass)
+  public shared ({ caller }) func adminDeletePost(postId : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (posts.get(postId)) {
+      case (null) { Runtime.trap("Post not found") };
+      case (?_post) {
+        posts.remove(postId);
+      };
+    };
+  };
+
+  // Delete any listing by ID (admin bypass)
+  public shared ({ caller }) func adminDeleteListing(listingId : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (listings.get(listingId)) {
+      case (null) { Runtime.trap("Listing not found") };
+      case (?_listing) {
+        listings.remove(listingId);
+      };
+    };
+  };
+
+  // Ban user by demoting them to guest
+  public shared ({ caller }) func adminBanUser(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+
+    switch (AccessControl.getUserRole(accessControlState, user)) {
+      case (#admin) { Runtime.trap("Cannot ban admin") };
+      case (#guest) { Runtime.trap("User already banned") };
+      case (#user) {
+        AccessControl.assignRole(accessControlState, caller, user, #guest);
+      };
+    };
+  };
+
+  // Unban/restores banned user back to user role
+  public shared ({ caller }) func adminUnbanUser(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+
+    switch (AccessControl.getUserRole(accessControlState, user)) {
+      case (#admin) { Runtime.trap("Already admin") };
+      case (#user) { Runtime.trap("Not currently banned") };
+      case (#guest) {
+        AccessControl.assignRole(accessControlState, caller, user, #user);
+      };
+    };
+  };
+
+  // --- EXISTING API (unchanged) ---
   // -----------------------------------
   // POSTS
   // -----------------------------------
@@ -856,3 +977,4 @@ actor {
     );
   };
 };
+

@@ -1,27 +1,28 @@
-import { useState } from "react";
-import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
-import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { Outlet, createRootRoute, createRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
-import { Layout, BullBoostBanner } from "./components/Layout";
-import { FeedPage } from "./pages/FeedPage";
-import { ExplorePage } from "./pages/ExplorePage";
-import { ReelsPage } from "./pages/ReelsPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { GaragePage } from "./pages/GaragePage";
-import { EventsPage } from "./pages/EventsPage";
-import { MarketplacePage } from "./pages/MarketplacePage";
+import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { AdminPage } from "./pages/AdminPage";
 import { ClubsPage } from "./pages/ClubsPage";
-import { NotificationsPage } from "./pages/NotificationsPage";
-import { MessagesPage } from "./pages/MessagesPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { UserProfilePage } from "./pages/UserProfilePage";
+import { EventsPage } from "./pages/EventsPage";
+import { ExplorePage } from "./pages/ExplorePage";
+import { FeedPage } from "./pages/FeedPage";
+import { GaragePage } from "./pages/GaragePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
-import { ShopPage } from "./pages/ShopPage";
+import { MarketplacePage } from "./pages/MarketplacePage";
 import { MechanicsPage } from "./pages/MechanicsPage";
+import { MessagesPage } from "./pages/MessagesPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { ReelsPage } from "./pages/ReelsPage";
 import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { ShopPage } from "./pages/ShopPage";
+import { UserProfilePage } from "./pages/UserProfilePage";
 
 const LoadingSpinner = () => (
   <div
@@ -151,7 +152,8 @@ const messagesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/messages",
   validateSearch: (search: Record<string, unknown>) => ({
-    recipient: typeof search.recipient === "string" ? search.recipient : undefined,
+    recipient:
+      typeof search.recipient === "string" ? search.recipient : undefined,
   }),
   component: MessagesPage,
 });
@@ -201,6 +203,12 @@ const aboutRoute = createRoute({
   component: RevSpaceInfoPage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -219,6 +227,7 @@ const routeTree = rootRoute.addChildren([
   shopRoute,
   mechanicsRoute,
   aboutRoute,
+  adminRoute,
 ]);
 
 const router = createRouter({ routeTree });

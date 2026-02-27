@@ -1,20 +1,41 @@
-import { useState, useRef, useEffect } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2, Volume2, VolumeX, X, Loader2 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile, useDeletePost, useGetComments, useAddComment } from "../hooks/useQueries";
-import { timeAgo, truncatePrincipal } from "../utils/format";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { toast } from "sonner";
 import type { Principal } from "@icp-sdk/core/principal";
+import { Link } from "@tanstack/react-router";
+import {
+  Bookmark,
+  ChevronLeft,
+  Film,
+  Heart,
+  Loader2,
+  MessageCircle,
+  Share2,
+  Trash2,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useAddComment,
+  useDeletePost,
+  useGetAllPosts,
+  useGetComments,
+  useGetProfile,
+  useLikePost,
+  useUnlikePost,
+} from "../hooks/useQueries";
+import { timeAgo, truncatePrincipal } from "../utils/format";
 
 // ─── CommentAuthorRow ─────────────────────────────────────────────────────────
 function CommentAuthorRow({ author }: { author: Principal }) {
   const { data: profile } = useGetProfile(author);
-  const displayName = profile?.displayName ?? truncatePrincipal(author.toString());
+  const displayName =
+    profile?.displayName ?? truncatePrincipal(author.toString());
   const avatarUrl = profile?.avatarUrl ?? "";
   const authorKey = author.toString();
 
@@ -60,7 +81,7 @@ function ReelsCommentsPanel({ postId, onClose }: ReelsCommentsPanelProps) {
           toast.success("Comment added");
         },
         onError: () => toast.error("Failed to add comment"),
-      }
+      },
     );
   };
 
@@ -104,23 +125,36 @@ function ReelsCommentsPanel({ postId, onClose }: ReelsCommentsPanelProps) {
         </div>
 
         {/* Comments list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4" style={{ overscrollBehavior: "contain" }}>
+        <div
+          className="flex-1 overflow-y-auto px-4 py-3 space-y-4"
+          style={{ overscrollBehavior: "contain" }}
+        >
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 size={22} className="animate-spin" style={{ color: "oklch(var(--orange))" }} />
+              <Loader2
+                size={22}
+                className="animate-spin"
+                style={{ color: "oklch(var(--orange))" }}
+              />
             </div>
           ) : comments && comments.length > 0 ? (
             comments.map((c) => (
               <div key={c.id} className="flex gap-2">
                 <CommentAuthorRow author={c.author} />
                 <div className="flex-1 min-w-0 -mt-0.5">
-                  <span className="text-[10px] text-white/40">{timeAgo(c.timestamp)}</span>
-                  <p className="text-sm text-white/85 mt-0.5 break-words">{c.content}</p>
+                  <span className="text-[10px] text-white/40">
+                    {timeAgo(c.timestamp)}
+                  </span>
+                  <p className="text-sm text-white/85 mt-0.5 break-words">
+                    {c.content}
+                  </p>
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-center py-6 text-white/40 text-sm">No comments yet. Be the first!</p>
+            <p className="text-center py-6 text-white/40 text-sm">
+              No comments yet. Be the first!
+            </p>
           )}
         </div>
 
@@ -151,9 +185,16 @@ function ReelsCommentsPanel({ postId, onClose }: ReelsCommentsPanelProps) {
             onClick={handleSubmit}
             disabled={!text.trim() || addComment.isPending}
             className="self-end shrink-0"
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
-            {addComment.isPending ? <Loader2 size={14} className="animate-spin" /> : "Post"}
+            {addComment.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              "Post"
+            )}
           </Button>
         </div>
       </div>
@@ -180,10 +221,19 @@ function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 mb-3">
-        <Skeleton className="w-9 h-9 rounded-full" style={{ background: "oklch(0 0 0 / 0.4)" }} />
+        <Skeleton
+          className="w-9 h-9 rounded-full"
+          style={{ background: "oklch(0 0 0 / 0.4)" }}
+        />
         <div className="flex flex-col gap-1">
-          <Skeleton className="w-24 h-3" style={{ background: "oklch(1 0 0 / 0.2)" }} />
-          <Skeleton className="w-14 h-2" style={{ background: "oklch(1 0 0 / 0.15)" }} />
+          <Skeleton
+            className="w-24 h-3"
+            style={{ background: "oklch(1 0 0 / 0.2)" }}
+          />
+          <Skeleton
+            className="w-14 h-2"
+            style={{ background: "oklch(1 0 0 / 0.15)" }}
+          />
         </div>
       </div>
     );
@@ -193,12 +243,20 @@ function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
   const avatarUrl = profile?.avatarUrl ?? "";
 
   return (
-    <Link to="/profile/$userId" params={{ userId: authorKey }} className="flex items-center gap-2 mb-3 group">
+    <Link
+      to="/profile/$userId"
+      params={{ userId: authorKey }}
+      className="flex items-center gap-2 mb-3 group"
+    >
       <Avatar className="w-9 h-9 border-2 border-white">
         {avatarUrl ? <AvatarImage src={avatarUrl} /> : null}
-        <AvatarFallback className="text-xs">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+        <AvatarFallback className="text-xs">
+          {displayName.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
       </Avatar>
-      <p className="text-white text-sm font-semibold group-hover:underline underline-offset-2">{displayName}</p>
+      <p className="text-white text-sm font-semibold group-hover:underline underline-offset-2">
+        {displayName}
+      </p>
     </Link>
   );
 }
@@ -213,10 +271,20 @@ interface ReelMediaProps {
   onTimeUpdate?: (postId: string, progress: number) => void;
 }
 
-function ReelMedia({ mediaUrl, postId, postType, isMuted, videoRef, onTimeUpdate }: ReelMediaProps) {
+function ReelMedia({
+  mediaUrl,
+  postId,
+  postType,
+  isMuted,
+  videoRef,
+  onTimeUpdate,
+}: ReelMediaProps) {
   if (!mediaUrl) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#111" }}>
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ background: "#111" }}
+      >
         <Film size={48} className="text-white/30" />
       </div>
     );
@@ -257,7 +325,19 @@ function ReelMedia({ mediaUrl, postId, postType, isMuted, videoRef, onTimeUpdate
   );
 }
 
-const REEL_TOPICS = ["All", "Street Drift", "Car Show", "Track Day", "Burnout", "Stance", "JDM Build", "Muscle", "Import", "Cars & Coffee", "Other"];
+const REEL_TOPICS = [
+  "All",
+  "Street Drift",
+  "Car Show",
+  "Track Day",
+  "Burnout",
+  "Stance",
+  "JDM Build",
+  "Muscle",
+  "Import",
+  "Cars & Coffee",
+  "Other",
+];
 
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
@@ -276,15 +356,16 @@ export function ReelsPage() {
   const deletePostMutation = useDeletePost();
 
   const allPosts = posts ?? [];
-  const displayPosts = selectedTopic === "All"
-    ? allPosts
-    : allPosts.filter((p) => p.topic === selectedTopic);
+  const displayPosts =
+    selectedTopic === "All"
+      ? allPosts
+      : allPosts.filter((p) => p.topic === selectedTopic);
 
   // Sync muted state directly on video DOM elements (React prop alone isn't always reliable)
   useEffect(() => {
-    videoRefs.current.forEach((video) => {
+    for (const video of videoRefs.current.values()) {
       video.muted = isMuted;
-    });
+    }
   }, [isMuted]);
 
   const handleTimeUpdate = (postId: string, pct: number) => {
@@ -323,7 +404,10 @@ export function ReelsPage() {
       });
     } else {
       setConfirmDeleteId(postId);
-      setTimeout(() => setConfirmDeleteId((cur) => (cur === postId ? null : cur)), 3000);
+      setTimeout(
+        () => setConfirmDeleteId((cur) => (cur === postId ? null : cur)),
+        3000,
+      );
     }
   };
 
@@ -346,7 +430,8 @@ export function ReelsPage() {
       <div
         className="fixed top-0 left-0 right-0 z-40 flex gap-2 px-4 pt-3 pb-2 overflow-x-auto scrollbar-hide"
         style={{
-          background: "linear-gradient(to bottom, oklch(0 0 0 / 0.85) 0%, transparent 100%)",
+          background:
+            "linear-gradient(to bottom, oklch(0 0 0 / 0.85) 0%, transparent 100%)",
           paddingLeft: "3.5rem",
         }}
       >
@@ -387,7 +472,9 @@ export function ReelsPage() {
         <div className="h-screen flex flex-col items-center justify-center text-center px-6">
           <Film size={48} className="text-white/30 mb-4" />
           <h3 className="text-white font-display text-xl font-bold mb-2">
-            {selectedTopic === "All" ? "No Reels Yet" : `No "${selectedTopic}" Reels`}
+            {selectedTopic === "All"
+              ? "No Reels Yet"
+              : `No "${selectedTopic}" Reels`}
           </h3>
           <p className="text-white/50 text-sm mb-6">
             {selectedTopic === "All"
@@ -395,7 +482,12 @@ export function ReelsPage() {
               : "Be the first to upload a reel with this topic."}
           </p>
           <Link to="/create">
-            <Button style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}>
+            <Button
+              style={{
+                background: "oklch(var(--orange))",
+                color: "oklch(var(--carbon))",
+              }}
+            >
               Upload Reel
             </Button>
           </Link>
@@ -403,15 +495,14 @@ export function ReelsPage() {
       )}
 
       {displayPosts.map((post) => {
-        const serverLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
+        const serverLiked = myPrincipal
+          ? post.likes.some((l) => l.toString() === myPrincipal)
+          : false;
         const liked = likedPosts.has(post.id) || serverLiked;
         const postProgress = progress[post.id] ?? 0;
 
         return (
-          <div
-            key={post.id}
-            className="reel-card shrink-0"
-          >
+          <div key={post.id} className="reel-card shrink-0">
             {/* Background media */}
             <div className="absolute inset-0">
               <ReelMedia
@@ -453,8 +544,12 @@ export function ReelsPage() {
                   # {post.topic}
                 </span>
               )}
-              <p className="text-white text-sm leading-relaxed line-clamp-3">{post.content}</p>
-              <p className="text-white/50 text-xs mt-1">{timeAgo(post.timestamp)}</p>
+              <p className="text-white text-sm leading-relaxed line-clamp-3">
+                {post.content}
+              </p>
+              <p className="text-white/50 text-xs mt-1">
+                {timeAgo(post.timestamp)}
+              </p>
             </div>
 
             {/* Right actions */}
@@ -470,12 +565,15 @@ export function ReelsPage() {
                   className="w-11 h-11 rounded-full flex items-center justify-center"
                   style={{ background: "oklch(0 0 0 / 0.4)" }}
                 >
-                  {isMuted
-                    ? <VolumeX size={22} color="white" />
-                    : <Volume2 size={22} color="white" />
-                  }
+                  {isMuted ? (
+                    <VolumeX size={22} color="white" />
+                  ) : (
+                    <Volume2 size={22} color="white" />
+                  )}
                 </div>
-                <span className="text-white text-xs">{isMuted ? "Muted" : "Sound"}</span>
+                <span className="text-white text-xs">
+                  {isMuted ? "Muted" : "Sound"}
+                </span>
               </button>
 
               <button
@@ -508,10 +606,15 @@ export function ReelsPage() {
                 >
                   <MessageCircle size={22} color="white" />
                 </div>
-                <span className="text-white text-xs">{post.comments.length}</span>
+                <span className="text-white text-xs">
+                  {post.comments.length}
+                </span>
               </button>
 
-              <button type="button" className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                className="flex flex-col items-center gap-1"
+              >
                 <div
                   className="w-11 h-11 rounded-full flex items-center justify-center"
                   style={{ background: "oklch(0 0 0 / 0.4)" }}
@@ -521,7 +624,10 @@ export function ReelsPage() {
                 <span className="text-white text-xs">Share</span>
               </button>
 
-              <button type="button" className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                className="flex flex-col items-center gap-1"
+              >
                 <div
                   className="w-11 h-11 rounded-full flex items-center justify-center"
                   style={{ background: "oklch(0 0 0 / 0.4)" }}
@@ -542,12 +648,20 @@ export function ReelsPage() {
                   <div
                     className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
                     style={{
-                      background: confirmDeleteId === post.id
-                        ? "oklch(0.5 0.2 30 / 0.8)"
-                        : "oklch(0 0 0 / 0.4)",
+                      background:
+                        confirmDeleteId === post.id
+                          ? "oklch(0.5 0.2 30 / 0.8)"
+                          : "oklch(0 0 0 / 0.4)",
                     }}
                   >
-                    <Trash2 size={20} color={confirmDeleteId === post.id ? "white" : "oklch(0.7 0.15 30)"} />
+                    <Trash2
+                      size={20}
+                      color={
+                        confirmDeleteId === post.id
+                          ? "white"
+                          : "oklch(0.7 0.15 30)"
+                      }
+                    />
                   </div>
                   <span className="text-white text-xs">
                     {confirmDeleteId === post.id ? "Confirm" : "Delete"}

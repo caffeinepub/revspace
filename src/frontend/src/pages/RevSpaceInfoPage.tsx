@@ -1,16 +1,16 @@
-import { motion } from "motion/react";
 import {
+  Car,
+  Check,
+  Copy,
+  DollarSign,
+  Flame,
+  Heart,
+  Instagram,
+  Users,
   Video,
   Zap,
-  Car,
-  Users,
-  Heart,
-  Flame,
-  Instagram,
-  DollarSign,
-  Copy,
-  Check,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -18,32 +18,38 @@ const features = [
   {
     icon: Video,
     title: "Short-Form Videos & Photos",
-    description: "A feed dedicated entirely to automotive content — clips, builds, burnouts, and more. Zero noise, pure cars.",
+    description:
+      "A feed dedicated entirely to automotive content — clips, builds, burnouts, and more. Zero noise, pure cars.",
   },
   {
     icon: Zap,
     title: "Swipe-Based Discovery",
-    description: "Find new builds instantly by swiping. Every swipe reveals another passionate builder from around the world.",
+    description:
+      "Find new builds instantly by swiping. Every swipe reveals another passionate builder from around the world.",
   },
   {
     icon: Car,
     title: "Detailed Car Profiles",
-    description: "Showcase your build with specs, mod lists, build history, future plans, and every twist-of-the-wrench story.",
+    description:
+      "Showcase your build with specs, mod lists, build history, future plans, and every twist-of-the-wrench story.",
   },
   {
     icon: Users,
     title: "Follow Creators & Builders",
-    description: "Connect with local enthusiasts, follow legendary builders, and grow your own community of fellow gearheads.",
+    description:
+      "Connect with local enthusiasts, follow legendary builders, and grow your own community of fellow gearheads.",
   },
   {
     icon: Heart,
     title: "Community-Driven",
-    description: "A platform powered by passion, not algorithms chasing trends. Real content from real enthusiasts — always.",
+    description:
+      "A platform powered by passion, not algorithms chasing trends. Real content from real enthusiasts — always.",
   },
   {
     icon: Flame,
     title: "Your Digital Garage",
-    description: "Whether you're JDM, muscle, Euro, off-road, or street — RevGrid is your digital home for every build.",
+    description:
+      "Whether you're JDM, muscle, Euro, off-road, or street — RevGrid is your digital home for every build.",
   },
 ];
 
@@ -146,14 +152,23 @@ export function RevSpaceInfoPage() {
             className="text-6xl md:text-8xl font-black uppercase tracking-tight mb-4"
             style={{
               fontFamily: "'Barlow Condensed', sans-serif",
-              background: `linear-gradient(135deg, oklch(var(--foreground)) 30%, oklch(var(--orange)) 100%)`,
+              background:
+                "linear-gradient(135deg, oklch(var(--foreground)) 30%, oklch(var(--orange)) 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
               lineHeight: 0.95,
             }}
           >
-            Rev<span style={{ WebkitTextFillColor: "oklch(var(--orange))", color: "oklch(var(--orange))" }}>Space</span>
+            Rev
+            <span
+              style={{
+                WebkitTextFillColor: "oklch(var(--orange))",
+                color: "oklch(var(--orange))",
+              }}
+            >
+              Space
+            </span>
           </h1>
 
           <p
@@ -164,9 +179,14 @@ export function RevSpaceInfoPage() {
             }}
           >
             The ultimate social platform built by{" "}
-            <span style={{ color: "oklch(var(--orange))" }}>car enthusiasts</span>
+            <span style={{ color: "oklch(var(--orange))" }}>
+              car enthusiasts
+            </span>
             , for{" "}
-            <span style={{ color: "oklch(var(--orange))" }}>car enthusiasts</span>.
+            <span style={{ color: "oklch(var(--orange))" }}>
+              car enthusiasts
+            </span>
+            .
           </p>
 
           {/* Divider line */}
@@ -211,25 +231,32 @@ export function RevSpaceInfoPage() {
               style={{ color: "oklch(var(--steel-light))" }}
             >
               <p>
-                Think TikTok — but every post is pure automotive culture. From slammed builds
-                and drift clips to engine swaps, burnouts, restorations, and daily drivers,{" "}
-                <strong style={{ color: "oklch(var(--foreground))" }}>RevGrid</strong> is where
-                cars take center stage.
+                Think TikTok — but every post is pure automotive culture. From
+                slammed builds and drift clips to engine swaps, burnouts,
+                restorations, and daily drivers,{" "}
+                <strong style={{ color: "oklch(var(--foreground))" }}>
+                  RevGrid
+                </strong>{" "}
+                is where cars take center stage.
               </p>
               <p>
-                Swipe left or right through endless car content, discover unique builds, and
-                connect with owners from all over the world. Every profile is more than just a
-                username — showcase your car with photos, videos, specs, build lists, future
-                plans, and mods in progress.
+                Swipe left or right through endless car content, discover unique
+                builds, and connect with owners from all over the world. Every
+                profile is more than just a username — showcase your car with
+                photos, videos, specs, build lists, future plans, and mods in
+                progress.
               </p>
               <p>
                 Whether you're into{" "}
                 <span style={{ color: "oklch(var(--orange))" }}>JDM</span>,{" "}
                 <span style={{ color: "oklch(var(--orange))" }}>muscle</span>,{" "}
                 <span style={{ color: "oklch(var(--orange))" }}>Euro</span>,{" "}
-                <span style={{ color: "oklch(var(--orange))" }}>off-road</span>, or{" "}
-                <span style={{ color: "oklch(var(--orange))" }}>street builds</span>, RevGrid
-                is your digital garage.
+                <span style={{ color: "oklch(var(--orange))" }}>off-road</span>,
+                or{" "}
+                <span style={{ color: "oklch(var(--orange))" }}>
+                  street builds
+                </span>
+                , RevGrid is your digital garage.
               </p>
             </div>
           </div>
@@ -254,7 +281,10 @@ export function RevSpaceInfoPage() {
           >
             🔥 <span style={{ color: "oklch(var(--orange))" }}>Features</span>
           </h2>
-          <p className="mt-2 text-sm uppercase tracking-widest" style={{ color: "oklch(var(--steel))" }}>
+          <p
+            className="mt-2 text-sm uppercase tracking-widest"
+            style={{ color: "oklch(var(--steel))" }}
+          >
             Built for builders, by builders
           </p>
         </motion.div>
@@ -297,7 +327,10 @@ export function RevSpaceInfoPage() {
                   >
                     {feature.title}
                   </h3>
-                  <p className="text-sm leading-relaxed" style={{ color: "oklch(var(--steel-light))" }}>
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: "oklch(var(--steel-light))" }}
+                  >
                     {feature.description}
                   </p>
                 </div>
@@ -326,7 +359,8 @@ export function RevSpaceInfoPage() {
               letterSpacing: "0.03em",
             }}
           >
-            RevGrid isn't just an app — it's a movement for people who live and breathe cars.
+            RevGrid isn't just an app — it's a movement for people who live and
+            breathe cars.
           </p>
         </motion.div>
       </section>
@@ -352,7 +386,10 @@ export function RevSpaceInfoPage() {
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{ background: "oklch(var(--orange) / 0.15)" }}
               >
-                <DollarSign size={20} style={{ color: "oklch(var(--orange))" }} />
+                <DollarSign
+                  size={20}
+                  style={{ color: "oklch(var(--orange))" }}
+                />
               </div>
               <h2
                 className="text-2xl font-black uppercase"
@@ -361,13 +398,18 @@ export function RevSpaceInfoPage() {
                   color: "oklch(var(--foreground))",
                 }}
               >
-                Support <span style={{ color: "oklch(var(--orange))" }}>RevSpace</span>
+                Support{" "}
+                <span style={{ color: "oklch(var(--orange))" }}>RevSpace</span>
               </h2>
             </div>
 
-            <p className="text-sm leading-relaxed" style={{ color: "oklch(var(--steel-light))" }}>
-              RevGrid is independently built and community-powered. If you'd like to support
-              development, server costs, and future features, donations are always appreciated.
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "oklch(var(--steel-light))" }}
+            >
+              RevGrid is independently built and community-powered. If you'd
+              like to support development, server costs, and future features,
+              donations are always appreciated.
             </p>
 
             <div>
@@ -378,7 +420,10 @@ export function RevSpaceInfoPage() {
                 Cash App
               </p>
               <CopyableTag value="$alteredsol" />
-              <p className="text-xs mt-2" style={{ color: "oklch(var(--steel))" }}>
+              <p
+                className="text-xs mt-2"
+                style={{ color: "oklch(var(--steel))" }}
+              >
                 Tap to copy
               </p>
             </div>
@@ -402,7 +447,10 @@ export function RevSpaceInfoPage() {
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{ background: "oklch(var(--orange) / 0.15)" }}
               >
-                <Instagram size={20} style={{ color: "oklch(var(--orange))" }} />
+                <Instagram
+                  size={20}
+                  style={{ color: "oklch(var(--orange))" }}
+                />
               </div>
               <h2
                 className="text-2xl font-black uppercase"
@@ -411,12 +459,17 @@ export function RevSpaceInfoPage() {
                   color: "oklch(var(--foreground))",
                 }}
               >
-                📩 <span style={{ color: "oklch(var(--orange))" }}>Contact</span>
+                📩{" "}
+                <span style={{ color: "oklch(var(--orange))" }}>Contact</span>
               </h2>
             </div>
 
-            <p className="text-sm leading-relaxed" style={{ color: "oklch(var(--steel-light))" }}>
-              Questions, collabs, or just want to show off your build? Slide into our DMs.
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "oklch(var(--steel-light))" }}
+            >
+              Questions, collabs, or just want to show off your build? Slide
+              into our DMs.
             </p>
 
             <a
@@ -425,7 +478,8 @@ export function RevSpaceInfoPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-5 py-3 rounded-xl font-bold text-base transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                background: "linear-gradient(135deg, oklch(var(--orange) / 0.15), oklch(var(--orange) / 0.05))",
+                background:
+                  "linear-gradient(135deg, oklch(var(--orange) / 0.15), oklch(var(--orange) / 0.05))",
                 border: "1px solid oklch(var(--orange) / 0.4)",
                 color: "oklch(var(--orange-bright))",
                 fontFamily: "'Barlow Condensed', sans-serif",
@@ -457,9 +511,14 @@ export function RevSpaceInfoPage() {
           }}
         >
           Built Different.{" "}
-          <span style={{ color: "oklch(var(--orange) / 0.3)" }}>Built Altered.</span>
+          <span style={{ color: "oklch(var(--orange) / 0.3)" }}>
+            Built Altered.
+          </span>
         </p>
-        <p className="mt-4 text-xs uppercase tracking-widest" style={{ color: "oklch(var(--steel))" }}>
+        <p
+          className="mt-4 text-xs uppercase tracking-widest"
+          style={{ color: "oklch(var(--steel))" }}
+        >
           © {new Date().getFullYear()} RevSpace — Built with ♥ using{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}

@@ -20,12 +20,20 @@ export interface EventView {
     eventDate: bigint;
     photos: Array<string>;
 }
+export interface ProfileWithPrincipal {
+    principal: Principal;
+    profile: Profile;
+}
 export interface Comment {
     id: string;
     content: string;
     author: Principal;
     timestamp: bigint;
     postId: string;
+}
+export interface UserWithRole {
+    principal: Principal;
+    role: UserRole;
 }
 export interface Listing {
     id: string;
@@ -39,15 +47,6 @@ export interface Listing {
     location: string;
     condition: string;
 }
-export interface Notification {
-    id: string;
-    notifType: string;
-    user: Principal;
-    isRead: boolean;
-    message: string;
-    timestamp: bigint;
-    relatedId: string;
-}
 export interface PostView {
     id: string;
     postType: string;
@@ -59,20 +58,6 @@ export interface PostView {
     mediaUrls: Array<string>;
     comments: Array<string>;
 }
-export interface Message {
-    id: string;
-    content: string;
-    sender: Principal;
-    timestamp: bigint;
-    receiver: Principal;
-}
-export interface Profile {
-    bio: string;
-    displayName: string;
-    avatarUrl: string;
-    bannerUrl: string;
-    location: string;
-}
 export interface ClubView {
     id: string;
     coverImageUrl: string;
@@ -81,6 +66,29 @@ export interface ClubView {
     name: string;
     description: string;
     category: string;
+}
+export interface Profile {
+    bio: string;
+    displayName: string;
+    avatarUrl: string;
+    bannerUrl: string;
+    location: string;
+}
+export interface Notification {
+    id: string;
+    notifType: string;
+    user: Principal;
+    isRead: boolean;
+    message: string;
+    timestamp: bigint;
+    relatedId: string;
+}
+export interface Message {
+    id: string;
+    content: string;
+    sender: Principal;
+    timestamp: bigint;
+    receiver: Principal;
 }
 export interface Car {
     id: string;
@@ -102,6 +110,13 @@ export interface backendInterface {
     addCar(make: string, model: string, year: string, color: string, description: string, modifications: Array<string>, imageUrls: Array<string>): Promise<string>;
     addComment(postId: string, content: string): Promise<string>;
     addEventPhoto(eventId: string, photoUrl: string): Promise<void>;
+    adminBanUser(user: Principal): Promise<void>;
+    adminDeleteListing(listingId: string): Promise<void>;
+    adminDeletePost(postId: string): Promise<void>;
+    adminDeleteProfile(user: Principal): Promise<void>;
+    adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
+    adminGetAllUsers(): Promise<Array<UserWithRole>>;
+    adminUnbanUser(user: Principal): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClub(name: string, description: string, category: string, coverImageUrl: string): Promise<string>;
     createEvent(title: string, description: string, location: string, eventDate: bigint, coverImageUrl: string, category: string, maxAttendees: bigint): Promise<string>;

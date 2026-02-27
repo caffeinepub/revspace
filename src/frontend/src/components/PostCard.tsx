@@ -1,13 +1,22 @@
-import { useState, useRef } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Play, Volume2, VolumeX } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PostView } from "../backend.d";
-import { timeAgo, getInitials, truncatePrincipal } from "../utils/format";
-import { useLikePost, useUnlikePost, useGetProfile } from "../hooks/useQueries";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { Link } from "@tanstack/react-router";
+import {
+  Bookmark,
+  Heart,
+  MessageCircle,
+  MoreHorizontal,
+  Play,
+  Share2,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import type { PostView } from "../backend.d";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useGetProfile, useLikePost, useUnlikePost } from "../hooks/useQueries";
+import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
 
 interface PostCardProps {
   post: PostView;
@@ -21,7 +30,9 @@ function PostTypeBadge({ type }: { type: string }) {
     Reel: "bg-purple-500/20 text-purple-400 border-purple-500/30",
   };
   return (
-    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colors[type] ?? "badge-orange"}`}>
+    <span
+      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colors[type] ?? "badge-orange"}`}
+    >
       {type}
     </span>
   );
@@ -32,11 +43,15 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const myPrincipal = identity?.getPrincipal().toString();
   const authorKey = post.author.toString();
 
-  const { data: profile, isLoading: profileLoading } = useGetProfile(post.author);
+  const { data: profile, isLoading: profileLoading } = useGetProfile(
+    post.author,
+  );
   const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
   const avatarUrl = profile?.avatarUrl ?? "";
 
-  const hasLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
+  const hasLiked = myPrincipal
+    ? post.likes.some((l) => l.toString() === myPrincipal)
+    : false;
   const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
   const [likeCount, setLikeCount] = useState(post.likes.length);
 
@@ -91,16 +106,26 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     <article className="post-card animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
-        <Link to="/profile/$userId" params={{ userId: authorKey }} className="flex items-center gap-3 group">
+        <Link
+          to="/profile/$userId"
+          params={{ userId: authorKey }}
+          className="flex items-center gap-3 group"
+        >
           <Avatar className="w-9 h-9">
             {profileLoading ? (
-              <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
+              <AvatarFallback
+                style={{ background: "oklch(var(--surface-elevated))" }}
+              >
                 <Skeleton className="w-full h-full rounded-full" />
               </AvatarFallback>
             ) : (
               <>
-                {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
-                <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
+                {avatarUrl ? (
+                  <AvatarImage src={avatarUrl} alt={displayName} />
+                ) : null}
+                <AvatarFallback
+                  style={{ background: "oklch(var(--surface-elevated))" }}
+                >
                   {getInitials(displayName)}
                 </AvatarFallback>
               </>
@@ -111,14 +136,21 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
               {profileLoading ? (
                 <Skeleton className="w-24 h-3" />
               ) : (
-                <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">{displayName}</span>
+                <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
+                  {displayName}
+                </span>
               )}
               <PostTypeBadge type={post.postType} />
             </div>
-            <span className="text-xs text-steel">{timeAgo(post.timestamp)}</span>
+            <span className="text-xs text-steel">
+              {timeAgo(post.timestamp)}
+            </span>
           </div>
         </Link>
-        <button type="button" className="text-steel hover:text-foreground transition-colors p-1">
+        <button
+          type="button"
+          className="text-steel hover:text-foreground transition-colors p-1"
+        >
           <MoreHorizontal size={18} />
         </button>
       </div>
@@ -164,10 +196,11 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
                 className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
                 style={{ background: "oklch(0 0 0 / 0.55)" }}
               >
-                {videoMuted
-                  ? <VolumeX size={18} color="white" />
-                  : <Volume2 size={18} color="white" />
-                }
+                {videoMuted ? (
+                  <VolumeX size={18} color="white" />
+                ) : (
+                  <Volume2 size={18} color="white" />
+                )}
               </button>
             </>
           )}
@@ -177,7 +210,9 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       {/* Content */}
       {post.content && (
         <div className="px-4 py-3">
-          <p className="text-sm text-foreground leading-relaxed">{post.content}</p>
+          <p className="text-sm text-foreground leading-relaxed">
+            {post.content}
+          </p>
         </div>
       )}
 

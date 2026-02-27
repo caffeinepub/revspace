@@ -1,11 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
-import { useActor } from "./useActor";
-import { useInternetIdentity } from "./useInternetIdentity";
-import type { Principal } from "@icp-sdk/core/principal";
 import { HttpAgent } from "@icp-sdk/core/agent";
+import type { Principal } from "@icp-sdk/core/principal";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { loadConfig } from "../config";
 import { StorageClient } from "../utils/StorageClient";
+import { useActor } from "./useActor";
+import { useInternetIdentity } from "./useInternetIdentity";
 
 // ========================
 // File Upload Hook
@@ -13,38 +13,43 @@ import { StorageClient } from "../utils/StorageClient";
 export function useUploadFile() {
   const { identity } = useInternetIdentity();
 
-  const uploadFile = useCallback(async (
-    file: File,
-    onProgress?: (pct: number) => void
-  ): Promise<string> => {
-    const config = await loadConfig();
-
-    // Build the agent the same way config.ts does so root keys and identity are correct
-    const agent = new HttpAgent({
-      host: config.backend_host,
-      ...(identity ? { identity } : {}),
-    });
-
-    // Fetch root key in local/dev environments (matches config.ts behaviour)
-    if (config.backend_host?.includes("localhost")) {
-      try {
-        await agent.fetchRootKey();
-      } catch (err) {
-        console.warn("Unable to fetch root key for storage agent", err);
+  const uploadFile = useCallback(
+    async (file: File, onProgress?: (pct: number) => void): Promise<string> => {
+      if (!identity) {
+        throw new Error("Not authenticated. Please log in before uploading.");
       }
-    }
 
-    const storageClient = new StorageClient(
-      config.bucket_name,
-      config.storage_gateway_url,
-      config.backend_canister_id,
-      config.project_id,
-      agent,
-    );
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const { hash } = await storageClient.putFile(bytes, onProgress);
-    return storageClient.getDirectURL(hash);
-  }, [identity]);
+      const config = await loadConfig();
+
+      // Mirror exactly how config.ts builds its agent so identity, host and
+      // root-key behaviour are identical to every other canister call.
+      const agent = new HttpAgent({
+        identity,
+        host: config.backend_host,
+      });
+
+      if (config.backend_host?.includes("localhost")) {
+        try {
+          await agent.fetchRootKey();
+        } catch (err) {
+          console.warn("Unable to fetch root key for storage agent", err);
+        }
+      }
+
+      const storageClient = new StorageClient(
+        config.bucket_name,
+        config.storage_gateway_url,
+        config.backend_canister_id,
+        config.project_id,
+        agent,
+      );
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const { hash } = await storageClient.putFile(bytes, onProgress);
+      return storageClient.getDirectURL(hash);
+    },
+    [identity],
+  );
 
   return uploadFile;
 }
@@ -116,7 +121,10 @@ export function useAddComment() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+    mutationFn: async ({
+      postId,
+      content,
+    }: { postId: string; content: string }) => {
       if (!actor) throw new Error("Not connected");
       return actor.addComment(postId, content);
     },
@@ -206,7 +214,13 @@ export function useUpdateProfile() {
       bannerUrl: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateProfile(displayName, bio, avatarUrl, location, bannerUrl);
+      return actor.updateProfile(
+        displayName,
+        bio,
+        avatarUrl,
+        location,
+        bannerUrl,
+      );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
   });
@@ -260,7 +274,7 @@ export function useAddCar() {
         car.color,
         car.description,
         car.modifications,
-        car.imageUrls
+        car.imageUrls,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["garage"] }),
@@ -339,7 +353,7 @@ export function useCreateEvent() {
         event.eventDate,
         event.coverImageUrl,
         event.category,
-        event.maxAttendees
+        event.maxAttendees,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
@@ -362,7 +376,10 @@ export function useAddEventPhoto() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ eventId, photoUrl }: { eventId: string; photoUrl: string }) => {
+    mutationFn: async ({
+      eventId,
+      photoUrl,
+    }: { eventId: string; photoUrl: string }) => {
       if (!actor) throw new Error("Not connected");
       return actor.addEventPhoto(eventId, photoUrl);
     },
@@ -421,7 +438,7 @@ export function useCreateListing() {
         listing.category,
         listing.condition,
         listing.imageUrls,
-        listing.location
+        listing.location,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["listings"] }),
@@ -502,7 +519,12 @@ export function useCreateClub() {
       coverImageUrl: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.createClub(club.name, club.description, club.category, club.coverImageUrl);
+      return actor.createClub(
+        club.name,
+        club.description,
+        club.category,
+        club.coverImageUrl,
+      );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clubs"] }),
   });
@@ -610,9 +632,24 @@ export function useMarkNotificationRead() {
 export function useSendNotificationToUser() {
   const { actor } = useActor();
   return useMutation({
-    mutationFn: async ({ targetUser, notifType, message, relatedId }: { targetUser: Principal; notifType: string; message: string; relatedId: string }) => {
+    mutationFn: async ({
+      targetUser,
+      notifType,
+      message,
+      relatedId,
+    }: {
+      targetUser: Principal;
+      notifType: string;
+      message: string;
+      relatedId: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.sendNotificationToUser(targetUser, notifType, message, relatedId);
+      return actor.sendNotificationToUser(
+        targetUser,
+        notifType,
+        message,
+        relatedId,
+      );
     },
   });
 }
@@ -649,12 +686,17 @@ export function useSendMessage() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ receiver, content }: { receiver: Principal; content: string }) => {
+    mutationFn: async ({
+      receiver,
+      content,
+    }: { receiver: Principal; content: string }) => {
       if (!actor) throw new Error("Not connected");
       return actor.sendMessage(receiver, content);
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["messages", vars.receiver.toString()] });
+      qc.invalidateQueries({
+        queryKey: ["messages", vars.receiver.toString()],
+      });
       qc.invalidateQueries({ queryKey: ["conversations"] });
     },
   });

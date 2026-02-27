@@ -1,15 +1,26 @@
-import { useState, useEffect, useRef } from "react";
-import { Loader2, User, MapPin, FileText, Camera, ImagePlus } from "lucide-react";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMyProfile, useUpdateProfile, useUploadFile } from "../hooks/useQueries";
-import { getInitials } from "../utils/format";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Camera,
+  FileText,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  User,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  useMyProfile,
+  useUpdateProfile,
+  useUploadFile,
+} from "../hooks/useQueries";
+import { convertHeicToJpeg } from "../lib/convertHeic";
+import { getInitials } from "../utils/format";
 
 export function SettingsPage() {
   const { data: profile, isLoading } = useMyProfile();
@@ -104,7 +115,10 @@ export function SettingsPage() {
         {/* Avatar & Banner Preview Card */}
         <div
           className="rounded-xl overflow-hidden mb-6"
-          style={{ border: "1px solid oklch(var(--border))", background: "oklch(var(--surface))" }}
+          style={{
+            border: "1px solid oklch(var(--border))",
+            background: "oklch(var(--surface))",
+          }}
         >
           {/* Banner */}
           <div className="relative h-24 overflow-hidden">
@@ -117,7 +131,10 @@ export function SettingsPage() {
             ) : (
               <div
                 className="w-full h-full"
-                style={{ background: "linear-gradient(135deg, oklch(var(--carbon)) 0%, oklch(var(--surface)) 50%, oklch(var(--orange) / 0.15) 100%)" }}
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(var(--carbon)) 0%, oklch(var(--surface)) 50%, oklch(var(--orange) / 0.15) 100%)",
+                }}
               />
             )}
             {/* Banner upload button */}
@@ -131,12 +148,16 @@ export function SettingsPage() {
               {bannerUploading ? (
                 <div className="flex flex-col items-center gap-1">
                   <Loader2 size={20} className="text-white animate-spin" />
-                  <span className="text-white text-xs">{Math.round(bannerProgress ?? 0)}%</span>
+                  <span className="text-white text-xs">
+                    {Math.round(bannerProgress ?? 0)}%
+                  </span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-1">
                   <ImagePlus size={20} className="text-white" />
-                  <span className="text-white text-xs font-semibold">Change Banner</span>
+                  <span className="text-white text-xs font-semibold">
+                    Change Banner
+                  </span>
                 </div>
               )}
             </button>
@@ -148,10 +169,16 @@ export function SettingsPage() {
               {isLoading ? (
                 <Skeleton className="w-16 h-16 rounded-full" />
               ) : (
-                <Avatar className="w-16 h-16 border-2" style={{ borderColor: "oklch(var(--surface))" }}>
+                <Avatar
+                  className="w-16 h-16 border-2"
+                  style={{ borderColor: "oklch(var(--surface))" }}
+                >
                   <AvatarImage src={form.avatarUrl} />
                   <AvatarFallback
-                    style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+                    style={{
+                      background: "oklch(var(--orange))",
+                      color: "oklch(var(--carbon))",
+                    }}
                     className="text-xl font-bold"
                   >
                     {getInitials(form.displayName || "??")}
@@ -174,8 +201,12 @@ export function SettingsPage() {
               </button>
             </div>
             <div>
-              <p className="font-semibold text-foreground">{form.displayName || "Your Name"}</p>
-              <p className="text-xs text-steel">{form.location || "No location set"}</p>
+              <p className="font-semibold text-foreground">
+                {form.displayName || "Your Name"}
+              </p>
+              <p className="text-xs text-steel">
+                {form.location || "No location set"}
+              </p>
             </div>
           </div>
         </div>
@@ -185,14 +216,23 @@ export function SettingsPage() {
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-steel">Uploading avatar...</span>
-              <span className="text-xs font-semibold" style={{ color: "oklch(var(--orange))" }}>
+              <span
+                className="text-xs font-semibold"
+                style={{ color: "oklch(var(--orange))" }}
+              >
                 {Math.round(avatarProgress)}%
               </span>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "oklch(var(--surface))" }}>
+            <div
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ background: "oklch(var(--surface))" }}
+            >
               <div
                 className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${avatarProgress}%`, background: "oklch(var(--orange))" }}
+                style={{
+                  width: `${avatarProgress}%`,
+                  background: "oklch(var(--orange))",
+                }}
               />
             </div>
           </div>
@@ -203,14 +243,23 @@ export function SettingsPage() {
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-steel">Uploading banner...</span>
-              <span className="text-xs font-semibold" style={{ color: "oklch(var(--orange))" }}>
+              <span
+                className="text-xs font-semibold"
+                style={{ color: "oklch(var(--orange))" }}
+              >
                 {Math.round(bannerProgress)}%
               </span>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "oklch(var(--surface))" }}>
+            <div
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ background: "oklch(var(--surface))" }}
+            >
               <div
                 className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${bannerProgress}%`, background: "oklch(var(--orange))" }}
+                style={{
+                  width: `${bannerProgress}%`,
+                  background: "oklch(var(--orange))",
+                }}
               />
             </div>
           </div>
@@ -241,7 +290,11 @@ export function SettingsPage() {
             disabled={avatarUploading}
             className="flex items-center gap-2 text-sm border-border text-steel hover:text-foreground"
           >
-            {avatarUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+            {avatarUploading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Camera size={14} />
+            )}
             Change Avatar
           </Button>
           <Button
@@ -251,7 +304,11 @@ export function SettingsPage() {
             disabled={bannerUploading}
             className="flex items-center gap-2 text-sm border-border text-steel hover:text-foreground"
           >
-            {bannerUploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+            {bannerUploading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <ImagePlus size={14} />
+            )}
             Change Banner
           </Button>
         </div>
@@ -267,10 +324,15 @@ export function SettingsPage() {
             ) : (
               <Input
                 value={form.displayName}
-                onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, displayName: e.target.value }))
+                }
                 placeholder="Your display name"
                 maxLength={50}
-                style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             )}
           </div>
@@ -285,14 +347,21 @@ export function SettingsPage() {
             ) : (
               <Textarea
                 value={form.bio}
-                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, bio: e.target.value }))
+                }
                 placeholder="Tell the community about you and your build..."
                 className="min-h-[80px] resize-none text-sm"
                 maxLength={200}
-                style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             )}
-            <p className="text-[11px] text-steel text-right mt-0.5">{form.bio.length}/200</p>
+            <p className="text-[11px] text-steel text-right mt-0.5">
+              {form.bio.length}/200
+            </p>
           </div>
 
           <div>
@@ -305,10 +374,15 @@ export function SettingsPage() {
             ) : (
               <Input
                 value={form.location}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, location: e.target.value }))
+                }
                 placeholder="Los Angeles, CA"
                 maxLength={100}
-                style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             )}
           </div>
@@ -338,7 +412,12 @@ export function SettingsPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-6">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

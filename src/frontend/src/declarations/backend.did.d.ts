@@ -96,9 +96,14 @@ export interface Profile {
   'bannerUrl' : string,
   'location' : string,
 }
+export interface ProfileWithPrincipal {
+  'principal' : Principal,
+  'profile' : Profile,
+}
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface UserWithRole { 'principal' : Principal, 'role' : UserRole }
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -133,6 +138,13 @@ export interface _SERVICE {
   >,
   'addComment' : ActorMethod<[string, string], string>,
   'addEventPhoto' : ActorMethod<[string, string], undefined>,
+  'adminBanUser' : ActorMethod<[Principal], undefined>,
+  'adminDeleteListing' : ActorMethod<[string], undefined>,
+  'adminDeletePost' : ActorMethod<[string], undefined>,
+  'adminDeleteProfile' : ActorMethod<[Principal], undefined>,
+  'adminGetAllProfiles' : ActorMethod<[], Array<ProfileWithPrincipal>>,
+  'adminGetAllUsers' : ActorMethod<[], Array<UserWithRole>>,
+  'adminUnbanUser' : ActorMethod<[Principal], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createClub' : ActorMethod<[string, string, string, string], string>,
   'createEvent' : ActorMethod<

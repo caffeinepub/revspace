@@ -1,21 +1,28 @@
-import { useState } from "react";
-import { Wrench, MessageSquare, Clock, ChevronRight, Send, Loader2 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import type { Principal } from "@icp-sdk/core/principal";
+import { Link } from "@tanstack/react-router";
 import {
-  useGetAllPosts,
-  useGetProfile,
-  useGetComments,
+  ChevronRight,
+  Clock,
+  Loader2,
+  MessageSquare,
+  Send,
+  Wrench,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import type { Comment, PostView } from "../backend.d";
+import {
   useAddComment,
   useCreatePost,
+  useGetAllPosts,
+  useGetComments,
+  useGetProfile,
 } from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
-import type { PostView, Comment } from "../backend.d";
-import type { Principal } from "@icp-sdk/core/principal";
 
 const CATEGORIES = [
   "Engine",
@@ -32,7 +39,8 @@ const CATEGORIES = [
 // ─── Author Component ─────────────────────────────────────────────────────────
 function PostAuthor({ author }: { author: Principal }) {
   const { data: profile } = useGetProfile(author);
-  const displayName = profile?.displayName || truncatePrincipal(author.toString());
+  const displayName =
+    profile?.displayName || truncatePrincipal(author.toString());
   const avatarUrl = profile?.avatarUrl || "";
   const authorKey = author.toString();
 
@@ -46,7 +54,10 @@ function PostAuthor({ author }: { author: Principal }) {
         {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
         <AvatarFallback
           className="text-[10px] font-bold"
-          style={{ background: "oklch(var(--orange) / 0.2)", color: "oklch(var(--orange-bright))" }}
+          style={{
+            background: "oklch(var(--orange) / 0.2)",
+            color: "oklch(var(--orange-bright))",
+          }}
         >
           {displayName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
@@ -64,7 +75,8 @@ function PostAuthor({ author }: { author: Principal }) {
 // ─── Comment Author ───────────────────────────────────────────────────────────
 function CommentAuthor({ author }: { author: Principal }) {
   const { data: profile } = useGetProfile(author);
-  const displayName = profile?.displayName || truncatePrincipal(author.toString());
+  const displayName =
+    profile?.displayName || truncatePrincipal(author.toString());
   const avatarUrl = profile?.avatarUrl || "";
   const authorKey = author.toString();
 
@@ -78,7 +90,10 @@ function CommentAuthor({ author }: { author: Principal }) {
         {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
         <AvatarFallback
           className="text-[8px] font-bold"
-          style={{ background: "oklch(var(--orange) / 0.15)", color: "oklch(var(--orange-bright))" }}
+          style={{
+            background: "oklch(var(--orange) / 0.15)",
+            color: "oklch(var(--orange-bright))",
+          }}
         >
           {displayName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
@@ -102,10 +117,16 @@ function CommentItem({ comment }: { comment: Comment }) {
     >
       <CommentAuthor author={comment.author} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm leading-relaxed" style={{ color: "oklch(var(--foreground))" }}>
+        <p
+          className="text-sm leading-relaxed"
+          style={{ color: "oklch(var(--foreground))" }}
+        >
           {comment.content}
         </p>
-        <span className="text-[10px] mt-0.5 block" style={{ color: "oklch(var(--steel))" }}>
+        <span
+          className="text-[10px] mt-0.5 block"
+          style={{ color: "oklch(var(--steel))" }}
+        >
           {timeAgo(comment.timestamp)}
         </span>
       </div>
@@ -130,7 +151,7 @@ function CommentSection({ postId }: { postId: string }) {
           toast.success("Reply posted!");
         },
         onError: () => toast.error("Failed to post reply"),
-      }
+      },
     );
   };
 
@@ -163,7 +184,10 @@ function CommentSection({ postId }: { postId: string }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-center py-2" style={{ color: "oklch(var(--steel))" }}>
+          <p
+            className="text-xs text-center py-2"
+            style={{ color: "oklch(var(--steel))" }}
+          >
             No replies yet — be the first to help!
           </p>
         )}
@@ -198,7 +222,9 @@ function CommentSection({ postId }: { postId: string }) {
           size="sm"
           className="self-end shrink-0"
           style={{
-            background: text.trim() ? "oklch(var(--orange))" : "oklch(var(--surface-elevated))",
+            background: text.trim()
+              ? "oklch(var(--orange))"
+              : "oklch(var(--surface-elevated))",
             color: text.trim() ? "oklch(var(--carbon))" : "oklch(var(--steel))",
             transition: "all 0.2s",
           }}
@@ -232,7 +258,10 @@ function QuestionCard({ post }: { post: PostView }) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 flex-wrap">
             <PostAuthor author={post.author} />
-            <span className="text-xs flex items-center gap-1" style={{ color: "oklch(var(--steel))" }}>
+            <span
+              className="text-xs flex items-center gap-1"
+              style={{ color: "oklch(var(--steel))" }}
+            >
               <Clock size={11} />
               {timeAgo(post.timestamp)}
             </span>
@@ -271,8 +300,8 @@ function QuestionCard({ post }: { post: PostView }) {
             {commentCount === 0
               ? "No replies"
               : commentCount === 1
-              ? "1 reply"
-              : `${commentCount} replies`}
+                ? "1 reply"
+                : `${commentCount} replies`}
           </span>
         </div>
       </div>
@@ -340,8 +369,9 @@ function AskQuestionForm({ onSuccess }: { onSuccess: () => void }) {
           toast.success("Question posted!");
           onSuccess();
         },
-        onError: () => toast.error("Failed to post question. Please try again."),
-      }
+        onError: () =>
+          toast.error("Failed to post question. Please try again."),
+      },
     );
   };
 
@@ -407,8 +437,12 @@ function AskQuestionForm({ onSuccess }: { onSuccess: () => void }) {
         disabled={!question.trim() || createPost.isPending}
         className="w-full font-semibold"
         style={{
-          background: question.trim() ? "oklch(var(--orange))" : "oklch(var(--surface-elevated))",
-          color: question.trim() ? "oklch(var(--carbon))" : "oklch(var(--steel))",
+          background: question.trim()
+            ? "oklch(var(--orange))"
+            : "oklch(var(--surface-elevated))",
+          color: question.trim()
+            ? "oklch(var(--carbon))"
+            : "oklch(var(--steel))",
           transition: "all 0.2s",
         }}
       >
@@ -442,10 +476,15 @@ export function MechanicsPage() {
     : mechanicsPosts;
 
   // Get unique categories that have been used
-  const usedCategories = Array.from(new Set(mechanicsPosts.map((p) => p.topic).filter(Boolean)));
+  const usedCategories = Array.from(
+    new Set(mechanicsPosts.map((p) => p.topic).filter(Boolean)),
+  );
 
   return (
-    <div className="min-h-screen" style={{ background: "oklch(var(--background))" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "oklch(var(--background))" }}
+    >
       {/* Page header */}
       <div
         className="relative px-4 pt-6 pb-5"
@@ -464,7 +503,10 @@ export function MechanicsPage() {
                 border: "1px solid oklch(var(--orange) / 0.3)",
               }}
             >
-              <Wrench size={18} style={{ color: "oklch(var(--orange-bright))" }} />
+              <Wrench
+                size={18}
+                style={{ color: "oklch(var(--orange-bright))" }}
+              />
             </div>
             <div>
               <h1
@@ -477,7 +519,10 @@ export function MechanicsPage() {
               >
                 Mechanics Q&amp;A
               </h1>
-              <p className="text-xs mt-0.5" style={{ color: "oklch(var(--steel-light))" }}>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "oklch(var(--steel-light))" }}
+              >
                 Ask a question · Get answers from the community
               </p>
             </div>
@@ -516,7 +561,9 @@ export function MechanicsPage() {
               <button
                 key={cat}
                 type="button"
-                onClick={() => setFilterCategory(cat === filterCategory ? null : cat)}
+                onClick={() =>
+                  setFilterCategory(cat === filterCategory ? null : cat)
+                }
                 className="text-xs px-3 py-1 rounded-full font-medium transition-all duration-150"
                 style={
                   filterCategory === cat
@@ -547,7 +594,9 @@ export function MechanicsPage() {
               <QuestionCardSkeleton />
             </>
           ) : filteredPosts.length > 0 ? (
-            filteredPosts.map((post) => <QuestionCard key={post.id} post={post} />)
+            filteredPosts.map((post) => (
+              <QuestionCard key={post.id} post={post} />
+            ))
           ) : (
             <div
               className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl"
@@ -563,15 +612,26 @@ export function MechanicsPage() {
                   border: "1px solid oklch(var(--orange) / 0.2)",
                 }}
               >
-                <Wrench size={24} style={{ color: "oklch(var(--orange-bright))" }} />
+                <Wrench
+                  size={24}
+                  style={{ color: "oklch(var(--orange-bright))" }}
+                />
               </div>
               <h3
                 className="text-lg font-bold uppercase tracking-wide mb-2"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "oklch(var(--foreground))" }}
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  color: "oklch(var(--foreground))",
+                }}
               >
-                {filterCategory ? `No ${filterCategory} questions yet` : "No questions yet"}
+                {filterCategory
+                  ? `No ${filterCategory} questions yet`
+                  : "No questions yet"}
               </h3>
-              <p className="text-sm max-w-xs" style={{ color: "oklch(var(--steel-light))" }}>
+              <p
+                className="text-sm max-w-xs"
+                style={{ color: "oklch(var(--steel-light))" }}
+              >
                 {filterCategory
                   ? "Try a different category or be the first to ask a question in this topic."
                   : "Be the first to ask the community a question! Get answers from fellow car enthusiasts."}
@@ -581,11 +641,14 @@ export function MechanicsPage() {
         </div>
 
         {/* Footer */}
-        <footer className="py-8 text-center text-xs border-t border-border mt-8" style={{ color: "oklch(var(--steel))" }}>
+        <footer
+          className="py-8 text-center text-xs border-t border-border mt-8"
+          style={{ color: "oklch(var(--steel))" }}
+        >
           © {new Date().getFullYear()}. Built with ❤️ using{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(
-              typeof window !== "undefined" ? window.location.hostname : ""
+              typeof window !== "undefined" ? window.location.hostname : "",
             )}`}
             target="_blank"
             rel="noopener noreferrer"

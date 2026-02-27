@@ -1,18 +1,18 @@
-import { useNavigate } from "@tanstack/react-router";
-import { MessageCircle, User, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Principal } from "@icp-sdk/core/principal";
+import { useNavigate } from "@tanstack/react-router";
+import { MessageCircle, User, Users } from "lucide-react";
 import { useGetProfile } from "../hooks/useQueries";
 import { getInitials, truncatePrincipal } from "../utils/format";
-import type { Principal } from "@icp-sdk/core/principal";
 
 interface FollowListModalProps {
   title: string;
@@ -68,8 +68,12 @@ function UserListItem({ principal }: { principal: Principal }) {
 
           {/* Name */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
-            <p className="text-[10px] text-steel font-mono truncate">{truncatePrincipal(principalStr)}</p>
+            <p className="text-sm font-semibold text-foreground truncate">
+              {displayName}
+            </p>
+            <p className="text-[10px] text-steel font-mono truncate">
+              {truncatePrincipal(principalStr)}
+            </p>
           </div>
 
           {/* Actions */}
@@ -88,7 +92,10 @@ function UserListItem({ principal }: { principal: Principal }) {
               type="button"
               size="sm"
               className="h-7 px-2.5 text-xs font-bold"
-              style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+              style={{
+                background: "oklch(var(--orange))",
+                color: "oklch(var(--carbon))",
+              }}
               onClick={handleMessage}
             >
               <MessageCircle size={12} className="mr-1" />
@@ -101,7 +108,12 @@ function UserListItem({ principal }: { principal: Principal }) {
   );
 }
 
-export function FollowListModal({ title, principals, open, onClose }: FollowListModalProps) {
+export function FollowListModal({
+  title,
+  principals,
+  open,
+  onClose,
+}: FollowListModalProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
@@ -111,7 +123,10 @@ export function FollowListModal({ title, principals, open, onClose }: FollowList
           border: "1px solid oklch(var(--border))",
         }}
       >
-        <DialogHeader className="px-4 pt-5 pb-3" style={{ borderBottom: "1px solid oklch(var(--border))" }}>
+        <DialogHeader
+          className="px-4 pt-5 pb-3"
+          style={{ borderBottom: "1px solid oklch(var(--border))" }}
+        >
           <DialogTitle className="font-display text-lg font-bold flex items-center gap-2">
             <Users size={18} style={{ color: "oklch(var(--orange-bright))" }} />
             {title}
@@ -132,7 +147,9 @@ export function FollowListModal({ title, principals, open, onClose }: FollowList
             >
               <Users size={22} className="text-steel" />
             </div>
-            <p className="text-sm font-semibold text-foreground">No users yet</p>
+            <p className="text-sm font-semibold text-foreground">
+              No users yet
+            </p>
             <p className="text-xs text-steel mt-1">
               {title === "Followers"
                 ? "No one is following this account yet"

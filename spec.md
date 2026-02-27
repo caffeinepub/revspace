@@ -1,53 +1,27 @@
 # RevSpace
 
 ## Current State
-Full-stack car enthusiast social platform with: feed posts, reels, garage, events (car meets), marketplace, clubs, leaderboard, messaging, notifications, shop page, SEO, and PWA support.
-
-Events currently support: create, list, RSVP/un-RSVP. No delete event, no cover image upload (URL only).
-Reels currently support: upload video (any type), like, comment, delete. No topic/category tagging on reels.
-Posts/Reels: postType is a free-text string with no enum constraint enforced in the UI.
+- MessagesPage shows conversations using truncated Principal IDs (e.g. "xk3ab...1f23") instead of display names
+- Sending a new message does NOT create a notification for the recipient
+- FeedPage renders posts in the order returned by `getAllPosts()` — newest posts appear at the bottom unless the backend already returns them sorted descending
+- NotificationsPage handles like/comment/follow/message types but does not handle new inbound message notifications specifically
 
 ## Requested Changes (Diff)
 
 ### Add
-- `deleteEvent(eventId: Text)` backend function — only creator or admin can delete
-- `addEventPhoto(eventId: Text, photoUrl: Text)` backend function — add photos to a meet after creation
-- `getEventPhotos(eventId: Text)` backend query — return array of photo URLs for an event
-- Event cover image upload (file picker) in the CreateEventModal instead of URL text field
-- Delete button on event cards/detail modal (only visible to event creator)
-- Event photo gallery section in EventDetailModal — view and add photos
-- `topic` field on Post type (Text) — reel categories (e.g. "Street Drift", "Car Show", "Track Day", "Burnout", "Stance", "JDM Build", "Muscle", "Import", "Other")
-- Topic/category selector when creating a Reel in CreatePostPage
-- Topic badge displayed on each reel card in ReelsPage
-- Topic filter bar at the top of ReelsPage to filter reels by topic
+- When a message is sent, fire a notification to the recipient with type `"message"` and a text like `"<senderName> sent you a message"`
+- In MessagesPage, look up the display name of each conversation partner via `getProfile(principal)` and show it instead of the truncated principal
 
 ### Modify
-- `createPost` backend — add `topic: Text` parameter
-- `PostView` type — add `topic: Text` field
-- `Post` type — add `topic: Text` field
-- `Event` type — add `photos: List.List<Text>` field
-- `EventView` type — add `photos: [Text]` field
-- EventsPage CreateEventModal — replace URL input with file upload picker
-- EventsPage EventDetailModal — add photo gallery + "Add Photo" upload button (only for creator/attendees)
-- EventsPage event cards — show delete button for creator
-- ReelsPage — show topic badge on each reel, add topic filter bar at top
+- MessagesPage `ConversationList` and `ChatView` headers: resolve and display the other user's `displayName` (falling back to truncated principal if no profile set)
+- FeedPage: sort `displayPosts` by `createdAt` descending so newest posts are always at the top
+- `useSendMessage` mutation: after success, call `sendNotificationToUser` for the receiver with type `"message"` and a message string that includes the sender's display name
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Update Motoko backend:
-   - Add `topic` field to Post/PostView types
-   - Update `createPost` to accept `topic` parameter
-   - Add `photos` field to Event/EventView types
-   - Add `deleteEvent` function (creator or admin only)
-   - Add `addEventPhoto` and `getEventPhotos` functions
-2. Update frontend:
-   - Update `useCreatePost` hook to pass `topic`
-   - Add `useDeleteEvent`, `useAddEventPhoto`, `useGetEventPhotos` hooks
-   - Update CreatePostPage — add topic selector for Reel type
-   - Update ReelsPage — show topic badge, add topic filter bar
-   - Update EventsPage:
-     - CreateEventModal: replace URL field with image file upload
-     - EventDetailModal: add photo gallery with upload button (creator/attendee)
-     - Event cards: show trash icon for creator with confirm-delete flow
+1. **MessagesPage** -- Create a small helper component `ConversationItem` that calls `useGetProfile(principal)` and renders the resolved display name + avatar. Use it in `ConversationList` and in the `ChatView` header.
+2. **FeedPage** -- After loading posts, sort by `createdAt` descending before rendering: `[...displayPosts].sort((a, b) => Number(b.createdAt - a.createdAt))`
+3. **Message notification** -- In `useSendMessage` (useQueries.ts), after success invalidate queries as before AND call `actor.sendNotificationToUser(receiver, "message", "<principal> sent you a message", "")`. Since we don't easily have the sender display name in the hook, use the short principal. Alternatively, wire it in `MessagesPage` ChatView after the `sendMessage` success by also calling `useSendNotificationToUser`.
+4. Wire the notification send in `ChatView.handleSend`: on success, also mutate `useSendNotificationToUser` with `{ targetUser: recipient, notifType: "message", message: "${senderDisplayName} sent you a message", relatedId: "" }`.

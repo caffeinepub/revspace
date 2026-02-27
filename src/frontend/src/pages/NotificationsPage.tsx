@@ -1,14 +1,32 @@
-import type { ReactElement } from "react";
-import { Heart, MessageCircle, UserPlus, Calendar, Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMyNotifications, useMarkNotificationRead } from "../hooks/useQueries";
-import { timeAgo } from "../utils/format";
+import {
+  Bell,
+  Calendar,
+  CheckCheck,
+  Heart,
+  MessageCircle,
+  UserPlus,
+} from "lucide-react";
+import type { ReactElement } from "react";
 import { toast } from "sonner";
+import {
+  useMarkNotificationRead,
+  useMyNotifications,
+} from "../hooks/useQueries";
+import { timeAgo } from "../utils/format";
 
 const NOTIF_ICONS: Record<string, ReactElement> = {
-  like: <Heart size={16} style={{ color: "oklch(0.75 0.18 27)" }} fill="oklch(0.75 0.18 27)" />,
-  comment: <MessageCircle size={16} style={{ color: "oklch(0.65 0.18 240)" }} />,
+  like: (
+    <Heart
+      size={16}
+      style={{ color: "oklch(0.75 0.18 27)" }}
+      fill="oklch(0.75 0.18 27)"
+    />
+  ),
+  comment: (
+    <MessageCircle size={16} style={{ color: "oklch(0.65 0.18 240)" }} />
+  ),
   follow: <UserPlus size={16} style={{ color: "oklch(0.65 0.2 40)" }} />,
   event: <Calendar size={16} style={{ color: "oklch(0.65 0.18 150)" }} />,
   message: <MessageCircle size={16} style={{ color: "oklch(0.6 0.18 220)" }} />,
@@ -31,9 +49,11 @@ export function NotificationsPage() {
 
   const handleMarkAllRead = () => {
     const unread = displayNotifs.filter((n) => !n.isRead);
-    Promise.all(unread.map((n) => markRead.mutateAsync(n.id))).then(() => {
-      toast.success("All notifications marked as read");
-    }).catch(() => toast.error("Failed to mark read"));
+    Promise.all(unread.map((n) => markRead.mutateAsync(n.id)))
+      .then(() => {
+        toast.success("All notifications marked as read");
+      })
+      .catch(() => toast.error("Failed to mark read"));
   };
 
   return (
@@ -66,7 +86,7 @@ export function NotificationsPage() {
 
       <div className="divide-y divide-border">
         {isLoading ? (
-          (["n1","n2","n3","n4"]).map((k) => (
+          ["n1", "n2", "n3", "n4"].map((k) => (
             <div key={k} className="flex items-center gap-3 px-4 py-3">
               <Skeleton className="w-10 h-10 rounded-full shrink-0" />
               <div className="flex-1 space-y-1.5">
@@ -86,7 +106,11 @@ export function NotificationsPage() {
               key={notif.id}
               type="button"
               className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface transition-colors w-full text-left"
-              style={!notif.isRead ? { background: "oklch(var(--orange) / 0.04)" } : undefined}
+              style={
+                !notif.isRead
+                  ? { background: "oklch(var(--orange) / 0.04)" }
+                  : undefined
+              }
               onClick={() => {
                 if (!notif.isRead) {
                   markRead.mutate(notif.id);
@@ -96,17 +120,26 @@ export function NotificationsPage() {
               {/* Icon */}
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                style={{ background: NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))" }}
+                style={{
+                  background:
+                    NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))",
+                }}
               >
-                {NOTIF_ICONS[notif.notifType] ?? <Bell size={16} className="text-steel" />}
+                {NOTIF_ICONS[notif.notifType] ?? (
+                  <Bell size={16} className="text-steel" />
+                )}
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <p className={`text-sm leading-snug ${!notif.isRead ? "text-foreground font-medium" : "text-steel"}`}>
+                <p
+                  className={`text-sm leading-snug ${!notif.isRead ? "text-foreground font-medium" : "text-steel"}`}
+                >
                   {notif.message}
                 </p>
-                <p className="text-[11px] text-steel mt-0.5">{timeAgo(notif.timestamp)}</p>
+                <p className="text-[11px] text-steel mt-0.5">
+                  {timeAgo(notif.timestamp)}
+                </p>
               </div>
 
               {/* Unread dot */}
@@ -124,7 +157,12 @@ export function NotificationsPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

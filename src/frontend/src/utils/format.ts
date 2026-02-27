@@ -1,6 +1,7 @@
 export function timeAgo(timestamp: bigint | number): string {
   const now = Date.now();
-  const ts = typeof timestamp === "bigint" ? Number(timestamp) / 1_000_000 : timestamp;
+  const ts =
+    typeof timestamp === "bigint" ? Number(timestamp) / 1_000_000 : timestamp;
   const diff = now - ts;
 
   const seconds = Math.floor(diff / 1000);
@@ -20,7 +21,8 @@ export function timeAgo(timestamp: bigint | number): string {
 }
 
 export function formatDate(timestamp: bigint | number): string {
-  const ts = typeof timestamp === "bigint" ? Number(timestamp) / 1_000_000 : timestamp;
+  const ts =
+    typeof timestamp === "bigint" ? Number(timestamp) / 1_000_000 : timestamp;
   return new Date(ts).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

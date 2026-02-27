@@ -1,18 +1,49 @@
-import { useState, useRef } from "react";
-import { Calendar, MapPin, Users, Plus, Loader2, Trash2, Camera, ImagePlus, X, ZoomIn } from "lucide-react";
-import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAllEvents, useRsvpEvent, useUnrsvpEvent, useCreateEvent, useDeleteEvent, useAddEventPhoto, useGetEventPhotos, useUploadFile } from "../hooks/useQueries";
-import { formatDate, formatPrice } from "../utils/format";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import type { EventView } from "../backend.d";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Calendar,
+  Camera,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  Plus,
+  Trash2,
+  Users,
+  X,
+  ZoomIn,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import type { EventView } from "../backend.d";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useAddEventPhoto,
+  useAllEvents,
+  useCreateEvent,
+  useDeleteEvent,
+  useGetEventPhotos,
+  useRsvpEvent,
+  useUnrsvpEvent,
+  useUploadFile,
+} from "../hooks/useQueries";
+import { convertHeicToJpeg } from "../lib/convertHeic";
+import { formatDate, formatPrice } from "../utils/format";
 
 const EVENT_CATEGORIES = ["All", "Cruise", "Show", "Track", "Meetup"];
 
@@ -23,11 +54,19 @@ const CATEGORY_COLORS: Record<string, string> = {
   Meetup: "bg-green-500/20 text-green-400 border-green-500/30",
 };
 
-function EventDetailModal({ event, open, onClose }: { event: EventView; open: boolean; onClose: () => void }) {
+function EventDetailModal({
+  event,
+  open,
+  onClose,
+}: { event: EventView; open: boolean; onClose: () => void }) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
-  const isCreator = myPrincipal ? event.creator.toString() === myPrincipal : false;
-  const isAttending = myPrincipal ? event.attendees.some((a) => a.toString() === myPrincipal) : false;
+  const isCreator = myPrincipal
+    ? event.creator.toString() === myPrincipal
+    : false;
+  const isAttending = myPrincipal
+    ? event.attendees.some((a) => a.toString() === myPrincipal)
+    : false;
   const rsvp = useRsvpEvent();
   const unrsvp = useUnrsvpEvent();
   const deleteEvent = useDeleteEvent();
@@ -86,7 +125,7 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
         {
           onSuccess: () => toast.success("Photo added!"),
           onError: () => toast.error("Failed to add photo"),
-        }
+        },
       );
     } catch {
       toast.error("Failed to upload photo");
@@ -98,7 +137,7 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
   };
 
   const allPhotos = [...(photos ?? []), ...(event.photos ?? [])].filter(
-    (url, i, arr) => url && arr.indexOf(url) === i
+    (url, i, arr) => url && arr.indexOf(url) === i,
   );
   const canAddPhoto = isCreator || isAttending;
 
@@ -107,17 +146,27 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
         <DialogContent
           className="max-w-lg w-full max-h-[90vh] overflow-y-auto"
-          style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+          style={{
+            background: "oklch(var(--surface))",
+            border: "1px solid oklch(var(--border))",
+          }}
         >
           <img
-            src={event.coverImageUrl || `https://picsum.photos/seed/${event.id}/800/400`}
+            src={
+              event.coverImageUrl ||
+              `https://picsum.photos/seed/${event.id}/800/400`
+            }
             alt={event.title}
             className="w-full h-48 object-cover rounded-lg"
           />
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
-              <DialogTitle className="font-display text-2xl">{event.title}</DialogTitle>
-              <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 font-medium ${CATEGORY_COLORS[event.category] ?? "badge-orange"}`}>
+              <DialogTitle className="font-display text-2xl">
+                {event.title}
+              </DialogTitle>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full border shrink-0 font-medium ${CATEGORY_COLORS[event.category] ?? "badge-orange"}`}
+              >
                 {event.category}
               </span>
             </div>
@@ -135,10 +184,13 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
             <div className="flex items-center gap-2 text-sm text-steel">
               <Users size={14} className="text-orange" />
               {event.attendees.length} attending
-              {Number(event.maxAttendees) > 0 && ` / ${formatPrice(event.maxAttendees)} max`}
+              {Number(event.maxAttendees) > 0 &&
+                ` / ${formatPrice(event.maxAttendees)} max`}
             </div>
 
-            <p className="text-sm text-foreground leading-relaxed">{event.description}</p>
+            <p className="text-sm text-foreground leading-relaxed">
+              {event.description}
+            </p>
           </div>
 
           {/* Photos Section */}
@@ -148,7 +200,9 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
                 <Camera size={14} className="text-orange" />
                 Photos
                 {allPhotos.length > 0 && (
-                  <span className="text-xs font-normal text-steel ml-1">({allPhotos.length})</span>
+                  <span className="text-xs font-normal text-steel ml-1">
+                    ({allPhotos.length})
+                  </span>
                 )}
               </h3>
               {canAddPhoto && (
@@ -172,9 +226,15 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
                     }}
                   >
                     {isUploadingPhoto ? (
-                      <><Loader2 size={12} className="animate-spin" />{Math.round(photoUploadPct)}%</>
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        {Math.round(photoUploadPct)}%
+                      </>
                     ) : (
-                      <><ImagePlus size={12} />Add Photo</>
+                      <>
+                        <ImagePlus size={12} />
+                        Add Photo
+                      </>
                     )}
                   </button>
                 </div>
@@ -183,7 +243,7 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
 
             {allPhotos.length > 0 ? (
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                {allPhotos.map((url, i) => (
+                {allPhotos.map((url, _i) => (
                   <button
                     key={url}
                     type="button"
@@ -197,8 +257,10 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
                       alt=""
                       className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ background: "oklch(0 0 0 / 0.4)" }}>
+                    <div
+                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: "oklch(0 0 0 / 0.4)" }}
+                    >
                       <ZoomIn size={18} color="white" />
                     </div>
                   </button>
@@ -207,12 +269,17 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
             ) : (
               <div
                 className="flex flex-col items-center justify-center py-6 rounded-xl text-center"
-                style={{ background: "oklch(var(--surface-elevated))", border: "1px dashed oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  border: "1px dashed oklch(var(--border))",
+                }}
               >
                 <Camera size={24} className="text-steel mb-2" />
                 <p className="text-xs text-steel">No photos yet</p>
                 {canAddPhoto && (
-                  <p className="text-[11px] text-steel/60 mt-0.5">Tap "Add Photo" to share memories</p>
+                  <p className="text-[11px] text-steel/60 mt-0.5">
+                    Tap "Add Photo" to share memories
+                  </p>
                 )}
               </div>
             )}
@@ -225,8 +292,14 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
             className="w-full"
             style={
               isAttending
-                ? { background: "oklch(var(--surface-elevated))", color: "oklch(var(--foreground))" }
-                : { background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }
+                ? {
+                    background: "oklch(var(--surface-elevated))",
+                    color: "oklch(var(--foreground))",
+                  }
+                : {
+                    background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
+                  }
             }
           >
             {rsvp.isPending || unrsvp.isPending ? (
@@ -248,16 +321,33 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
               className="w-full font-semibold transition-all"
               style={
                 confirmDelete
-                  ? { background: "oklch(0.45 0.22 25)", color: "white", border: "1px solid oklch(0.55 0.25 25)" }
-                  : { background: "transparent", color: "oklch(0.65 0.18 25)", border: "1px solid oklch(0.65 0.18 25 / 0.4)" }
+                  ? {
+                      background: "oklch(0.45 0.22 25)",
+                      color: "white",
+                      border: "1px solid oklch(0.55 0.25 25)",
+                    }
+                  : {
+                      background: "transparent",
+                      color: "oklch(0.65 0.18 25)",
+                      border: "1px solid oklch(0.65 0.18 25 / 0.4)",
+                    }
               }
             >
               {deleteEvent.isPending ? (
-                <><Loader2 size={14} className="mr-2 animate-spin" />Deleting...</>
+                <>
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                  Deleting...
+                </>
               ) : confirmDelete ? (
-                <><Trash2 size={14} className="mr-2" />Tap again to confirm delete</>
+                <>
+                  <Trash2 size={14} className="mr-2" />
+                  Tap again to confirm delete
+                </>
               ) : (
-                <><Trash2 size={14} className="mr-2" />Delete Event</>
+                <>
+                  <Trash2 size={14} className="mr-2" />
+                  Delete Event
+                </>
               )}
             </Button>
           )}
@@ -266,7 +356,10 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
 
       {/* Lightbox */}
       {lightboxUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "oklch(0 0 0 / 0.9)" }}>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: "oklch(0 0 0 / 0.9)" }}
+        >
           <button
             type="button"
             aria-label="Close lightbox"
@@ -293,7 +386,10 @@ function EventDetailModal({ event, open, onClose }: { event: EventView; open: bo
   );
 }
 
-function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateEventModal({
+  open,
+  onClose,
+}: { open: boolean; onClose: () => void }) {
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -344,10 +440,18 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
         onSuccess: () => {
           toast.success("Event created!");
           onClose();
-          setForm({ title: "", description: "", location: "", eventDate: "", coverImageUrl: "", category: "Meetup", maxAttendees: "100" });
+          setForm({
+            title: "",
+            description: "",
+            location: "",
+            eventDate: "",
+            coverImageUrl: "",
+            category: "Meetup",
+            maxAttendees: "100",
+          });
         },
         onError: () => toast.error("Failed to create event"),
-      }
+      },
     );
   };
 
@@ -355,10 +459,15 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full max-h-[90vh] overflow-y-auto"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Create Event</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Create Event
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -366,47 +475,76 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
             <Label className="text-xs text-steel mb-1 block">Title *</Label>
             <Input
               value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, title: e.target.value }))
+              }
               placeholder="Cars & Coffee Downtown"
               required
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs text-steel mb-1 block">Category</Label>
-              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
-                <SelectTrigger style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+              >
+                <SelectTrigger
+                  style={{
+                    background: "oklch(var(--surface-elevated))",
+                    borderColor: "oklch(var(--border))",
+                  }}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent style={{ background: "oklch(var(--surface))" }}>
                   {EVENT_CATEGORIES.slice(1).map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-steel mb-1 block">Max Attendees</Label>
+              <Label className="text-xs text-steel mb-1 block">
+                Max Attendees
+              </Label>
               <Input
                 value={form.maxAttendees}
-                onChange={(e) => setForm((f) => ({ ...f, maxAttendees: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, maxAttendees: e.target.value }))
+                }
                 type="number"
                 min="1"
-                style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
               />
             </div>
           </div>
 
           <div>
-            <Label className="text-xs text-steel mb-1 block">Date & Time *</Label>
+            <Label className="text-xs text-steel mb-1 block">
+              Date & Time *
+            </Label>
             <Input
               value={form.eventDate}
-              onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, eventDate: e.target.value }))
+              }
               type="datetime-local"
               required
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
@@ -414,10 +552,15 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
             <Label className="text-xs text-steel mb-1 block">Location *</Label>
             <Input
               value={form.location}
-              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, location: e.target.value }))
+              }
               placeholder="123 Main St, Los Angeles, CA"
               required
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
@@ -425,10 +568,15 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
             <Label className="text-xs text-steel mb-1 block">Description</Label>
             <Textarea
               value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
               placeholder="Tell us about the event..."
               className="min-h-[80px] resize-none text-sm"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
@@ -443,11 +591,21 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
               onChange={handleCoverUpload}
             />
             {form.coverImageUrl ? (
-              <div className="relative rounded-xl overflow-hidden" style={{ height: 120 }}>
-                <img src={form.coverImageUrl} alt="" className="w-full h-full object-cover" />
+              <div
+                className="relative rounded-xl overflow-hidden"
+                style={{ height: 120 }}
+              >
+                <img
+                  src={form.coverImageUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
                 <button
                   type="button"
-                  onClick={() => { setForm((f) => ({ ...f, coverImageUrl: "" })); if (coverInputRef.current) coverInputRef.current.value = ""; }}
+                  onClick={() => {
+                    setForm((f) => ({ ...f, coverImageUrl: "" }));
+                    if (coverInputRef.current) coverInputRef.current.value = "";
+                  }}
                   className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
                   style={{ background: "oklch(0 0 0 / 0.6)" }}
                   aria-label="Remove cover photo"
@@ -477,13 +635,24 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
               >
                 {isUploadingCover ? (
                   <>
-                    <Loader2 size={22} className="animate-spin" style={{ color: "oklch(var(--orange))" }} />
-                    <p className="text-xs text-steel">{Math.round(coverUploadPct)}% uploading...</p>
+                    <Loader2
+                      size={22}
+                      className="animate-spin"
+                      style={{ color: "oklch(var(--orange))" }}
+                    />
+                    <p className="text-xs text-steel">
+                      {Math.round(coverUploadPct)}% uploading...
+                    </p>
                   </>
                 ) : (
                   <>
-                    <ImagePlus size={22} style={{ color: "oklch(var(--orange))" }} />
-                    <p className="text-xs text-steel">Tap to upload cover photo</p>
+                    <ImagePlus
+                      size={22}
+                      style={{ color: "oklch(var(--orange))" }}
+                    />
+                    <p className="text-xs text-steel">
+                      Tap to upload cover photo
+                    </p>
                   </>
                 )}
               </button>
@@ -492,12 +661,24 @@ function CreateEventModal({ open, onClose }: { open: boolean; onClose: () => voi
 
           <Button
             type="submit"
-            disabled={createEvent.isPending || isUploadingCover || !form.title || !form.location || !form.eventDate}
+            disabled={
+              createEvent.isPending ||
+              isUploadingCover ||
+              !form.title ||
+              !form.location ||
+              !form.eventDate
+            }
             className="w-full"
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             {createEvent.isPending ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" />Creating...</>
+              <>
+                <Loader2 size={14} className="mr-2 animate-spin" />
+                Creating...
+              </>
             ) : (
               "Create Event"
             )}
@@ -512,16 +693,19 @@ export function EventsPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedEvent, setSelectedEvent] = useState<EventView | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<string | null>(null);
+  const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<
+    string | null
+  >(null);
   const { data: events, isLoading } = useAllEvents();
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const deleteEvent = useDeleteEvent();
 
   const displayEvents = events ?? [];
-  const filtered = activeCategory === "All"
-    ? displayEvents
-    : displayEvents.filter((e) => e.category === activeCategory);
+  const filtered =
+    activeCategory === "All"
+      ? displayEvents
+      : displayEvents.filter((e) => e.category === activeCategory);
 
   const handleDeleteFromCard = (e: React.MouseEvent, eventId: string) => {
     e.stopPropagation();
@@ -535,7 +719,10 @@ export function EventsPage() {
       });
     } else {
       setConfirmDeleteEventId(eventId);
-      setTimeout(() => setConfirmDeleteEventId((cur) => (cur === eventId ? null : cur)), 3000);
+      setTimeout(
+        () => setConfirmDeleteEventId((cur) => (cur === eventId ? null : cur)),
+        3000,
+      );
     }
   };
 
@@ -543,18 +730,27 @@ export function EventsPage() {
     <div className="min-h-screen">
       {/* Urban Banner */}
       <div className="relative w-full h-[180px] md:h-[240px] overflow-hidden">
-        <img src="/assets/generated/urban-events-banner.dim_1600x400.jpg" alt="Events" className="w-full h-full object-cover object-center" />
+        <img
+          src="/assets/generated/urban-events-banner.dim_1600x400.jpg"
+          alt="Events"
+          className="w-full h-full object-cover object-center"
+        />
         <div className="absolute inset-0 urban-overlay" />
         <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
           <div>
             <h1 className="tag-text text-3xl text-white">Events</h1>
-            <p className="text-white/60 text-xs mt-0.5">Car meets &amp; street gatherings</p>
+            <p className="text-white/60 text-xs mt-0.5">
+              Car meets &amp; street gatherings
+            </p>
           </div>
           <Button
             type="button"
             size="sm"
             onClick={() => setShowCreateModal(true)}
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             <Plus size={14} className="mr-1" />
             Create
@@ -572,8 +768,15 @@ export function EventsPage() {
             className="shrink-0 text-sm px-3 py-1.5 rounded-full font-medium transition-all"
             style={
               activeCategory === cat
-                ? { background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }
-                : { background: "oklch(var(--surface))", color: "oklch(var(--steel-light))", border: "1px solid oklch(var(--border))" }
+                ? {
+                    background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
+                  }
+                : {
+                    background: "oklch(var(--surface))",
+                    color: "oklch(var(--steel-light))",
+                    border: "1px solid oklch(var(--border))",
+                  }
             }
           >
             {cat}
@@ -583,8 +786,12 @@ export function EventsPage() {
 
       <div className="p-4 space-y-4">
         {isLoading ? (
-          (["e1","e2","e3"]).map((k) => (
-            <div key={k} className="rounded-xl overflow-hidden" style={{ border: "1px solid oklch(var(--border))" }}>
+          ["e1", "e2", "e3"].map((k) => (
+            <div
+              key={k}
+              className="rounded-xl overflow-hidden"
+              style={{ border: "1px solid oklch(var(--border))" }}
+            >
               <Skeleton className="w-full h-48" />
               <div className="p-4 space-y-2">
                 <Skeleton className="w-3/4 h-4" />
@@ -595,7 +802,9 @@ export function EventsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <Calendar size={32} className="mx-auto mb-3 text-steel" />
-            <p className="text-steel text-sm">No {activeCategory.toLowerCase()} events yet</p>
+            <p className="text-steel text-sm">
+              No {activeCategory.toLowerCase()} events yet
+            </p>
           </div>
         ) : (
           filtered.map((event) => (
@@ -603,18 +812,27 @@ export function EventsPage() {
               key={event.id}
               type="button"
               className="w-full overflow-hidden rounded-xl cursor-pointer group text-left"
-              style={{ border: "1px solid oklch(var(--border))", background: "oklch(var(--surface))" }}
+              style={{
+                border: "1px solid oklch(var(--border))",
+                background: "oklch(var(--surface))",
+              }}
               onClick={() => setSelectedEvent(event)}
             >
               <div className="relative overflow-hidden">
                 <img
-                  src={event.coverImageUrl || `https://picsum.photos/seed/${event.id}/800/400`}
+                  src={
+                    event.coverImageUrl ||
+                    `https://picsum.photos/seed/${event.id}/800/400`
+                  }
                   alt={event.title}
                   className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <div
                   className="absolute inset-0"
-                  style={{ background: "linear-gradient(to top, oklch(0 0 0 / 0.6) 0%, transparent 50%)" }}
+                  style={{
+                    background:
+                      "linear-gradient(to top, oklch(0 0 0 / 0.6) 0%, transparent 50%)",
+                  }}
                 />
                 <span
                   className={`absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full border font-medium ${CATEGORY_COLORS[event.category] ?? "badge-orange"}`}
@@ -631,7 +849,11 @@ export function EventsPage() {
                     style={
                       confirmDeleteEventId === event.id
                         ? { background: "oklch(0.5 0.22 25)", color: "white" }
-                        : { background: "oklch(0 0 0 / 0.55)", color: "oklch(0.75 0.15 25)", backdropFilter: "blur(4px)" }
+                        : {
+                            background: "oklch(0 0 0 / 0.55)",
+                            color: "oklch(0.75 0.15 25)",
+                            backdropFilter: "blur(4px)",
+                          }
                     }
                     aria-label="Delete event"
                   >
@@ -640,7 +862,9 @@ export function EventsPage() {
                   </button>
                 )}
                 <div className="absolute bottom-3 left-4 right-4">
-                  <p className="text-white font-display text-xl font-bold leading-tight">{event.title}</p>
+                  <p className="text-white font-display text-xl font-bold leading-tight">
+                    {event.title}
+                  </p>
                 </div>
               </div>
               <div className="p-4">
@@ -651,7 +875,9 @@ export function EventsPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <MapPin size={12} className="text-orange" />
-                    <span className="truncate max-w-[180px]">{event.location}</span>
+                    <span className="truncate max-w-[180px]">
+                      {event.location}
+                    </span>
                   </span>
                   <span className="flex items-center gap-1">
                     <Users size={12} className="text-orange" />
@@ -660,7 +886,10 @@ export function EventsPage() {
                 </div>
                 <div
                   className="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold"
-                  style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+                  style={{
+                    background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
+                  }}
                 >
                   RSVP Now
                 </div>
@@ -673,7 +902,12 @@ export function EventsPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>
@@ -685,7 +919,10 @@ export function EventsPage() {
           onClose={() => setSelectedEvent(null)}
         />
       )}
-      <CreateEventModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+      <CreateEventModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 }

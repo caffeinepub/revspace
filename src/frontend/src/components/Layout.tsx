@@ -1,25 +1,27 @@
-import { type ReactNode, useState } from "react";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
-  Home,
-  Compass,
-  Plus,
   Bell,
-  User,
-  Car,
   Calendar,
-  ShoppingBag,
-  Users,
-  MessageCircle,
-  Settings,
-  Trophy,
-  Store,
-  Menu,
-  X,
+  Car,
+  Compass,
   Film,
-  Wrench,
+  Home,
   Info,
+  Menu,
+  MessageCircle,
+  Plus,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  Trophy,
+  User,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { useActor } from "../hooks/useActor";
 import { useMyNotifications } from "../hooks/useQueries";
 
 interface LayoutProps {
@@ -44,11 +46,25 @@ const ALL_NAV_ITEMS = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+function useIsAdmin(): boolean {
+  const { actor, isFetching } = useActor();
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!actor || isFetching) return;
+    actor
+      .isCallerAdmin()
+      .then(setIsAdmin)
+      .catch(() => setIsAdmin(false));
+  }, [actor, isFetching]);
+  return isAdmin;
+}
+
 function MobileNav() {
   const [open, setOpen] = useState(false);
   const matchRoute = useMatchRoute();
   const { data: notifications } = useMyNotifications();
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+  const isAdmin = useIsAdmin();
 
   return (
     <>
@@ -118,7 +134,10 @@ function MobileNav() {
             className="h-8 object-contain"
             style={{ maxWidth: 120, background: "#000", borderRadius: 4 }}
           />
-          <span className="text-xs font-semibold tracking-wide" style={{ color: "oklch(var(--orange))" }}>
+          <span
+            className="text-xs font-semibold tracking-wide"
+            style={{ color: "oklch(var(--orange))" }}
+          >
             Shop Parts &amp; Accessories →
           </span>
         </a>
@@ -149,7 +168,11 @@ function MobileNav() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-4 py-4 mb-2">
-          <Link to="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
+          <Link
+            to="/"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2"
+          >
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{ background: "oklch(var(--orange))" }}
@@ -160,7 +183,11 @@ function MobileNav() {
               Rev<span style={{ color: "oklch(var(--orange))" }}>Space</span>
             </span>
           </Link>
-          <button type="button" onClick={() => setOpen(false)} aria-label="Close menu">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+          >
             <X size={22} style={{ color: "oklch(var(--steel-light))" }} />
           </button>
         </div>
@@ -184,7 +211,8 @@ function MobileNav() {
         <div className="flex flex-col gap-0.5 px-2 overflow-y-auto flex-1">
           {ALL_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+            const isActive =
+              matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
             return (
               <Link key={item.to} to={item.to} onClick={() => setOpen(false)}>
                 <div className={`sidebar-item ${isActive ? "active" : ""}`}>
@@ -204,11 +232,32 @@ function MobileNav() {
               </Link>
             );
           })}
+
+          {/* Admin Panel — only shown to admins */}
+          {isAdmin && (
+            <Link to="/admin" onClick={() => setOpen(false)}>
+              <div
+                className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
+                style={{
+                  borderTop: "1px solid oklch(0.55 0.22 75 / 0.2)",
+                  marginTop: 4,
+                  paddingTop: 10,
+                  color: "oklch(0.8 0.22 75)",
+                }}
+              >
+                <ShieldCheck size={18} />
+                <span>Admin Panel</span>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Ad banner */}
         <div className="px-4 pb-2">
-          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "oklch(var(--steel))" }}>
+          <p
+            className="text-[10px] uppercase tracking-wider mb-1"
+            style={{ color: "oklch(var(--steel))" }}
+          >
             Sponsored
           </p>
           <a
@@ -230,7 +279,10 @@ function MobileNav() {
           </a>
         </div>
 
-        <div className="px-4 py-4 text-[11px]" style={{ color: "oklch(var(--steel))" }}>
+        <div
+          className="px-4 py-4 text-[11px]"
+          style={{ color: "oklch(var(--steel))" }}
+        >
           <p>© 2026 RevSpace</p>
           <p>
             Built with ❤️ using{" "}
@@ -253,6 +305,7 @@ function Sidebar() {
   const matchRoute = useMatchRoute();
   const { data: notifications } = useMyNotifications();
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+  const isAdmin = useIsAdmin();
 
   return (
     <aside className="sidebar-nav">
@@ -287,7 +340,8 @@ function Sidebar() {
       <div className="flex flex-col gap-0.5">
         {ALL_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+          const isActive =
+            matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
 
           return (
             <Link key={item.to} to={item.to}>
@@ -308,11 +362,35 @@ function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin Panel link — only for admins */}
+        {isAdmin && (
+          <div
+            style={{
+              borderTop: "1px solid oklch(0.55 0.22 75 / 0.2)",
+              marginTop: 6,
+              paddingTop: 6,
+            }}
+          >
+            <Link to="/admin">
+              <div
+                className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
+                style={{ color: "oklch(0.8 0.22 75)" }}
+              >
+                <ShieldCheck size={18} />
+                <span>Admin Panel</span>
+              </div>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Ad banner */}
       <div className="mt-auto pt-4 px-3 pb-2">
-        <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "oklch(var(--steel))" }}>
+        <p
+          className="text-[10px] uppercase tracking-wider mb-1"
+          style={{ color: "oklch(var(--steel))" }}
+        >
           Sponsored
         </p>
         <a
@@ -362,10 +440,12 @@ export function BullBoostBanner() {
       rel="noopener noreferrer"
       className="fixed bottom-0 left-0 right-0 z-[200] flex items-center justify-center gap-3 px-4 py-2 transition-opacity duration-200 hover:opacity-90 active:opacity-80"
       style={{
-        background: "linear-gradient(90deg, #000 0%, #0a0a0a 40%, #111 60%, #000 100%)",
+        background:
+          "linear-gradient(90deg, #000 0%, #0a0a0a 40%, #111 60%, #000 100%)",
         borderTop: "1px solid oklch(var(--orange) / 0.4)",
         minHeight: 52,
-        boxShadow: "0 -4px 24px rgba(0,0,0,0.6), 0 -1px 0 oklch(var(--orange) / 0.2)",
+        boxShadow:
+          "0 -4px 24px rgba(0,0,0,0.6), 0 -1px 0 oklch(var(--orange) / 0.2)",
       }}
     >
       <img

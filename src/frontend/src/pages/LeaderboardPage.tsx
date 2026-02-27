@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Trophy } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Principal } from "@icp-sdk/core/principal";
+import { Link } from "@tanstack/react-router";
+import { Trophy } from "lucide-react";
+import { useState } from "react";
 import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
 import { truncatePrincipal } from "../utils/format";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type SortMode = "posts" | "likes";
 
@@ -15,7 +15,9 @@ interface LeaderEntry {
   likeCount: number;
 }
 
-function computeLeaderboard(posts: Array<{ author: { toString(): string }; likes: unknown[] }>): LeaderEntry[] {
+function computeLeaderboard(
+  posts: Array<{ author: { toString(): string }; likes: unknown[] }>,
+): LeaderEntry[] {
   const map = new Map<string, LeaderEntry>();
 
   for (const post of posts) {
@@ -49,16 +51,27 @@ interface LeaderRowUserInfoProps {
   maxValue: number;
 }
 
-function LeaderRowUserInfo({ entry, rank, sortMode, maxValue }: LeaderRowUserInfoProps) {
+function LeaderRowUserInfo({
+  entry,
+  rank,
+  sortMode,
+  maxValue,
+}: LeaderRowUserInfoProps) {
   const principal = (() => {
-    try { return Principal.fromText(entry.principal); } catch { return undefined; }
+    try {
+      return Principal.fromText(entry.principal);
+    } catch {
+      return undefined;
+    }
   })();
   const { data: profile, isLoading } = useGetProfile(principal);
 
-  const displayName = profile?.displayName ?? truncatePrincipal(entry.principal);
+  const displayName =
+    profile?.displayName ?? truncatePrincipal(entry.principal);
   const avatarUrl = profile?.avatarUrl ?? "";
   const value = sortMode === "posts" ? entry.postCount : entry.likeCount;
-  const barWidth = maxValue > 0 ? Math.max(4, Math.round((value / maxValue) * 100)) : 4;
+  const barWidth =
+    maxValue > 0 ? Math.max(4, Math.round((value / maxValue) * 100)) : 4;
   const isTop3 = rank <= 3;
 
   return (
@@ -69,9 +82,7 @@ function LeaderRowUserInfo({ entry, rank, sortMode, maxValue }: LeaderRowUserInf
         border: isTop3
           ? `1px solid ${MEDAL_COLORS[rank - 1].bg}`
           : "1px solid oklch(var(--border))",
-        boxShadow: isTop3
-          ? `0 0 12px ${MEDAL_COLORS[rank - 1].bg}30`
-          : "none",
+        boxShadow: isTop3 ? `0 0 12px ${MEDAL_COLORS[rank - 1].bg}30` : "none",
       }}
     >
       {/* Progress bar background */}
@@ -106,8 +117,13 @@ function LeaderRowUserInfo({ entry, rank, sortMode, maxValue }: LeaderRowUserInf
         ) : (
           <>
             <Avatar className="w-8 h-8 shrink-0">
-              {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
-              <AvatarFallback className="text-[10px]" style={{ background: "oklch(var(--surface-elevated))" }}>
+              {avatarUrl ? (
+                <AvatarImage src={avatarUrl} alt={displayName} />
+              ) : null}
+              <AvatarFallback
+                className="text-[10px]"
+                style={{ background: "oklch(var(--surface-elevated))" }}
+              >
                 {displayName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -116,10 +132,16 @@ function LeaderRowUserInfo({ entry, rank, sortMode, maxValue }: LeaderRowUserInf
                 {displayName}
               </p>
               <div className="flex items-center gap-3 mt-0.5">
-                <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
+                <span
+                  className="text-[11px]"
+                  style={{ color: "oklch(var(--steel-light))" }}
+                >
                   {entry.postCount} {entry.postCount === 1 ? "post" : "posts"}
                 </span>
-                <span className="text-[11px]" style={{ color: "oklch(var(--steel-light))" }}>
+                <span
+                  className="text-[11px]"
+                  style={{ color: "oklch(var(--steel-light))" }}
+                >
                   ♥ {entry.likeCount} {entry.likeCount === 1 ? "like" : "likes"}
                 </span>
               </div>
@@ -183,7 +205,7 @@ export function LeaderboardPage() {
     .sort((a, b) =>
       sortMode === "posts"
         ? b.postCount - a.postCount || b.likeCount - a.likeCount
-        : b.likeCount - a.likeCount || b.postCount - a.postCount
+        : b.likeCount - a.likeCount || b.postCount - a.postCount,
     )
     .slice(0, 20);
 
@@ -214,7 +236,10 @@ export function LeaderboardPage() {
             className="px-4 py-1.5 rounded-full text-sm font-semibold capitalize transition-all"
             style={
               sortMode === mode
-                ? { background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }
+                ? {
+                    background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
+                  }
                 : {
                     background: "oklch(var(--surface))",
                     color: "oklch(var(--steel-light))",
@@ -228,18 +253,27 @@ export function LeaderboardPage() {
       </div>
 
       {/* Description */}
-      <p className="px-4 pb-3 text-xs" style={{ color: "oklch(var(--steel-light))" }}>
-        Top {sortMode === "posts" ? "posters" : "liked creators"} across RevSpace
+      <p
+        className="px-4 pb-3 text-xs"
+        style={{ color: "oklch(var(--steel-light))" }}
+      >
+        Top {sortMode === "posts" ? "posters" : "liked creators"} across
+        RevSpace
       </p>
 
       {/* List */}
       <div className="px-4 pb-6 space-y-2">
         {isLoading ? (
-          (["sk1","sk2","sk3","sk4","sk5","sk6","sk7","sk8"] as const).map((k) => (
+          (
+            ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6", "sk7", "sk8"] as const
+          ).map((k) => (
             <div
               key={k}
               className="flex items-center gap-3 p-3 rounded-xl"
-              style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface))",
+                border: "1px solid oklch(var(--border))",
+              }}
             >
               <Skeleton className="w-8 h-8 rounded-full shrink-0" />
               <div className="flex-1 space-y-1.5">
@@ -251,8 +285,15 @@ export function LeaderboardPage() {
           ))
         ) : sorted.length === 0 ? (
           <div className="text-center py-20">
-            <Trophy size={36} className="mx-auto mb-3" style={{ color: "oklch(var(--steel))" }} />
-            <p className="text-sm" style={{ color: "oklch(var(--steel-light))" }}>
+            <Trophy
+              size={36}
+              className="mx-auto mb-3"
+              style={{ color: "oklch(var(--steel))" }}
+            />
+            <p
+              className="text-sm"
+              style={{ color: "oklch(var(--steel-light))" }}
+            >
               No posts yet — be the first to climb the ranks!
             </p>
           </div>
@@ -273,7 +314,13 @@ export function LeaderboardPage() {
       </div>
 
       {/* Footer */}
-      <footer className="py-8 text-center text-xs border-t mt-4" style={{ color: "oklch(var(--steel-light))", borderColor: "oklch(var(--border))" }}>
+      <footer
+        className="py-8 text-center text-xs border-t mt-4"
+        style={{
+          color: "oklch(var(--steel-light))",
+          borderColor: "oklch(var(--border))",
+        }}
+      >
         © 2026. Built with ❤️ using{" "}
         <a
           href="https://caffeine.ai"

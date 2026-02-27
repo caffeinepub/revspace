@@ -1,21 +1,27 @@
-import { useState } from "react";
-import { Car } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import type { Principal } from "@icp-sdk/core/principal";
 import { Link } from "@tanstack/react-router";
+import { Car } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
 import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useAddComment, useGetComments } from "../hooks/useQueries";
-import { toast } from "sonner";
 import { timeAgo, truncatePrincipal } from "../utils/format";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2 } from "lucide-react";
-import type { Principal } from "@icp-sdk/core/principal";
 
 function CommentAuthor({ author }: { author: Principal }) {
   const { data: profile } = useGetProfile(author);
-  const displayName = profile?.displayName ?? truncatePrincipal(author.toString());
+  const displayName =
+    profile?.displayName ?? truncatePrincipal(author.toString());
   const avatarUrl = profile?.avatarUrl ?? "";
   const authorKey = author.toString();
 
@@ -65,7 +71,7 @@ function CommentsDialog({
           toast.success("Comment added");
         },
         onError: () => toast.error("Failed to add comment"),
-      }
+      },
     );
   };
 
@@ -73,7 +79,10 @@ function CommentsDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="font-display text-lg">Comments</DialogTitle>
@@ -81,19 +90,25 @@ function CommentsDialog({
 
         <div className="max-h-72 overflow-y-auto space-y-3 py-2">
           {isLoading ? (
-            <div className="text-center py-4 text-steel text-sm">Loading...</div>
-          ) :           comments && comments.length > 0 ? (
+            <div className="text-center py-4 text-steel text-sm">
+              Loading...
+            </div>
+          ) : comments && comments.length > 0 ? (
             comments.map((c) => (
               <div key={c.id} className="flex gap-2">
                 <CommentAuthor author={c.author} />
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-steel">{timeAgo(c.timestamp)}</span>
+                  <span className="text-[10px] text-steel">
+                    {timeAgo(c.timestamp)}
+                  </span>
                   <p className="text-sm text-foreground">{c.content}</p>
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-center py-4 text-steel text-sm">No comments yet. Be the first!</p>
+            <p className="text-center py-4 text-steel text-sm">
+              No comments yet. Be the first!
+            </p>
           )}
         </div>
 
@@ -103,7 +118,10 @@ function CommentsDialog({
             onChange={(e) => setText(e.target.value)}
             placeholder="Add a comment..."
             className="min-h-[60px] resize-none text-sm"
-            style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+            style={{
+              background: "oklch(var(--surface-elevated))",
+              borderColor: "oklch(var(--border))",
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -115,10 +133,17 @@ function CommentsDialog({
             type="button"
             onClick={handleSubmit}
             disabled={!text.trim() || addComment.isPending}
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
             className="self-end"
           >
-            {addComment.isPending ? <Loader2 size={14} className="animate-spin" /> : "Post"}
+            {addComment.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              "Post"
+            )}
           </Button>
         </div>
       </DialogContent>
@@ -130,7 +155,9 @@ export function FeedPage() {
   const { data: posts, isLoading } = useGetAllPosts();
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
-  const displayPosts = posts ?? [];
+  const displayPosts = [...(posts ?? [])].sort((a, b) =>
+    Number(b.timestamp - a.timestamp),
+  );
 
   return (
     <div className="min-h-screen">
@@ -142,28 +169,36 @@ export function FeedPage() {
           className="w-full h-full object-cover"
           style={{ objectPosition: "center 55%" }}
         />
-        <div className="absolute inset-0 flex flex-col justify-end p-6"
-          style={{ background: "linear-gradient(to top, oklch(0 0 0 / 0.75) 0%, transparent 60%)" }}>
-          <h1 className="tag-text text-4xl md:text-6xl text-white" style={{ textShadow: "0 0 30px oklch(var(--orange) / 0.8)" }}>
+        <div
+          className="absolute inset-0 flex flex-col justify-end p-6"
+          style={{
+            background:
+              "linear-gradient(to top, oklch(0 0 0 / 0.75) 0%, transparent 60%)",
+          }}
+        >
+          <h1
+            className="tag-text text-4xl md:text-6xl text-white"
+            style={{ textShadow: "0 0 30px oklch(var(--orange) / 0.8)" }}
+          >
             RevSpace
           </h1>
-          <p className="text-white/70 text-sm font-medium mt-1">The streets are watching</p>
+          <p className="text-white/70 text-sm font-medium mt-1">
+            The streets are watching
+          </p>
         </div>
       </div>
 
       {/* Feed */}
       <div className="space-y-0.5 py-2">
-        {isLoading ? (
-          (["s1", "s2", "s3"]).map((k) => <PostCardSkeleton key={k} />)
-        ) : (
-          displayPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onCommentClick={(id) => setCommentPostId(id)}
-            />
-          ))
-        )}
+        {isLoading
+          ? ["s1", "s2", "s3"].map((k) => <PostCardSkeleton key={k} />)
+          : displayPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onCommentClick={(id) => setCommentPostId(id)}
+              />
+            ))}
 
         {!isLoading && displayPosts.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
@@ -173,12 +208,19 @@ export function FeedPage() {
             >
               <Car size={28} className="text-steel" />
             </div>
-            <h3 className="font-display text-xl font-bold mb-2">No posts yet</h3>
+            <h3 className="font-display text-xl font-bold mb-2">
+              No posts yet
+            </h3>
             <p className="text-steel text-sm mb-6">
               Be the first to share your build with the RevSpace community.
             </p>
             <Link to="/create">
-              <Button style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}>
+              <Button
+                style={{
+                  background: "oklch(var(--orange))",
+                  color: "oklch(var(--carbon))",
+                }}
+              >
                 Create First Post
               </Button>
             </Link>

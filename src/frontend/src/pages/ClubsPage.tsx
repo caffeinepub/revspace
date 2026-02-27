@@ -1,23 +1,55 @@
-import { useState } from "react";
-import { Users, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAllClubs, useJoinClub, useLeaveClub, useCreateClub } from "../hooks/useQueries";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import type { ClubView } from "../backend.d";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Plus, Users } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import type { ClubView } from "../backend.d";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useAllClubs,
+  useCreateClub,
+  useJoinClub,
+  useLeaveClub,
+} from "../hooks/useQueries";
 
-const CLUB_CATEGORIES = ["JDM", "European", "American", "NA", "Turbocharged", "Stance", "Lifestyle", "Track", "Off-Road"];
+const CLUB_CATEGORIES = [
+  "JDM",
+  "European",
+  "American",
+  "NA",
+  "Turbocharged",
+  "Stance",
+  "Lifestyle",
+  "Track",
+  "Off-Road",
+];
 
-function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolean; onClose: () => void }) {
+function ClubDetailModal({
+  club,
+  open,
+  onClose,
+}: { club: ClubView; open: boolean; onClose: () => void }) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
-  const isMember = myPrincipal ? club.members.some((m) => m.toString() === myPrincipal) : false;
+  const isMember = myPrincipal
+    ? club.members.some((m) => m.toString() === myPrincipal)
+    : false;
   const joinClub = useJoinClub();
   const leaveClub = useLeaveClub();
 
@@ -43,17 +75,26 @@ function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolea
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <div className="relative overflow-hidden rounded-lg">
           <img
-            src={club.coverImageUrl || `https://picsum.photos/seed/${club.id}/800/400`}
+            src={
+              club.coverImageUrl ||
+              `https://picsum.photos/seed/${club.id}/800/400`
+            }
             alt={club.name}
             className="w-full h-40 object-cover"
           />
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to top, oklch(0 0 0 / 0.7) 0%, transparent 60%)" }}
+            style={{
+              background:
+                "linear-gradient(to top, oklch(0 0 0 / 0.7) 0%, transparent 60%)",
+            }}
           />
           <div className="absolute bottom-3 left-4">
             <span
@@ -69,7 +110,9 @@ function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolea
         </div>
 
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">{club.name}</DialogTitle>
+          <DialogTitle className="font-display text-2xl">
+            {club.name}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -77,7 +120,9 @@ function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolea
             <Users size={14} className="text-orange" />
             <span>{club.members.length} members</span>
           </div>
-          <p className="text-sm text-foreground leading-relaxed">{club.description}</p>
+          <p className="text-sm text-foreground leading-relaxed">
+            {club.description}
+          </p>
         </div>
 
         <Button
@@ -87,8 +132,15 @@ function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolea
           className="w-full"
           style={
             isMember
-              ? { background: "oklch(var(--surface-elevated))", color: "oklch(var(--foreground))", border: "1px solid oklch(var(--border))" }
-              : { background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }
+              ? {
+                  background: "oklch(var(--surface-elevated))",
+                  color: "oklch(var(--foreground))",
+                  border: "1px solid oklch(var(--border))",
+                }
+              : {
+                  background: "oklch(var(--orange))",
+                  color: "oklch(var(--carbon))",
+                }
           }
         >
           {joinClub.isPending || leaveClub.isPending ? (
@@ -104,7 +156,10 @@ function ClubDetailModal({ club, open, onClose }: { club: ClubView; open: boolea
   );
 }
 
-function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateClubModal({
+  open,
+  onClose,
+}: { open: boolean; onClose: () => void }) {
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -119,7 +174,12 @@ function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void
       onSuccess: () => {
         toast.success("Club created!");
         onClose();
-        setForm({ name: "", description: "", category: "JDM", coverImageUrl: "" });
+        setForm({
+          name: "",
+          description: "",
+          category: "JDM",
+          coverImageUrl: "",
+        });
       },
       onError: () => toast.error("Failed to create club"),
     });
@@ -129,10 +189,15 @@ function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full"
-        style={{ background: "oklch(var(--surface))", border: "1px solid oklch(var(--border))" }}
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(var(--border))",
+        }}
       >
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Create Club</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Create Club
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,19 +208,32 @@ function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="JDM Underground"
               required
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
           <div>
             <Label className="text-xs text-steel mb-1 block">Category</Label>
-            <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
-              <SelectTrigger style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}>
+            <Select
+              value={form.category}
+              onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+            >
+              <SelectTrigger
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent style={{ background: "oklch(var(--surface))" }}>
                 {CLUB_CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -165,21 +243,33 @@ function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void
             <Label className="text-xs text-steel mb-1 block">Description</Label>
             <Textarea
               value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
               placeholder="What is your club about?"
               className="min-h-[80px] resize-none text-sm"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
           <div>
-            <Label className="text-xs text-steel mb-1 block">Cover Image URL</Label>
+            <Label className="text-xs text-steel mb-1 block">
+              Cover Image URL
+            </Label>
             <Input
               value={form.coverImageUrl}
-              onChange={(e) => setForm((f) => ({ ...f, coverImageUrl: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, coverImageUrl: e.target.value }))
+              }
               placeholder="https://..."
               type="url"
-              style={{ background: "oklch(var(--surface-elevated))", borderColor: "oklch(var(--border))" }}
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                borderColor: "oklch(var(--border))",
+              }}
             />
           </div>
 
@@ -187,10 +277,16 @@ function CreateClubModal({ open, onClose }: { open: boolean; onClose: () => void
             type="submit"
             disabled={createClub.isPending || !form.name}
             className="w-full"
-            style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
           >
             {createClub.isPending ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" />Creating...</>
+              <>
+                <Loader2 size={14} className="mr-2 animate-spin" />
+                Creating...
+              </>
             ) : (
               "Create Club"
             )}
@@ -218,7 +314,10 @@ export function ClubsPage() {
           type="button"
           size="sm"
           onClick={() => setShowCreateModal(true)}
-          style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}
+          style={{
+            background: "oklch(var(--orange))",
+            color: "oklch(var(--carbon))",
+          }}
         >
           <Plus size={14} className="mr-1" />
           Create
@@ -227,7 +326,7 @@ export function ClubsPage() {
 
       <div className="p-4 grid grid-cols-1 gap-4">
         {isLoading ? (
-          (["c1","c2","c3"]).map((k) => (
+          ["c1", "c2", "c3"].map((k) => (
             <Skeleton key={k} className="h-52 rounded-xl" />
           ))
         ) : displayClubs.length === 0 ? (
@@ -246,22 +345,33 @@ export function ClubsPage() {
                 key={club.id}
                 type="button"
                 className="relative overflow-hidden rounded-xl cursor-pointer group text-left w-full"
-                style={{ border: "1px solid oklch(var(--border))", background: "oklch(var(--surface))" }}
+                style={{
+                  border: "1px solid oklch(var(--border))",
+                  background: "oklch(var(--surface))",
+                }}
                 onClick={() => setSelectedClub(club)}
               >
                 <div className="relative overflow-hidden">
                   <img
-                    src={club.coverImageUrl || `https://picsum.photos/seed/${club.id}/800/400`}
+                    src={
+                      club.coverImageUrl ||
+                      `https://picsum.photos/seed/${club.id}/800/400`
+                    }
                     alt={club.name}
                     className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div
                     className="absolute inset-0"
-                    style={{ background: "linear-gradient(to top, oklch(0 0 0 / 0.8) 0%, transparent 40%)" }}
+                    style={{
+                      background:
+                        "linear-gradient(to top, oklch(0 0 0 / 0.8) 0%, transparent 40%)",
+                    }}
                   />
                   <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
                     <div>
-                      <p className="text-white font-display text-xl font-bold">{club.name}</p>
+                      <p className="text-white font-display text-xl font-bold">
+                        {club.name}
+                      </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span
                           className="text-[10px] px-2 py-0.5 rounded-full font-medium"
@@ -293,7 +403,9 @@ export function ClubsPage() {
                   </div>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-sm text-steel line-clamp-2">{club.description}</p>
+                  <p className="text-sm text-steel line-clamp-2">
+                    {club.description}
+                  </p>
                 </div>
               </button>
             );
@@ -304,7 +416,12 @@ export function ClubsPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>
@@ -316,7 +433,10 @@ export function ClubsPage() {
           onClose={() => setSelectedClub(null)}
         />
       )}
-      <CreateClubModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+      <CreateClubModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 }

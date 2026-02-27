@@ -1,13 +1,28 @@
-import { useState, useRef, useCallback } from "react";
-import { Image, Video, Film, X, Loader2, Upload, ImagePlus, Tag } from "lucide-react";
-import { convertHeicToJpeg } from "../lib/convertHeic";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreatePost, useUploadFile } from "../hooks/useQueries";
-import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Film,
+  Image,
+  ImagePlus,
+  Loader2,
+  Tag,
+  Upload,
+  Video,
+  X,
+} from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useCreatePost, useUploadFile } from "../hooks/useQueries";
+import { convertHeicToJpeg } from "../lib/convertHeic";
 
 const POST_TYPES = [
   { value: "Photo", icon: Image, label: "Photo", accept: "image/*" },
@@ -44,35 +59,40 @@ export function CreatePostPage() {
   const currentType = POST_TYPES.find((t) => t.value === postType)!;
   const isVideo = postType === "Video" || postType === "Reel";
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let selected = e.target.files?.[0];
-    if (!selected) return;
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      let selected = e.target.files?.[0];
+      if (!selected) return;
 
-    // Convert HEIC/HEIF to JPEG so browsers can display and upload it
-    if (!selected.type.startsWith("video/")) {
-      selected = await convertHeicToJpeg(selected);
-    }
+      // Convert HEIC/HEIF to JPEG so browsers can display and upload it
+      if (!selected.type.startsWith("video/")) {
+        selected = await convertHeicToJpeg(selected);
+      }
 
-    // Revoke previous preview URL
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+      // Revoke previous preview URL
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
 
-    setFile(selected);
-    const objectUrl = URL.createObjectURL(selected);
-    setPreviewUrl(objectUrl);
-    setUploadProgress(null);
+      setFile(selected);
+      const objectUrl = URL.createObjectURL(selected);
+      setPreviewUrl(objectUrl);
+      setUploadProgress(null);
 
-    // For Reels: warn if video is over 10 minutes
-    if (postType === "Reel") {
-      const tempVideo = document.createElement("video");
-      tempVideo.src = objectUrl;
-      tempVideo.onloadedmetadata = () => {
-        if (tempVideo.duration > 600) {
-          toast.warning("Video is over 10 minutes — it may be trimmed or rejected on upload");
-        }
-        URL.revokeObjectURL(tempVideo.src);
-      };
-    }
-  }, [previewUrl, postType]);
+      // For Reels: warn if video is over 10 minutes
+      if (postType === "Reel") {
+        const tempVideo = document.createElement("video");
+        tempVideo.src = objectUrl;
+        tempVideo.onloadedmetadata = () => {
+          if (tempVideo.duration > 600) {
+            toast.warning(
+              "Video is over 10 minutes — it may be trimmed or rejected on upload",
+            );
+          }
+          URL.revokeObjectURL(tempVideo.src);
+        };
+      }
+    },
+    [previewUrl, postType],
+  );
 
   const clearFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -122,7 +142,7 @@ export function CreatePostPage() {
           void navigate({ to: "/" });
         },
         onError: () => toast.error("Failed to publish post"),
-      }
+      },
     );
   };
 
@@ -136,7 +156,10 @@ export function CreatePostPage() {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => { clearFile(); void navigate({ to: "/" }); }}
+          onClick={() => {
+            clearFile();
+            void navigate({ to: "/" });
+          }}
           className="text-steel hover:text-foreground"
         >
           <X size={18} />
@@ -154,7 +177,10 @@ export function CreatePostPage() {
               <button
                 key={value}
                 type="button"
-                onClick={() => { setPostType(value); clearFile(); }}
+                onClick={() => {
+                  setPostType(value);
+                  clearFile();
+                }}
                 className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
                 style={
                   postType === value
@@ -197,7 +223,12 @@ export function CreatePostPage() {
               >
                 <SelectValue placeholder="Select a topic..." />
               </SelectTrigger>
-              <SelectContent style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}>
+              <SelectContent
+                style={{
+                  background: "oklch(var(--surface))",
+                  borderColor: "oklch(var(--border))",
+                }}
+              >
                 {REEL_TOPICS.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
@@ -279,9 +310,15 @@ export function CreatePostPage() {
               >
                 <div
                   className="w-14 h-14 rounded-xl flex items-center justify-center"
-                  style={{ background: "oklch(var(--orange) / 0.1)", border: "1px solid oklch(var(--orange) / 0.3)" }}
+                  style={{
+                    background: "oklch(var(--orange) / 0.1)",
+                    border: "1px solid oklch(var(--orange) / 0.3)",
+                  }}
                 >
-                  <ImagePlus size={26} style={{ color: "oklch(var(--orange))" }} />
+                  <ImagePlus
+                    size={26}
+                    style={{ color: "oklch(var(--orange))" }}
+                  />
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-semibold text-foreground">
@@ -302,7 +339,10 @@ export function CreatePostPage() {
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-steel">Uploading...</span>
-                <span className="text-xs font-semibold" style={{ color: "oklch(var(--orange))" }}>
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: "oklch(var(--orange))" }}
+                >
                   {Math.round(uploadProgress)}%
                 </span>
               </div>
@@ -344,10 +384,15 @@ export function CreatePostPage() {
             onChange={(e) => setContent(e.target.value)}
             placeholder="Share your build story, mod list, or weekend drive..."
             className="min-h-[120px] resize-none text-sm"
-            style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}
+            style={{
+              background: "oklch(var(--surface))",
+              borderColor: "oklch(var(--border))",
+            }}
             maxLength={2000}
           />
-          <p className="text-[11px] text-steel text-right mt-1">{content.length}/2000</p>
+          <p className="text-[11px] text-steel text-right mt-1">
+            {content.length}/2000
+          </p>
         </div>
 
         {/* Submit */}
@@ -356,15 +401,18 @@ export function CreatePostPage() {
           disabled={isBusy || !content.trim()}
           className="w-full h-12 text-base font-bold rounded-xl"
           style={{
-            background: isBusy || !content.trim()
-              ? "oklch(var(--surface-elevated))"
-              : "oklch(var(--orange))",
-            color: isBusy || !content.trim()
-              ? "oklch(var(--steel-light))"
-              : "oklch(var(--carbon))",
-            boxShadow: !isBusy && content.trim()
-              ? "0 0 30px oklch(var(--orange) / 0.3)"
-              : "none",
+            background:
+              isBusy || !content.trim()
+                ? "oklch(var(--surface-elevated))"
+                : "oklch(var(--orange))",
+            color:
+              isBusy || !content.trim()
+                ? "oklch(var(--steel-light))"
+                : "oklch(var(--carbon))",
+            boxShadow:
+              !isBusy && content.trim()
+                ? "0 0 30px oklch(var(--orange) / 0.3)"
+                : "none",
           }}
         >
           {isUploading ? (
@@ -386,7 +434,12 @@ export function CreatePostPage() {
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="text-orange hover:underline">
+        <a
+          href="https://caffeine.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange hover:underline"
+        >
           caffeine.ai
         </a>
       </footer>

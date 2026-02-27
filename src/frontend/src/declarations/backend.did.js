@@ -19,10 +19,25 @@ export const _CaffeineStorageRefillResult = IDL.Record({
   'success' : IDL.Opt(IDL.Bool),
   'topped_up_amount' : IDL.Opt(IDL.Nat),
 });
+export const Profile = IDL.Record({
+  'bio' : IDL.Text,
+  'displayName' : IDL.Text,
+  'avatarUrl' : IDL.Text,
+  'bannerUrl' : IDL.Text,
+  'location' : IDL.Text,
+});
+export const ProfileWithPrincipal = IDL.Record({
+  'principal' : IDL.Principal,
+  'profile' : Profile,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
+});
+export const UserWithRole = IDL.Record({
+  'principal' : IDL.Principal,
+  'role' : UserRole,
 });
 export const PostView = IDL.Record({
   'id' : IDL.Text,
@@ -34,13 +49,6 @@ export const PostView = IDL.Record({
   'timestamp' : IDL.Int,
   'mediaUrls' : IDL.Vec(IDL.Text),
   'comments' : IDL.Vec(IDL.Text),
-});
-export const Profile = IDL.Record({
-  'bio' : IDL.Text,
-  'displayName' : IDL.Text,
-  'avatarUrl' : IDL.Text,
-  'bannerUrl' : IDL.Text,
-  'location' : IDL.Text,
 });
 export const Comment = IDL.Record({
   'id' : IDL.Text,
@@ -154,6 +162,17 @@ export const idlService = IDL.Service({
     ),
   'addComment' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'addEventPhoto' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'adminBanUser' : IDL.Func([IDL.Principal], [], []),
+  'adminDeleteListing' : IDL.Func([IDL.Text], [], []),
+  'adminDeletePost' : IDL.Func([IDL.Text], [], []),
+  'adminDeleteProfile' : IDL.Func([IDL.Principal], [], []),
+  'adminGetAllProfiles' : IDL.Func(
+      [],
+      [IDL.Vec(ProfileWithPrincipal)],
+      ['query'],
+    ),
+  'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
+  'adminUnbanUser' : IDL.Func([IDL.Principal], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createClub' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -269,10 +288,25 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
+  const Profile = IDL.Record({
+    'bio' : IDL.Text,
+    'displayName' : IDL.Text,
+    'avatarUrl' : IDL.Text,
+    'bannerUrl' : IDL.Text,
+    'location' : IDL.Text,
+  });
+  const ProfileWithPrincipal = IDL.Record({
+    'principal' : IDL.Principal,
+    'profile' : Profile,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
+  });
+  const UserWithRole = IDL.Record({
+    'principal' : IDL.Principal,
+    'role' : UserRole,
   });
   const PostView = IDL.Record({
     'id' : IDL.Text,
@@ -284,13 +318,6 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'mediaUrls' : IDL.Vec(IDL.Text),
     'comments' : IDL.Vec(IDL.Text),
-  });
-  const Profile = IDL.Record({
-    'bio' : IDL.Text,
-    'displayName' : IDL.Text,
-    'avatarUrl' : IDL.Text,
-    'bannerUrl' : IDL.Text,
-    'location' : IDL.Text,
   });
   const Comment = IDL.Record({
     'id' : IDL.Text,
@@ -404,6 +431,17 @@ export const idlFactory = ({ IDL }) => {
       ),
     'addComment' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'addEventPhoto' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'adminBanUser' : IDL.Func([IDL.Principal], [], []),
+    'adminDeleteListing' : IDL.Func([IDL.Text], [], []),
+    'adminDeletePost' : IDL.Func([IDL.Text], [], []),
+    'adminDeleteProfile' : IDL.Func([IDL.Principal], [], []),
+    'adminGetAllProfiles' : IDL.Func(
+        [],
+        [IDL.Vec(ProfileWithPrincipal)],
+        ['query'],
+      ),
+    'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
+    'adminUnbanUser' : IDL.Func([IDL.Principal], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createClub' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
