@@ -136,6 +136,18 @@ export function useCreatePost() {
   });
 }
 
+export function useDeletePost() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deletePost(postId);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
+  });
+}
+
 // ========================
 // Profile
 // ========================

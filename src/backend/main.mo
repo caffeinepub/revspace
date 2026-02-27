@@ -307,6 +307,20 @@ actor {
     ).toArray();
   };
 
+  // New deletePost function
+  public shared ({ caller }) func deletePost(postId : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete posts");
+    };
+    switch (posts.get(postId)) {
+      case (null) { Runtime.trap("Post not found") };
+      case (?post) {
+        if (post.author != caller) { Runtime.trap("You do not own this post") };
+        posts.remove(postId);
+      };
+    };
+  };
+
   // -----------------------------------
   // USER PROFILES (Required Interface)
   // -----------------------------------
@@ -756,3 +770,4 @@ actor {
     ).toArray();
   };
 };
+

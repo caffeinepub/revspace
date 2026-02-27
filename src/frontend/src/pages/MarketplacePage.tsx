@@ -114,14 +114,14 @@ function ListingDetailModal({ listing, open, onClose }: { listing: Listing; open
               type="button"
               variant="outline"
               className="flex-1 border-border"
-              disabled={markSold.isPending}
+              disabled={markSold.isPending || deleteListing.isPending}
               onClick={() =>
                 markSold.mutate(listing.id, {
                   onSuccess: () => {
                     toast.success("Listing marked as sold");
                     onClose();
                   },
-                  onError: () => toast.error("Failed"),
+                  onError: (err) => toast.error(`Failed to mark sold: ${err instanceof Error ? err.message : "Unknown error"}`),
                 })
               }
             >
@@ -131,16 +131,16 @@ function ListingDetailModal({ listing, open, onClose }: { listing: Listing; open
               type="button"
               variant="outline"
               className="flex-1 border-destructive text-destructive hover:bg-destructive/10"
-              disabled={deleteListing.isPending}
-              onClick={() =>
+              disabled={deleteListing.isPending || markSold.isPending}
+              onClick={() => {
                 deleteListing.mutate(listing.id, {
                   onSuccess: () => {
                     toast.success("Listing deleted");
                     onClose();
                   },
-                  onError: () => toast.error("Failed"),
-                })
-              }
+                  onError: (err) => toast.error(`Failed to delete: ${err instanceof Error ? err.message : "Unknown error"}`),
+                });
+              }}
             >
               {deleteListing.isPending ? <Loader2 size={14} className="animate-spin" /> : "Delete"}
             </Button>

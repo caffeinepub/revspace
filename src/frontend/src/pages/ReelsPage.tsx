@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film, Trash2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile } from "../hooks/useQueries";
+import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile, useDeletePost } from "../hooks/useQueries";
 import { DEMO_POSTS } from "../data/demo";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -94,8 +94,10 @@ export function ReelsPage() {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
+  const deletePostMutation = useDeletePost();
 
   const displayPosts = posts && posts.length > 0 ? posts : DEMO_POSTS;
 
@@ -114,6 +116,27 @@ export function ReelsPage() {
     } else {
       setLikedPosts((prev) => new Set([...prev, postId]));
       likeMutation.mutate(postId);
+    }
+  };
+
+  const handleDelete = (postId: string) => {
+    if (confirmDeleteId === postId) {
+      // Second tap — actually delete
+      deletePostMutation.mutate(postId, {
+        onSuccess: () => {
+          toast.success("Reel deleted");
+          setConfirmDeleteId(null);
+        },
+        onError: () => {
+          toast.error("Failed to delete reel");
+          setConfirmDeleteId(null);
+        },
+      });
+    } else {
+      // First tap — ask for confirmation
+      setConfirmDeleteId(postId);
+      // Auto-cancel after 3 seconds
+      setTimeout(() => setConfirmDeleteId((cur) => (cur === postId ? null : cur)), 3000);
     }
   };
 
@@ -216,6 +239,30 @@ export function ReelsPage() {
                 </div>
                 <span className="text-white text-xs">Save</span>
               </button>
+
+              {/* Delete — only for post owner */}
+              {myPrincipal && post.author.toString() === myPrincipal && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(post.id)}
+                  disabled={deletePostMutation.isPending}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
+                    style={{
+                      background: confirmDeleteId === post.id
+                        ? "oklch(0.5 0.2 30 / 0.8)"
+                        : "oklch(0 0 0 / 0.4)",
+                    }}
+                  >
+                    <Trash2 size={20} color={confirmDeleteId === post.id ? "white" : "oklch(0.7 0.15 30)"} />
+                  </div>
+                  <span className="text-white text-xs">
+                    {confirmDeleteId === post.id ? "Confirm" : "Delete"}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         );

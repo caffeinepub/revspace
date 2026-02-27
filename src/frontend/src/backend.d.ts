@@ -106,6 +106,7 @@ export interface backendInterface {
     createNotification(notifType: string, message: string, relatedId: string): Promise<string>;
     createPost(content: string, mediaUrls: Array<string>, postType: string): Promise<string>;
     deleteListing(listingId: string): Promise<void>;
+    deletePost(postId: string): Promise<void>;
     followUser(user: Principal): Promise<void>;
     getAllPosts(): Promise<Array<PostView>>;
     getCallerUserProfile(): Promise<Profile | null>;

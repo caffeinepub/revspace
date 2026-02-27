@@ -206,6 +206,7 @@ export interface backendInterface {
     createNotification(notifType: string, message: string, relatedId: string): Promise<string>;
     createPost(content: string, mediaUrls: Array<string>, postType: string): Promise<string>;
     deleteListing(listingId: string): Promise<void>;
+    deletePost(postId: string): Promise<void>;
     followUser(user: Principal): Promise<void>;
     getAllPosts(): Promise<Array<PostView>>;
     getCallerUserProfile(): Promise<Profile | null>;
@@ -467,6 +468,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteListing(arg0);
+            return result;
+        }
+    }
+    async deletePost(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deletePost(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deletePost(arg0);
             return result;
         }
     }

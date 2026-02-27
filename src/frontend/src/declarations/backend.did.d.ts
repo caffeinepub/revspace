@@ -143,6 +143,7 @@ export interface _SERVICE {
   'createNotification' : ActorMethod<[string, string, string], string>,
   'createPost' : ActorMethod<[string, Array<string>, string], string>,
   'deleteListing' : ActorMethod<[string], undefined>,
+  'deletePost' : ActorMethod<[string], undefined>,
   'followUser' : ActorMethod<[Principal], undefined>,
   'getAllPosts' : ActorMethod<[], Array<PostView>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [Profile]>,
