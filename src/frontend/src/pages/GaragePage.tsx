@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useMyGarage, useAddCar, useRemoveCar, uploadFile } from "../hooks/useQueries";
+import { useMyGarage, useAddCar, useRemoveCar, useUploadFile } from "../hooks/useQueries";
 import { toast } from "sonner";
 import type { Car as CarType } from "../backend.d";
 
@@ -109,6 +109,7 @@ function AddCarModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addCar = useAddCar();
+  const uploadFile = useUploadFile();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

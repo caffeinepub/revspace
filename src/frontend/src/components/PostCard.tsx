@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Play } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PostView, Profile } from "../backend.d";
+import type { PostView } from "../backend.d";
 import { timeAgo, getInitials, truncatePrincipal } from "../utils/format";
-import { useLikePost, useUnlikePost } from "../hooks/useQueries";
+import { useLikePost, useUnlikePost, useGetProfile } from "../hooks/useQueries";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { DEMO_PROFILES } from "../data/demo";
 import { toast } from "sonner";
 
 interface PostCardProps {
@@ -32,10 +30,10 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const authorKey = post.author.toString();
-  const profile = DEMO_PROFILES[authorKey];
 
+  const { data: profile, isLoading: profileLoading } = useGetProfile(post.author);
   const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
-  const avatarUrl = profile?.avatarUrl ?? `https://picsum.photos/seed/${authorKey}/80/80`;
+  const avatarUrl = profile?.avatarUrl ?? "";
 
   const hasLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
   const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
@@ -72,20 +70,34 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     }
   };
 
+  const isVideoPost = post.postType === "Video" || post.postType === "Reel";
+
   return (
     <article className="post-card animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <Avatar className="w-9 h-9">
-            <AvatarImage src={avatarUrl} alt={displayName} />
-            <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
-              {getInitials(displayName)}
-            </AvatarFallback>
+            {profileLoading ? (
+              <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
+                <Skeleton className="w-full h-full rounded-full" />
+              </AvatarFallback>
+            ) : (
+              <>
+                {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+                <AvatarFallback style={{ background: "oklch(var(--surface-elevated))" }}>
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </>
+            )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">{displayName}</span>
+              {profileLoading ? (
+                <Skeleton className="w-24 h-3" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground">{displayName}</span>
+              )}
               <PostTypeBadge type={post.postType} />
             </div>
             <span className="text-xs text-steel">{timeAgo(post.timestamp)}</span>
@@ -99,29 +111,36 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       {/* Media */}
       {post.mediaUrls.length > 0 && (
         <div className="relative">
-          <img
-            src={post.mediaUrls[0]}
-            alt="Post media"
-            className="feed-image aspect-[4/3]"
-            loading="lazy"
-          />
-          {post.postType === "Video" || post.postType === "Reel" ? (
-            <div className="absolute inset-0 flex items-center justify-center">
+          {isVideoPost ? (
+            <video
+              key={post.mediaUrls[0]}
+              src={post.mediaUrls[0]}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="feed-image aspect-[4/3] w-full object-cover"
+            >
+              <track kind="captions" />
+            </video>
+          ) : (
+            <img
+              src={post.mediaUrls[0]}
+              alt="Post media"
+              className="feed-image aspect-[4/3]"
+              loading="lazy"
+            />
+          )}
+          {isVideoPost && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ background: "oklch(0 0 0 / 0.5)" }}
+                style={{ background: "oklch(0 0 0 / 0.4)" }}
               >
-                <div
-                  className="w-0 h-0 ml-1"
-                  style={{
-                    borderTop: "10px solid transparent",
-                    borderBottom: "10px solid transparent",
-                    borderLeft: "18px solid white",
-                  }}
-                />
+                <Play size={22} className="text-white ml-1" fill="white" />
               </div>
             </div>
-          ) : null}
+          )}
         </div>
       )}
 

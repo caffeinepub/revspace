@@ -115,11 +115,12 @@ export function FeedPage() {
   return (
     <div className="min-h-screen">
       {/* Header Banner */}
-      <div className="relative w-full h-[200px] md:h-[280px] overflow-hidden">
+      <div className="relative w-full h-[260px] md:h-[360px] overflow-hidden">
         <img
-          src="/assets/generated/urban-hero-banner.dim_1600x600.jpg"
+          src="/assets/uploads/20a6241e809d72a3483bfd2fc4848f41-1.jpg"
           alt="RevSpace Banner"
-          className="w-full h-full object-cover object-center"
+          className="w-full h-full object-cover"
+          style={{ objectPosition: "center 55%" }}
         />
         <div className="absolute inset-0 flex flex-col justify-end p-6"
           style={{ background: "linear-gradient(to top, oklch(0 0 0 / 0.75) 0%, transparent 60%)" }}>

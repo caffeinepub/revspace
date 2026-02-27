@@ -3,8 +3,7 @@ import { Image, Video, Film, X, Loader2, Upload, ImagePlus } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useCreatePost } from "../hooks/useQueries";
-import { uploadFile } from "../hooks/useQueries";
+import { useCreatePost, useUploadFile } from "../hooks/useQueries";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -24,6 +23,7 @@ export function CreatePostPage() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createPost = useCreatePost();
+  const uploadFile = useUploadFile();
 
   const currentType = POST_TYPES.find((t) => t.value === postType)!;
   const isVideo = postType === "Video" || postType === "Reel";

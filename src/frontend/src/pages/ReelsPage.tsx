@@ -1,13 +1,94 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, ChevronLeft, Film } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useGetAllPosts, useLikePost, useUnlikePost } from "../hooks/useQueries";
-import { DEMO_POSTS, DEMO_PROFILES } from "../data/demo";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useGetAllPosts, useLikePost, useUnlikePost, useGetProfile } from "../hooks/useQueries";
+import { DEMO_POSTS } from "../data/demo";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { toast } from "sonner";
+import type { Principal } from "@icp-sdk/core/principal";
 
+// ─── ReelAuthorInfo ──────────────────────────────────────────────────────────
+interface ReelAuthorInfoProps {
+  authorPrincipal: Principal;
+}
+
+function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
+  const { data: profile, isLoading } = useGetProfile(authorPrincipal);
+  const authorKey = authorPrincipal.toString();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 mb-3">
+        <Skeleton className="w-9 h-9 rounded-full" style={{ background: "oklch(0 0 0 / 0.4)" }} />
+        <div className="flex flex-col gap-1">
+          <Skeleton className="w-24 h-3" style={{ background: "oklch(1 0 0 / 0.2)" }} />
+          <Skeleton className="w-14 h-2" style={{ background: "oklch(1 0 0 / 0.15)" }} />
+        </div>
+      </div>
+    );
+  }
+
+  const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
+  const avatarUrl = profile?.avatarUrl ?? "";
+
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <Avatar className="w-9 h-9 border-2 border-white">
+        {avatarUrl ? <AvatarImage src={avatarUrl} /> : null}
+        <AvatarFallback className="text-xs">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <p className="text-white text-sm font-semibold">{displayName}</p>
+    </div>
+  );
+}
+
+// ─── ReelMedia ────────────────────────────────────────────────────────────────
+interface ReelMediaProps {
+  mediaUrl: string | undefined;
+  postId: string;
+  postType: string;
+}
+
+function ReelMedia({ mediaUrl, postId, postType }: ReelMediaProps) {
+  if (!mediaUrl) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#111" }}>
+        <Film size={48} className="text-white/30" />
+      </div>
+    );
+  }
+
+  const isVideoType = postType === "Reel" || postType === "Video";
+
+  if (isVideoType) {
+    return (
+      <video
+        key={mediaUrl}
+        src={mediaUrl}
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+      >
+        <track kind="captions" />
+      </video>
+    );
+  }
+
+  return (
+    <img
+      src={mediaUrl ?? `https://picsum.photos/seed/${postId}/600/900`}
+      alt=""
+      className="w-full h-full object-cover"
+    />
+  );
+}
+
+// ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
   const { data: posts } = useGetAllPosts();
   const { identity } = useInternetIdentity();
@@ -52,10 +133,6 @@ export function ReelsPage() {
       </Link>
 
       {displayPosts.map((post) => {
-        const authorKey = post.author.toString();
-        const profile = DEMO_PROFILES[authorKey];
-        const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
-        const avatarUrl = profile?.avatarUrl ?? `https://picsum.photos/seed/${authorKey}/80/80`;
         const serverLiked = myPrincipal ? post.likes.some((l) => l.toString() === myPrincipal) : false;
         const liked = likedPosts.has(post.id) || serverLiked;
 
@@ -64,12 +141,12 @@ export function ReelsPage() {
             key={post.id}
             className="reel-card shrink-0"
           >
-            {/* Background image */}
+            {/* Background media */}
             <div className="absolute inset-0">
-              <img
-                src={post.mediaUrls[0] ?? `https://picsum.photos/seed/${post.id}/600/900`}
-                alt=""
-                className="w-full h-full object-cover"
+              <ReelMedia
+                mediaUrl={post.mediaUrls[0]}
+                postId={post.id}
+                postType={post.postType}
               />
               <div
                 className="absolute inset-0"
@@ -82,17 +159,9 @@ export function ReelsPage() {
 
             {/* Content overlay */}
             <div className="absolute bottom-24 left-0 right-16 px-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Avatar className="w-9 h-9 border-2 border-white">
-                  <AvatarImage src={avatarUrl} />
-                  <AvatarFallback className="text-xs">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-white text-sm font-semibold">{displayName}</p>
-                  <p className="text-white/60 text-xs">{timeAgo(post.timestamp)}</p>
-                </div>
-              </div>
+              <ReelAuthorInfo authorPrincipal={post.author} />
               <p className="text-white text-sm leading-relaxed line-clamp-3">{post.content}</p>
+              <p className="text-white/50 text-xs mt-1">{timeAgo(post.timestamp)}</p>
             </div>
 
             {/* Right actions */}

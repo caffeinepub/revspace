@@ -6,14 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMyProfile, useUpdateProfile } from "../hooks/useQueries";
-import { uploadFile } from "../hooks/useQueries";
+import { useMyProfile, useUpdateProfile, useUploadFile } from "../hooks/useQueries";
 import { getInitials } from "../utils/format";
 import { toast } from "sonner";
 
 export function SettingsPage() {
   const { data: profile, isLoading } = useMyProfile();
   const updateProfile = useUpdateProfile();
+  const uploadFile = useUploadFile();
 
   const [form, setForm] = useState({
     displayName: "",

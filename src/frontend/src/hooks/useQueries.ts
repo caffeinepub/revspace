@@ -1,29 +1,41 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useActor } from "./useActor";
+import { useInternetIdentity } from "./useInternetIdentity";
 import type { Principal } from "@icp-sdk/core/principal";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import { loadConfig } from "../config";
 import { StorageClient } from "../utils/StorageClient";
 
 // ========================
-// File Upload Utility
+// File Upload Hook
 // ========================
-export async function uploadFile(
-  file: File,
-  onProgress?: (pct: number) => void
-): Promise<string> {
-  const config = await loadConfig();
-  const agent = new HttpAgent({ host: config.backend_host });
-  const storageClient = new StorageClient(
-    config.bucket_name,
-    config.storage_gateway_url,
-    config.backend_canister_id,
-    config.project_id,
-    agent,
-  );
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const { hash } = await storageClient.putFile(bytes, onProgress);
-  return storageClient.getDirectURL(hash);
+export function useUploadFile() {
+  const { identity } = useInternetIdentity();
+
+  const uploadFile = useCallback(async (
+    file: File,
+    onProgress?: (pct: number) => void
+  ): Promise<string> => {
+    const config = await loadConfig();
+    const agentOptions: Record<string, unknown> = { host: config.backend_host };
+    if (identity) {
+      agentOptions.identity = identity;
+    }
+    const agent = new HttpAgent(agentOptions);
+    const storageClient = new StorageClient(
+      config.bucket_name,
+      config.storage_gateway_url,
+      config.backend_canister_id,
+      config.project_id,
+      agent,
+    );
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { hash } = await storageClient.putFile(bytes, onProgress);
+    return storageClient.getDirectURL(hash);
+  }, [identity]);
+
+  return uploadFile;
 }
 
 // ========================

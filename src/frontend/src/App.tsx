@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,46 +21,69 @@ import { UserProfilePage } from "./pages/UserProfilePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { ShopPage } from "./pages/ShopPage";
 
-// Root layout with auth guard
-function RootLayout() {
+const LoadingSpinner = () => (
+  <div
+    className="min-h-screen flex items-center justify-center"
+    style={{ background: "oklch(var(--carbon))" }}
+  >
+    <div className="flex flex-col items-center gap-3">
+      <div
+        className="w-12 h-12 rounded-xl flex items-center justify-center"
+        style={{ background: "oklch(var(--orange))" }}
+      >
+        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+      <p className="text-steel text-sm">Loading RevSpace...</p>
+    </div>
+  </div>
+);
+
+// AuthGate: always shows login intro on every page load/refresh, even for returning users.
+// "loggedInThisLoad" is a plain module-level variable — it resets to false on every
+// full page load (navigation, refresh, new tab), so the login screen is always shown first.
+let loggedInThisLoad = false;
+
+function AuthGate({ children }: { children: React.ReactNode }) {
   const { identity, isInitializing } = useInternetIdentity();
+  const [passedIntro, setPassedIntro] = useState(false);
 
   if (isInitializing) {
+    return <LoadingSpinner />;
+  }
+
+  // Show login intro if the user hasn't clicked "Login to Site" in this page load
+  if (!passedIntro || !loggedInThisLoad || !identity) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "oklch(var(--carbon))" }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ background: "oklch(var(--orange))" }}
-          >
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          </div>
-          <p className="text-steel text-sm">Loading RevSpace...</p>
-        </div>
-      </div>
+      <LoginScreen
+        onLoginSuccess={() => {
+          loggedInThisLoad = true;
+          setPassedIntro(true);
+        }}
+      />
     );
   }
 
-  if (!identity) {
-    return <LoginScreen />;
-  }
+  return <>{children}</>;
+}
 
+// Root layout with auth guard
+function RootLayout() {
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <AuthGate>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </AuthGate>
   );
 }
 
 // Reels is full-screen, no layout wrapper
 function ReelsLayout() {
-  const { identity, isInitializing } = useInternetIdentity();
-  if (isInitializing) return null;
-  if (!identity) return <LoginScreen />;
-  return <ReelsPage />;
+  return (
+    <AuthGate>
+      <ReelsPage />
+    </AuthGate>
+  );
 }
 
 // Route definitions

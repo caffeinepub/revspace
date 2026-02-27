@@ -1,8 +1,20 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
-export function LoginScreen() {
-  const { login, isLoggingIn } = useInternetIdentity();
+interface LoginScreenProps {
+  onLoginSuccess?: () => void;
+}
+
+export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+  const { login, isLoggingIn, identity } = useInternetIdentity();
+
+  // When identity appears after clicking Login, notify parent
+  useEffect(() => {
+    if (identity && onLoginSuccess) {
+      onLoginSuccess();
+    }
+  }, [identity, onLoginSuccess]);
 
   return (
     <div

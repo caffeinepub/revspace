@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAllListings, useCreateListing, useMarkListingSold, useDeleteListing, uploadFile } from "../hooks/useQueries";
+import { useAllListings, useCreateListing, useMarkListingSold, useDeleteListing, useUploadFile } from "../hooks/useQueries";
 import { formatPrice, truncatePrincipal } from "../utils/format";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import type { Listing } from "../backend.d";
@@ -166,6 +166,7 @@ function CreateListingModal({ open, onClose }: { open: boolean; onClose: () => v
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createListing = useCreateListing();
+  const uploadFile = useUploadFile();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
