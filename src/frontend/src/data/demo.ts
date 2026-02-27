@@ -12,6 +12,7 @@ export const DEMO_POSTS: PostView[] = [
   {
     id: "post-1",
     postType: "Photo",
+    topic: "",
     content: "Just dropped the new aero kit on the STI 🔥 Track day ready. She's been sitting for 3 weeks while I ran the cage and now she finally gets to breathe.",
     author: fakePrincipal("user-1"),
     likes: [fakePrincipal("user-2"), fakePrincipal("user-3"), fakePrincipal("user-4")],
@@ -22,6 +23,7 @@ export const DEMO_POSTS: PostView[] = [
   {
     id: "post-2",
     postType: "Video",
+    topic: "Track Day",
     content: "First pull on the dyno after the E85 tune. 487whp 🥺 Dreams do come true.",
     author: fakePrincipal("user-2"),
     likes: [fakePrincipal("user-1"), fakePrincipal("user-3")],
@@ -32,6 +34,7 @@ export const DEMO_POSTS: PostView[] = [
   {
     id: "post-3",
     postType: "Photo",
+    topic: "",
     content: "Sunrise run through the canyons. Nothing hits different than canyon roads at 6am with no traffic. The R35 was singing.",
     author: fakePrincipal("user-3"),
     likes: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-5"), fakePrincipal("user-6"), fakePrincipal("user-7")],
@@ -42,6 +45,7 @@ export const DEMO_POSTS: PostView[] = [
   {
     id: "post-4",
     postType: "Photo",
+    topic: "",
     content: "Carbon fibre wing installation complete. 3 weeks of waiting was worth it. The stance is unreal now.",
     author: fakePrincipal("user-4"),
     likes: [fakePrincipal("user-1")],
@@ -52,6 +56,7 @@ export const DEMO_POSTS: PostView[] = [
   {
     id: "post-5",
     postType: "Reel",
+    topic: "Stance",
     content: "Interior restomod vibes 🎶 New alcantara everything. Suede dash, seats, pillars. The OEM+ dream.",
     author: fakePrincipal("user-5"),
     likes: [fakePrincipal("user-2"), fakePrincipal("user-3"), fakePrincipal("user-6")],
@@ -128,6 +133,7 @@ export const DEMO_EVENTS: EventView[] = [
     maxAttendees: BigInt(500),
     attendees: [fakePrincipal("user-1"), fakePrincipal("user-2"), fakePrincipal("user-3")],
     creator: fakePrincipal("user-1"),
+    photos: [],
   },
   {
     id: "event-2",
@@ -140,6 +146,7 @@ export const DEMO_EVENTS: EventView[] = [
     maxAttendees: BigInt(80),
     attendees: [fakePrincipal("user-2"), fakePrincipal("user-3")],
     creator: fakePrincipal("user-2"),
+    photos: [],
   },
   {
     id: "event-3",
@@ -152,6 +159,7 @@ export const DEMO_EVENTS: EventView[] = [
     maxAttendees: BigInt(2000),
     attendees: [fakePrincipal("user-1"), fakePrincipal("user-4"), fakePrincipal("user-5")],
     creator: fakePrincipal("user-3"),
+    photos: [],
   },
   {
     id: "event-4",
@@ -164,6 +172,7 @@ export const DEMO_EVENTS: EventView[] = [
     maxAttendees: BigInt(30),
     attendees: [fakePrincipal("user-1"), fakePrincipal("user-5")],
     creator: fakePrincipal("user-4"),
+    photos: [],
   },
 ];
 

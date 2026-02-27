@@ -27,6 +27,7 @@ export const UserRole = IDL.Variant({
 export const PostView = IDL.Record({
   'id' : IDL.Text,
   'postType' : IDL.Text,
+  'topic' : IDL.Text,
   'content' : IDL.Text,
   'author' : IDL.Principal,
   'likes' : IDL.Vec(IDL.Principal),
@@ -86,6 +87,7 @@ export const EventView = IDL.Record({
   'category' : IDL.Text,
   'location' : IDL.Text,
   'eventDate' : IDL.Int,
+  'photos' : IDL.Vec(IDL.Text),
 });
 export const Listing = IDL.Record({
   'id' : IDL.Text,
@@ -151,6 +153,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'addComment' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+  'addEventPhoto' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createClub' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -181,10 +184,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'createPost' : IDL.Func(
-      [IDL.Text, IDL.Vec(IDL.Text), IDL.Text],
+      [IDL.Text, IDL.Vec(IDL.Text), IDL.Text, IDL.Text],
       [IDL.Text],
       [],
     ),
+  'deleteEvent' : IDL.Func([IDL.Text], [], []),
   'deleteListing' : IDL.Func([IDL.Text], [], []),
   'deletePost' : IDL.Func([IDL.Text], [], []),
   'followUser' : IDL.Func([IDL.Principal], [], []),
@@ -199,6 +203,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Principal)],
       ['query'],
     ),
+  'getEventPhotos' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
   'getFollowers' : IDL.Func(
       [IDL.Principal],
       [IDL.Vec(IDL.Principal)],
@@ -272,6 +277,7 @@ export const idlFactory = ({ IDL }) => {
   const PostView = IDL.Record({
     'id' : IDL.Text,
     'postType' : IDL.Text,
+    'topic' : IDL.Text,
     'content' : IDL.Text,
     'author' : IDL.Principal,
     'likes' : IDL.Vec(IDL.Principal),
@@ -331,6 +337,7 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'location' : IDL.Text,
     'eventDate' : IDL.Int,
+    'photos' : IDL.Vec(IDL.Text),
   });
   const Listing = IDL.Record({
     'id' : IDL.Text,
@@ -396,6 +403,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'addComment' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'addEventPhoto' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createClub' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -426,10 +434,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createPost' : IDL.Func(
-        [IDL.Text, IDL.Vec(IDL.Text), IDL.Text],
+        [IDL.Text, IDL.Vec(IDL.Text), IDL.Text, IDL.Text],
         [IDL.Text],
         [],
       ),
+    'deleteEvent' : IDL.Func([IDL.Text], [], []),
     'deleteListing' : IDL.Func([IDL.Text], [], []),
     'deletePost' : IDL.Func([IDL.Text], [], []),
     'followUser' : IDL.Func([IDL.Principal], [], []),
@@ -448,6 +457,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Principal)],
         ['query'],
       ),
+    'getEventPhotos' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
     'getFollowers' : IDL.Func(
         [IDL.Principal],
         [IDL.Vec(IDL.Principal)],

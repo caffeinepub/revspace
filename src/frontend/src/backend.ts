@@ -100,6 +100,7 @@ export interface EventView {
     category: string;
     location: string;
     eventDate: bigint;
+    photos: Array<string>;
 }
 export interface Comment {
     id: string;
@@ -132,6 +133,7 @@ export interface Notification {
 export interface PostView {
     id: string;
     postType: string;
+    topic: string;
     content: string;
     author: Principal;
     likes: Array<Principal>;
@@ -199,12 +201,14 @@ export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     addCar(make: string, model: string, year: string, color: string, description: string, modifications: Array<string>, imageUrls: Array<string>): Promise<string>;
     addComment(postId: string, content: string): Promise<string>;
+    addEventPhoto(eventId: string, photoUrl: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClub(name: string, description: string, category: string, coverImageUrl: string): Promise<string>;
     createEvent(title: string, description: string, location: string, eventDate: bigint, coverImageUrl: string, category: string, maxAttendees: bigint): Promise<string>;
     createListing(title: string, description: string, price: bigint, category: string, condition: string, imageUrls: Array<string>, location: string): Promise<string>;
     createNotification(notifType: string, message: string, relatedId: string): Promise<string>;
-    createPost(content: string, mediaUrls: Array<string>, postType: string): Promise<string>;
+    createPost(content: string, mediaUrls: Array<string>, postType: string, topic: string): Promise<string>;
+    deleteEvent(eventId: string): Promise<void>;
     deleteListing(listingId: string): Promise<void>;
     deletePost(postId: string): Promise<void>;
     followUser(user: Principal): Promise<void>;
@@ -215,6 +219,7 @@ export interface backendInterface {
     getCommentsForPost(postId: string): Promise<Array<Comment>>;
     getConversations(): Promise<Array<Principal>>;
     getEventAttendees(eventId: string): Promise<Array<Principal>>;
+    getEventPhotos(eventId: string): Promise<Array<string>>;
     getFollowers(user: Principal): Promise<Array<Principal>>;
     getFollowing(user: Principal): Promise<Array<Principal>>;
     getGarageByUser(user: Principal): Promise<Array<Car>>;
@@ -374,6 +379,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async addEventPhoto(arg0: string, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addEventPhoto(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addEventPhoto(arg0, arg1);
+            return result;
+        }
+    }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
         if (this.processError) {
             try {
@@ -444,17 +463,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createPost(arg0: string, arg1: Array<string>, arg2: string): Promise<string> {
+    async createPost(arg0: string, arg1: Array<string>, arg2: string, arg3: string): Promise<string> {
         if (this.processError) {
             try {
-                const result = await this.actor.createPost(arg0, arg1, arg2);
+                const result = await this.actor.createPost(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createPost(arg0, arg1, arg2);
+            const result = await this.actor.createPost(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async deleteEvent(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteEvent(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteEvent(arg0);
             return result;
         }
     }
@@ -595,6 +628,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getEventAttendees(arg0);
+            return result;
+        }
+    }
+    async getEventPhotos(arg0: string): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getEventPhotos(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getEventPhotos(arg0);
             return result;
         }
     }

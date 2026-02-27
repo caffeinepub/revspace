@@ -18,6 +18,7 @@ export interface EventView {
     category: string;
     location: string;
     eventDate: bigint;
+    photos: Array<string>;
 }
 export interface Comment {
     id: string;
@@ -50,6 +51,7 @@ export interface Notification {
 export interface PostView {
     id: string;
     postType: string;
+    topic: string;
     content: string;
     author: Principal;
     likes: Array<Principal>;
@@ -99,12 +101,14 @@ export enum UserRole {
 export interface backendInterface {
     addCar(make: string, model: string, year: string, color: string, description: string, modifications: Array<string>, imageUrls: Array<string>): Promise<string>;
     addComment(postId: string, content: string): Promise<string>;
+    addEventPhoto(eventId: string, photoUrl: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClub(name: string, description: string, category: string, coverImageUrl: string): Promise<string>;
     createEvent(title: string, description: string, location: string, eventDate: bigint, coverImageUrl: string, category: string, maxAttendees: bigint): Promise<string>;
     createListing(title: string, description: string, price: bigint, category: string, condition: string, imageUrls: Array<string>, location: string): Promise<string>;
     createNotification(notifType: string, message: string, relatedId: string): Promise<string>;
-    createPost(content: string, mediaUrls: Array<string>, postType: string): Promise<string>;
+    createPost(content: string, mediaUrls: Array<string>, postType: string, topic: string): Promise<string>;
+    deleteEvent(eventId: string): Promise<void>;
     deleteListing(listingId: string): Promise<void>;
     deletePost(postId: string): Promise<void>;
     followUser(user: Principal): Promise<void>;
@@ -115,6 +119,7 @@ export interface backendInterface {
     getCommentsForPost(postId: string): Promise<Array<Comment>>;
     getConversations(): Promise<Array<Principal>>;
     getEventAttendees(eventId: string): Promise<Array<Principal>>;
+    getEventPhotos(eventId: string): Promise<Array<string>>;
     getFollowers(user: Principal): Promise<Array<Principal>>;
     getFollowing(user: Principal): Promise<Array<Principal>>;
     getGarageByUser(user: Principal): Promise<Array<Car>>;

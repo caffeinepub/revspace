@@ -18,10 +18,10 @@ export function useUploadFile() {
     onProgress?: (pct: number) => void
   ): Promise<string> => {
     const config = await loadConfig();
-    const agentOptions: Record<string, unknown> = { host: config.backend_host };
-    if (identity) {
-      agentOptions.identity = identity;
-    }
+    // Always create an authenticated agent when identity is available
+    const agentOptions = identity
+      ? { host: config.backend_host, identity }
+      : { host: config.backend_host };
     const agent = new HttpAgent(agentOptions);
     const storageClient = new StorageClient(
       config.bucket_name,
@@ -124,13 +124,15 @@ export function useCreatePost() {
       content,
       mediaUrls,
       postType,
+      topic,
     }: {
       content: string;
       mediaUrls: string[];
       postType: string;
+      topic: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.createPost(content, mediaUrls, postType);
+      return actor.createPost(content, mediaUrls, postType, topic);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
   });
@@ -330,6 +332,45 @@ export function useCreateEvent() {
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+  });
+}
+
+export function useDeleteEvent() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteEvent(eventId);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+  });
+}
+
+export function useAddEventPhoto() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ eventId, photoUrl }: { eventId: string; photoUrl: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addEventPhoto(eventId, photoUrl);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["events"] });
+      qc.invalidateQueries({ queryKey: ["eventPhotos", vars.eventId] });
+    },
+  });
+}
+
+export function useGetEventPhotos(eventId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["eventPhotos", eventId],
+    queryFn: async () => {
+      if (!actor || !eventId) return [];
+      return actor.getEventPhotos(eventId);
+    },
+    enabled: !!actor && !isFetching && !!eventId,
   });
 }
 

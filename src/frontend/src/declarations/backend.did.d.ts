@@ -48,6 +48,7 @@ export interface EventView {
   'category' : string,
   'location' : string,
   'eventDate' : bigint,
+  'photos' : Array<string>,
 }
 export interface Listing {
   'id' : string,
@@ -80,6 +81,7 @@ export interface Notification {
 export interface PostView {
   'id' : string,
   'postType' : string,
+  'topic' : string,
   'content' : string,
   'author' : Principal,
   'likes' : Array<Principal>,
@@ -130,6 +132,7 @@ export interface _SERVICE {
     string
   >,
   'addComment' : ActorMethod<[string, string], string>,
+  'addEventPhoto' : ActorMethod<[string, string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createClub' : ActorMethod<[string, string, string, string], string>,
   'createEvent' : ActorMethod<
@@ -141,7 +144,8 @@ export interface _SERVICE {
     string
   >,
   'createNotification' : ActorMethod<[string, string, string], string>,
-  'createPost' : ActorMethod<[string, Array<string>, string], string>,
+  'createPost' : ActorMethod<[string, Array<string>, string, string], string>,
+  'deleteEvent' : ActorMethod<[string], undefined>,
   'deleteListing' : ActorMethod<[string], undefined>,
   'deletePost' : ActorMethod<[string], undefined>,
   'followUser' : ActorMethod<[Principal], undefined>,
@@ -152,6 +156,7 @@ export interface _SERVICE {
   'getCommentsForPost' : ActorMethod<[string], Array<Comment>>,
   'getConversations' : ActorMethod<[], Array<Principal>>,
   'getEventAttendees' : ActorMethod<[string], Array<Principal>>,
+  'getEventPhotos' : ActorMethod<[string], Array<string>>,
   'getFollowers' : ActorMethod<[Principal], Array<Principal>>,
   'getFollowing' : ActorMethod<[Principal], Array<Principal>>,
   'getGarageByUser' : ActorMethod<[Principal], Array<Car>>,

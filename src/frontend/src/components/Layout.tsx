@@ -33,7 +33,7 @@ const ALL_NAV_ITEMS = [
   { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { to: "/clubs", label: "Car Clubs", icon: Users },
   { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { to: "/shop", label: "Shop", icon: Store },
+  { to: "/shop", label: "Performance Shop", icon: Store },
   { to: "/messages", label: "Messages", icon: MessageCircle },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/profile", label: "Profile", icon: User },
@@ -93,6 +93,32 @@ function MobileNav() {
           </button>
         </div>
       </header>
+
+      {/* Mobile ad banner strip below header */}
+      <div
+        className="fixed top-[53px] left-0 right-0 z-40 md:hidden"
+        style={{
+          background: "oklch(var(--carbon) / 0.98)",
+          borderBottom: "1px solid oklch(var(--border))",
+        }}
+      >
+        <a
+          href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-3 py-1.5"
+        >
+          <img
+            src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
+            alt="JDM Store - Shop Parts & Accessories"
+            className="h-8 object-contain"
+            style={{ maxWidth: 120, background: "#000", borderRadius: 4 }}
+          />
+          <span className="text-xs font-semibold tracking-wide" style={{ color: "oklch(var(--orange))" }}>
+            Shop Parts &amp; Accessories →
+          </span>
+        </a>
+      </div>
 
       {/* Drawer overlay */}
       {open && (

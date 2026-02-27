@@ -1,18 +1,21 @@
+import Migration "migration";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 import Text "mo:core/Text";
-import Nat "mo:core/Nat";
-import Int "mo:core/Int";
 import Map "mo:core/Map";
-import List "mo:core/List";
 import Set "mo:core/Set";
+import List "mo:core/List";
 import Array "mo:core/Array";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Nat "mo:core/Nat";
+import Int "mo:core/Int";
 
+// Specify migration module and function in the with clause
+(with migration = Migration.run)
 actor {
   // -----------------------------------
   // Types Module (all custom types)
@@ -27,6 +30,7 @@ actor {
       timestamp : Int;
       likes : Set.Set<Principal>;
       comments : List.List<Text>;
+      topic : Text;
     };
 
     public type PostView = {
@@ -38,6 +42,7 @@ actor {
       timestamp : Int;
       likes : [Principal];
       comments : [Text];
+      topic : Text;
     };
 
     public type Comment = {
@@ -79,6 +84,7 @@ actor {
       category : Text;
       maxAttendees : Nat;
       attendees : Set.Set<Principal>;
+      photos : List.List<Text>;
     };
 
     public type EventView = {
@@ -92,6 +98,7 @@ actor {
       category : Text;
       maxAttendees : Nat;
       attendees : [Principal];
+      photos : [Text];
     };
 
     public type Listing = {
@@ -164,6 +171,7 @@ actor {
       category = event.category;
       maxAttendees = event.maxAttendees;
       attendees = event.attendees.toArray();
+      photos = event.photos.toArray();
     };
 
     public func clubToView(club : Types.Club) : Types.ClubView = {
@@ -185,6 +193,7 @@ actor {
       timestamp = post.timestamp;
       likes = post.likes.toArray();
       comments = post.comments.toArray();
+      topic = post.topic;
     };
   };
 
@@ -198,17 +207,17 @@ actor {
   include MixinAuthorization(accessControlState);
 
   // Persistent Stable Maps using component stableMap
-  stable let posts = Map.empty<Text, Types.Post>();
-  stable let comments = Map.empty<Text, Types.Comment>();
-  stable let profiles = Map.empty<Principal, Types.Profile>();
-  stable let cars = Map.empty<Text, Types.Car>();
-  stable let events = Map.empty<Text, Types.Event>();
-  stable let listings = Map.empty<Text, Types.Listing>();
-  stable let clubs = Map.empty<Text, Types.Club>();
-  stable let notifications = Map.empty<Text, Types.Notification>();
-  stable let messages = Map.empty<Text, Types.Message>();
-  stable let follows = Map.empty<Principal, Set.Set<Principal>>();
-  stable let followers = Map.empty<Principal, Set.Set<Principal>>();
+  let posts = Map.empty<Text, Types.Post>();
+  let comments = Map.empty<Text, Types.Comment>();
+  let profiles = Map.empty<Principal, Types.Profile>();
+  let cars = Map.empty<Text, Types.Car>();
+  let events = Map.empty<Text, Types.Event>();
+  let listings = Map.empty<Text, Types.Listing>();
+  let clubs = Map.empty<Text, Types.Club>();
+  let notifications = Map.empty<Text, Types.Notification>();
+  let messages = Map.empty<Text, Types.Message>();
+  let follows = Map.empty<Principal, Set.Set<Principal>>();
+  let followers = Map.empty<Principal, Set.Set<Principal>>();
 
   // -----------------------------------
   // Utils
@@ -221,7 +230,7 @@ actor {
   // -----------------------------------
   // POSTS
   // -----------------------------------
-  public shared ({ caller }) func createPost(content : Text, mediaUrls : [Text], postType : Text) : async Text {
+  public shared ({ caller }) func createPost(content : Text, mediaUrls : [Text], postType : Text, topic : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can create posts");
     };
@@ -235,6 +244,7 @@ actor {
       timestamp = Time.now();
       likes = Set.empty<Principal>();
       comments = List.empty<Text>();
+      topic;
     };
     posts.add(id, post);
     id;
@@ -448,6 +458,7 @@ actor {
       category;
       maxAttendees;
       attendees = Set.empty<Principal>();
+      photos = List.empty<Text>();
     };
     events.add(id, event);
     id;
@@ -490,6 +501,44 @@ actor {
       case (?event) {
         event.attendees.toArray();
       };
+    };
+  };
+
+  // New Function: Delete Event (only by creator or admin)
+  public shared ({ caller }) func deleteEvent(eventId : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete events");
+    };
+    switch (events.get(eventId)) {
+      case (null) { Runtime.trap("Event not found") };
+      case (?event) {
+        if (event.creator != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: You do not own this event");
+        };
+        events.remove(eventId);
+      };
+    };
+  };
+
+  // New Function: Add Photo to Event
+  public shared ({ caller }) func addEventPhoto(eventId : Text, photoUrl : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can add event photos");
+    };
+    switch (events.get(eventId)) {
+      case (null) { Runtime.trap("Event not found") };
+      case (?event) {
+        event.photos.add(photoUrl);
+        events.add(eventId, event);
+      };
+    };
+  };
+
+  // New Function: Get Event Photos
+  public query ({ caller }) func getEventPhotos(eventId : Text) : async [Text] {
+    switch (events.get(eventId)) {
+      case (null) { [] };
+      case (?event) { event.photos.toArray() };
     };
   };
 

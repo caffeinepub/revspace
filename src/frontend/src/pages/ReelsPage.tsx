@@ -257,6 +257,8 @@ function ReelMedia({ mediaUrl, postId, postType, isMuted, videoRef, onTimeUpdate
   );
 }
 
+const REEL_TOPICS = ["All", "Street Drift", "Car Show", "Track Day", "Burnout", "Stance", "JDM Build", "Muscle", "Import", "Cars & Coffee", "Other"];
+
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
   const { data: posts, isLoading } = useGetAllPosts();
@@ -267,12 +269,16 @@ export function ReelsPage() {
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState<Record<string, number>>({});
+  const [selectedTopic, setSelectedTopic] = useState("All");
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
-  const displayPosts = posts ?? [];
+  const allPosts = posts ?? [];
+  const displayPosts = selectedTopic === "All"
+    ? allPosts
+    : allPosts.filter((p) => p.topic === selectedTopic);
 
   const handleTimeUpdate = (postId: string, pct: number) => {
     setProgress((prev) => ({ ...prev, [postId]: pct }));
@@ -329,6 +335,40 @@ export function ReelsPage() {
         </div>
       </Link>
 
+      {/* Topic filter bar — sticky at top */}
+      <div
+        className="fixed top-0 left-0 right-0 z-40 flex gap-2 px-4 pt-3 pb-2 overflow-x-auto scrollbar-hide"
+        style={{
+          background: "linear-gradient(to bottom, oklch(0 0 0 / 0.85) 0%, transparent 100%)",
+          paddingLeft: "3.5rem",
+        }}
+      >
+        {REEL_TOPICS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setSelectedTopic(t)}
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+            style={
+              selectedTopic === t
+                ? {
+                    background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
+                    boxShadow: "0 0 12px oklch(var(--orange) / 0.5)",
+                  }
+                : {
+                    background: "oklch(0 0 0 / 0.5)",
+                    color: "oklch(1 0 0 / 0.75)",
+                    border: "1px solid oklch(1 0 0 / 0.2)",
+                    backdropFilter: "blur(8px)",
+                  }
+            }
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {commentPostId && (
         <ReelsCommentsPanel
           postId={commentPostId}
@@ -339,8 +379,14 @@ export function ReelsPage() {
       {!isLoading && displayPosts.length === 0 && (
         <div className="h-screen flex flex-col items-center justify-center text-center px-6">
           <Film size={48} className="text-white/30 mb-4" />
-          <h3 className="text-white font-display text-xl font-bold mb-2">No Reels Yet</h3>
-          <p className="text-white/50 text-sm mb-6">Upload your first video reel to get started.</p>
+          <h3 className="text-white font-display text-xl font-bold mb-2">
+            {selectedTopic === "All" ? "No Reels Yet" : `No "${selectedTopic}" Reels`}
+          </h3>
+          <p className="text-white/50 text-sm mb-6">
+            {selectedTopic === "All"
+              ? "Upload your first video reel to get started."
+              : "Be the first to upload a reel with this topic."}
+          </p>
           <Link to="/create">
             <Button style={{ background: "oklch(var(--orange))", color: "oklch(var(--carbon))" }}>
               Upload Reel
@@ -387,6 +433,19 @@ export function ReelsPage() {
             {/* Content overlay */}
             <div className="absolute bottom-24 left-0 right-16 px-4">
               <ReelAuthorInfo authorPrincipal={post.author} />
+              {post.topic && (
+                <span
+                  className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-2"
+                  style={{
+                    background: "oklch(var(--orange) / 0.25)",
+                    color: "oklch(var(--orange-bright))",
+                    border: "1px solid oklch(var(--orange) / 0.5)",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >
+                  # {post.topic}
+                </span>
+              )}
               <p className="text-white text-sm leading-relaxed line-clamp-3">{post.content}</p>
               <p className="text-white/50 text-xs mt-1">{timeAgo(post.timestamp)}</p>
             </div>

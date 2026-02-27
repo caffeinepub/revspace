@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from "react";
-import { Image, Video, Film, X, Loader2, Upload, ImagePlus } from "lucide-react";
+import { Image, Video, Film, X, Loader2, Upload, ImagePlus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreatePost, useUploadFile } from "../hooks/useQueries";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
@@ -13,9 +14,23 @@ const POST_TYPES = [
   { value: "Reel", icon: Film, label: "Reel", accept: "video/*" },
 ];
 
+const REEL_TOPICS = [
+  "Street Drift",
+  "Car Show",
+  "Track Day",
+  "Burnout",
+  "Stance",
+  "JDM Build",
+  "Muscle",
+  "Import",
+  "Cars & Coffee",
+  "Other",
+];
+
 export function CreatePostPage() {
   const navigate = useNavigate();
   const [postType, setPostType] = useState("Photo");
+  const [topic, setTopic] = useState("Other");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -86,11 +101,13 @@ export function CreatePostPage() {
       setUploadProgress(null);
     }
 
+    const isReelOrVideo = postType === "Reel" || postType === "Video";
     createPost.mutate(
       {
         content: content.trim(),
         mediaUrls,
         postType,
+        topic: isReelOrVideo ? topic : "",
       },
       {
         onSuccess: () => {
@@ -153,6 +170,40 @@ export function CreatePostPage() {
             ))}
           </div>
         </div>
+
+        {/* Topic Selector — only for Reel/Video */}
+        {(postType === "Reel" || postType === "Video") && (
+          <div>
+            <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Tag size={12} />
+                Topic / Category
+              </span>
+            </Label>
+            <Select value={topic} onValueChange={setTopic}>
+              <SelectTrigger
+                className="h-11 text-sm font-medium"
+                style={{
+                  background: "oklch(var(--surface))",
+                  borderColor: "oklch(var(--border))",
+                  color: "oklch(var(--foreground))",
+                }}
+              >
+                <SelectValue placeholder="Select a topic..." />
+              </SelectTrigger>
+              <SelectContent style={{ background: "oklch(var(--surface))", borderColor: "oklch(var(--border))" }}>
+                {REEL_TOPICS.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-steel mt-1">
+              Help others find your reel by tagging it with a topic
+            </p>
+          </div>
+        )}
 
         {/* Media Upload */}
         <div>

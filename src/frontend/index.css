@@ -173,7 +173,7 @@
   }
 
   .main-content {
-    @apply pt-14 md:pt-0 md:pl-64;
+    @apply pt-24 md:pt-0 md:pl-64;
     min-height: 100vh;
   }
 
