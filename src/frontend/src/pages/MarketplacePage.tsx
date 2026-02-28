@@ -42,6 +42,7 @@ import {
   useUploadFile,
 } from "../hooks/useQueries";
 import { convertToJpegIfNeeded } from "../lib/convertHeic";
+import { validateFile } from "../lib/uploadValidator";
 import { formatPrice, truncatePrincipal } from "../utils/format";
 
 // Helper component: shows seller's display name on listing cards
@@ -296,6 +297,20 @@ function CreateListingModal({
     let file = e.target.files?.[0];
     if (!file) return;
     file = await convertToJpegIfNeeded(file);
+
+    // Pre-upload validation: size + MIME checks for marketplace photos
+    const validation = await validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error ?? "File validation failed.", {
+        duration: 8000,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (validation.warning) {
+      toast.warning(validation.warning, { duration: 6000 });
+    }
+
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));

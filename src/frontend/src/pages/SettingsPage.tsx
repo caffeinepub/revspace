@@ -35,6 +35,7 @@ import {
 } from "../lib/modelAccount";
 import { isUserPro } from "../lib/pro";
 import { getCachedProfile } from "../lib/profileCache";
+import { validateFile } from "../lib/uploadValidator";
 import { getInitials } from "../utils/format";
 
 const MODEL_SPECIALTIES = ["JDM", "Euro", "Stance", "Muscle", "Other"];
@@ -529,6 +530,20 @@ export function SettingsPage() {
     let file = e.target.files?.[0];
     if (!file) return;
     file = await convertToJpegIfNeeded(file);
+
+    // Pre-upload validation: size + MIME only (no duration for images)
+    const validation = await validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error ?? "File validation failed.", {
+        duration: 8000,
+      });
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+      return;
+    }
+    if (validation.warning) {
+      toast.warning(validation.warning, { duration: 6000 });
+    }
+
     setAvatarUploading(true);
     setAvatarProgress(0);
     try {
@@ -550,6 +565,20 @@ export function SettingsPage() {
     let file = e.target.files?.[0];
     if (!file) return;
     file = await convertToJpegIfNeeded(file);
+
+    // Pre-upload validation: size + MIME only (no duration for images)
+    const validation = await validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error ?? "File validation failed.", {
+        duration: 8000,
+      });
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
+      return;
+    }
+    if (validation.warning) {
+      toast.warning(validation.warning, { duration: 6000 });
+    }
+
     setBannerUploading(true);
     setBannerProgress(0);
     try {

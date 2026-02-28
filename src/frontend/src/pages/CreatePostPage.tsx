@@ -10,21 +10,30 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  CheckCircle2,
   Film,
   Image,
   ImagePlus,
   Loader2,
+  RotateCcw,
   Tag,
   Upload,
   Video,
   X,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { UploadHealthBanner } from "../components/UploadHealthBanner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreatePost, useUploadFile } from "../hooks/useQueries";
 import { convertToJpegIfNeeded } from "../lib/convertHeic";
+import { clearDraft, getDraft, hasDraft, saveDraft } from "../lib/draftPost";
 import { awardPostCreation } from "../lib/revbucks";
+import { recordUploadAttempt } from "../lib/uploadHealth";
+import {
+  type FileValidationOptions,
+  validateFile,
+} from "../lib/uploadValidator";
 
 // Explicit extensions alongside the MIME wildcard so iOS Safari and Android
 // WebView both show video files in the native picker correctly.
@@ -54,16 +63,78 @@ const REEL_TOPICS = [
   "Other",
 ];
 
+// ── Upload stages ────────────────────────────────────────────────────────────
+type UploadStage = "idle" | "validating" | "uploading" | "publishing";
+
+interface StagePill {
+  label: string;
+  progress?: number; // 0-100, only shown in "uploading" stage
+}
+
+function getStageInfo(
+  stage: UploadStage,
+  progress: number | null,
+): StagePill | null {
+  if (stage === "idle") return null;
+  if (stage === "validating") return { label: "Validating..." };
+  if (stage === "uploading")
+    return {
+      label: `Uploading... ${Math.round(progress ?? 0)}%`,
+      progress: progress ?? 0,
+    };
+  if (stage === "publishing") return { label: "Publishing..." };
+  return null;
+}
+
+// ── Actionable error mapper ──────────────────────────────────────────────────
+function mapErrorMessage(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  if (lower.includes("log in") || lower.includes("identity")) {
+    return "You need to be logged in. Tap the login button and try again.";
+  }
+  if (lower.includes("size") || lower.includes("mb")) {
+    return "File is too large. Try compressing or trimming it before uploading.";
+  }
+  if (
+    lower.includes("format") ||
+    lower.includes("mime") ||
+    lower.includes("type")
+  ) {
+    return "This file format isn't supported. Try MP4 for video or JPEG/PNG for photos.";
+  }
+  if (
+    lower.includes("network") ||
+    lower.includes("timeout") ||
+    lower.includes("fetch")
+  ) {
+    return "Upload interrupted. Keep this tab open and try again — your caption is saved.";
+  }
+  if (lower.includes("rate limit")) {
+    return "You're posting too fast. Wait a minute and try again.";
+  }
+  return `Upload failed: ${msg}`;
+}
+
 export function CreatePostPage() {
   const navigate = useNavigate();
   const { identity } = useInternetIdentity();
+  const principalId = identity?.getPrincipal().toText() ?? "";
+
   const [postType, setPostType] = useState("Photo");
   const [topic, setTopic] = useState("Other");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [stage, setStage] = useState<UploadStage>("idle");
+
+  // Draft state
+  const [draftBannerVisible, setDraftBannerVisible] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const draftAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createPost = useCreatePost();
   const uploadFile = useUploadFile();
@@ -71,12 +142,59 @@ export function CreatePostPage() {
   const currentType = POST_TYPES.find((t) => t.value === postType)!;
   const isVideo = postType === "Video" || postType === "Reel";
 
+  // ── On mount: check for saved draft ────────────────────────────────────────
+  useEffect(() => {
+    if (!principalId) return;
+    if (hasDraft(principalId)) {
+      setDraftBannerVisible(true);
+    }
+  }, [principalId]);
+
+  // ── Draft autosave — debounced 1500ms on content/topic change ──────────────
+  useEffect(() => {
+    if (!principalId || !content.trim()) return;
+
+    if (draftAutosaveTimer.current) {
+      clearTimeout(draftAutosaveTimer.current);
+    }
+
+    draftAutosaveTimer.current = setTimeout(() => {
+      saveDraft(principalId, { content, postType, topic });
+      setDraftSavedAt(Date.now());
+      // Fade out the indicator after 2.5 seconds
+      setTimeout(() => setDraftSavedAt(null), 2500);
+    }, 1500);
+
+    return () => {
+      if (draftAutosaveTimer.current) {
+        clearTimeout(draftAutosaveTimer.current);
+      }
+    };
+  }, [content, postType, topic, principalId]);
+
+  // ── Restore draft ───────────────────────────────────────────────────────────
+  const handleRestoreDraft = () => {
+    if (!principalId) return;
+    const draft = getDraft(principalId);
+    if (!draft) return;
+    setContent(draft.content);
+    setPostType(draft.postType);
+    setTopic(draft.topic);
+    setDraftBannerVisible(false);
+  };
+
+  const handleDismissDraft = () => {
+    setDraftBannerVisible(false);
+    if (principalId) clearDraft(principalId);
+  };
+
+  // ── File change handler ─────────────────────────────────────────────────────
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       let selected = e.target.files?.[0];
       if (!selected) return;
 
-      // Convert HEIC/HEIF/WebP to JPEG so all browsers can display and upload it
+      // Step 1: Convert HEIC/HEIF/WebP to JPEG
       if (!selected.type.startsWith("video/")) {
         selected = await convertToJpegIfNeeded(selected);
       }
@@ -89,18 +207,21 @@ export function CreatePostPage() {
       setPreviewUrl(objectUrl);
       setUploadProgress(null);
 
-      // For Reels: warn if video is over 10 minutes
-      if (postType === "Reel") {
-        const tempVideo = document.createElement("video");
-        tempVideo.src = objectUrl;
-        tempVideo.onloadedmetadata = () => {
-          if (tempVideo.duration > 600) {
-            toast.warning(
-              "Video is over 10 minutes — it may be trimmed or rejected on upload",
-            );
-          }
-          URL.revokeObjectURL(tempVideo.src);
-        };
+      // Step 2: Run pre-selection validation (warnings only — no blocking here)
+      const opts: FileValidationOptions = {
+        postType: postType as "Photo" | "Video" | "Reel",
+      };
+      const result = await validateFile(selected, opts);
+      if (result.warning) {
+        toast.warning(result.warning, { duration: 6000 });
+      }
+      if (!result.valid && result.error) {
+        // Validation failed — show error and clear the file
+        toast.error(result.error, { duration: 8000 });
+        URL.revokeObjectURL(objectUrl);
+        setFile(null);
+        setPreviewUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
     [previewUrl, postType],
@@ -124,24 +245,63 @@ export function CreatePostPage() {
     let mediaUrls: string[] = [];
 
     if (file) {
-      setIsUploading(true);
+      // ── Stage 1: Validate ────────────────────────────────────────────────
+      setStage("validating");
+      const opts: FileValidationOptions = {
+        postType: postType as "Photo" | "Video" | "Reel",
+      };
+      const validation = await validateFile(file, opts);
+
+      if (!validation.valid) {
+        toast.error(validation.error ?? "File validation failed.", {
+          duration: 8000,
+        });
+        setStage("idle");
+        return;
+      }
+      if (validation.warning) {
+        toast.warning(validation.warning, { duration: 6000 });
+      }
+
+      // ── Stage 2: Upload ──────────────────────────────────────────────────
+      setStage("uploading");
       setUploadProgress(0);
+
+      const uploadStart = Date.now();
       try {
         const url = await uploadFile(file, (pct) => setUploadProgress(pct));
         mediaUrls = [url];
+
+        // Record successful upload
+        recordUploadAttempt({
+          timestamp: Date.now(),
+          success: true,
+          fileSizeMB: file.size / (1024 * 1024),
+        });
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Failed to upload media",
-        );
-        setIsUploading(false);
+        const errorType = err instanceof Error ? err.message : String(err);
+        const friendlyMessage = mapErrorMessage(err);
+
+        // Record failed upload
+        recordUploadAttempt({
+          timestamp: uploadStart,
+          success: false,
+          errorType,
+        });
+
+        toast.error(friendlyMessage, { duration: 8000 });
+        setStage("idle");
         setUploadProgress(null);
         return;
       }
-      setIsUploading(false);
+
       setUploadProgress(null);
     }
 
+    // ── Stage 3: Publish ───────────────────────────────────────────────────
+    setStage("publishing");
     const isReelOrVideo = postType === "Reel" || postType === "Video";
+
     createPost.mutate(
       {
         content: content.trim(),
@@ -152,21 +312,32 @@ export function CreatePostPage() {
       {
         onSuccess: () => {
           toast.success("Post published! 🔥");
+
           // Award RevBucks for creating a post
-          const principal = identity?.getPrincipal().toText();
-          if (principal) {
-            awardPostCreation(principal);
+          if (principalId) {
+            awardPostCreation(principalId);
             toast.success("+10 RevBucks earned! ⚡", { duration: 3000 });
           }
+
+          // Clear draft on successful publish
+          if (principalId) clearDraft(principalId);
+
           clearFile();
+          setContent("");
+          setStage("idle");
           void navigate({ to: "/" });
         },
-        onError: () => toast.error("Failed to publish post"),
+        onError: (err) => {
+          const friendlyMessage = mapErrorMessage(err);
+          toast.error(friendlyMessage, { duration: 8000 });
+          setStage("idle");
+        },
       },
     );
   };
 
-  const isBusy = isUploading || createPost.isPending;
+  const isBusy = stage !== "idle" || createPost.isPending;
+  const stageInfo = getStageInfo(stage, uploadProgress);
 
   return (
     <div className="min-h-screen">
@@ -187,6 +358,49 @@ export function CreatePostPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-5 max-w-xl mx-auto">
+        {/* Draft restore banner */}
+        {draftBannerVisible && (
+          <div
+            className="flex items-center gap-3 rounded-xl px-3.5 py-3"
+            style={{
+              background: "oklch(0.2 0.06 260 / 0.3)",
+              border: "1px solid oklch(0.55 0.18 260 / 0.4)",
+            }}
+          >
+            <RotateCcw
+              size={15}
+              className="shrink-0"
+              style={{ color: "oklch(0.7 0.18 260)" }}
+            />
+            <p
+              className="text-xs flex-1"
+              style={{ color: "oklch(0.82 0.08 260)" }}
+            >
+              You have a saved draft
+            </p>
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="text-xs font-semibold px-2 py-1 rounded-lg transition-opacity hover:opacity-80"
+              style={{
+                background: "oklch(0.55 0.2 260 / 0.3)",
+                color: "oklch(0.78 0.2 260)",
+                border: "1px solid oklch(0.55 0.2 260 / 0.4)",
+              }}
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissDraft}
+              className="text-steel hover:text-foreground transition-colors ml-1"
+              aria-label="Dismiss draft"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Post Type Selector */}
         <div>
           <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
@@ -267,6 +481,9 @@ export function CreatePostPage() {
           <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
             Media {postType === "Photo" ? "(Image)" : "(Video)"}
           </Label>
+
+          {/* Upload health warning banner */}
+          <UploadHealthBanner />
 
           <input
             ref={fileInputRef}
@@ -354,35 +571,56 @@ export function CreatePostPage() {
             )}
           </div>
 
-          {/* Upload Progress */}
-          {uploadProgress !== null && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-steel">Uploading...</span>
+          {/* Multi-stage upload progress indicator */}
+          {stageInfo && (
+            <div className="mt-2 space-y-1.5">
+              {/* Stage pill */}
+              <div className="flex items-center justify-between">
                 <span
-                  className="text-xs font-semibold"
-                  style={{ color: "oklch(var(--orange))" }}
-                >
-                  {Math.round(uploadProgress)}%
-                </span>
-              </div>
-              <div
-                className="h-1.5 rounded-full overflow-hidden"
-                style={{ background: "oklch(var(--surface-elevated))" }}
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-300"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
                   style={{
-                    width: `${uploadProgress}%`,
                     background: "oklch(var(--orange))",
+                    color: "oklch(var(--carbon))",
                   }}
-                />
+                >
+                  {stage === "publishing" && (
+                    <CheckCircle2 size={11} className="opacity-80" />
+                  )}
+                  {(stage === "uploading" || stage === "validating") && (
+                    <Loader2 size={11} className="animate-spin opacity-80" />
+                  )}
+                  {stageInfo.label}
+                </span>
+                {stage === "uploading" && uploadProgress !== null && (
+                  <span
+                    className="text-xs font-semibold"
+                    style={{ color: "oklch(var(--orange))" }}
+                  >
+                    {Math.round(uploadProgress)}%
+                  </span>
+                )}
               </div>
+
+              {/* Progress bar — only during upload */}
+              {stage === "uploading" && uploadProgress !== null && (
+                <div
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ background: "oklch(var(--surface-elevated))" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${uploadProgress}%`,
+                      background: "oklch(var(--orange))",
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* Browse button when file already selected */}
-          {previewUrl && (
+          {previewUrl && !isBusy && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -396,9 +634,21 @@ export function CreatePostPage() {
 
         {/* Caption */}
         <div>
-          <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
-            Caption *
-          </Label>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-xs text-steel uppercase tracking-wider font-semibold">
+              Caption *
+            </Label>
+            {/* Draft saved indicator */}
+            {draftSavedAt && (
+              <span
+                className="text-[10px] flex items-center gap-1 transition-opacity"
+                style={{ color: "oklch(0.65 0.14 150)" }}
+              >
+                <CheckCircle2 size={10} />
+                Draft saved
+              </span>
+            )}
+          </div>
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -435,12 +685,17 @@ export function CreatePostPage() {
                 : "none",
           }}
         >
-          {isUploading ? (
+          {stage === "validating" ? (
+            <div className="flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin" />
+              Validating...
+            </div>
+          ) : stage === "uploading" ? (
             <div className="flex items-center gap-2">
               <Loader2 size={16} className="animate-spin" />
               Uploading media...
             </div>
-          ) : createPost.isPending ? (
+          ) : stage === "publishing" || createPost.isPending ? (
             <div className="flex items-center gap-2">
               <Loader2 size={16} className="animate-spin" />
               Publishing...
@@ -453,9 +708,9 @@ export function CreatePostPage() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
-        © 2026. Built with ❤️ using{" "}
+        © {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
-          href="https://caffeine.ai"
+          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-orange hover:underline"

@@ -1,39 +1,39 @@
 # RevSpace
 
 ## Current State
-- Build Battle duration is hardcoded to 7 days (`SEVEN_DAYS_MS`) in `buildBattle.ts` and the UI text throughout `BuildBattlePage.tsx` references "7 days"
-- Profile data is saved to localStorage cache and backend, but the cache fallback only restores `displayName`, `bio`, `location` -- it does not restore `avatarUrl` and `bannerUrl` reliably across sessions
-- The `useMyProfile` query only caches/restores data when backend returns nothing, but if profile exists on backend with empty avatar it doesn't restore from cache
-- Vite config has no explicit browser targets (`build.target`) which defaults to modern-only ES modules -- Safari 14 and older Chromium versions may fail on optional chaining, `??=`, `at()`, etc.
-- No `@vitejs/plugin-legacy` or explicit polyfills for older browsers
-- The `index.html` missing explicit `<meta name="viewport">` restrictions that prevent zoom issues on iOS Safari
-- `dvh` units (`min-h-screen` with `dvh`) not supported in older Safari/Firefox versions
+RevSpace is a full-stack ICP car-enthusiast social platform with 25+ pages. The Motoko backend stores posts, profiles, cars, events, listings, clubs, notifications, and messages. The frontend uses React + TypeScript + Tailwind. Uploads are handled via `StorageClient.ts` (chunked PUT to the Caffeine storage gateway) and wired through `useUploadFile()` in `useQueries.ts`. The `CreatePostPage` captures a file, uploads it, then calls `createPost` with the returned URL. Several prior fixes addressed auth race conditions, MIME types, HEIC conversion, and retry logic.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `@vitejs/plugin-legacy` configured to target last 2 versions of major browsers including Safari 12+, Chrome 80+, Firefox 80+, Edge 80+ for broad compatibility
-- Explicit `build.target: ['es2020', 'chrome80', 'firefox78', 'safari13.1', 'edge80']` in vite config
-- Polyfill for `globalThis` in entry point
-- Profile cache now stores and restores ALL fields including `avatarUrl` and `bannerUrl`
-- Profile restore logic: even when backend returns a profile, if avatarUrl is empty but cache has one, merge cache data in
-- `useMyProfile` and `useUpdateProfile` robustly write all fields (including avatar/banner URLs) to both backend and cache every time
+- **Server-side draft posts**: new `PostDraft` type + `saveDraft`, `getDraft`, `deleteDraft`, `publishDraft` endpoints in Motoko so captions, topic, and post type survive browser cache clears.
+- **Upload state tracking**: `UploadState` type in backend (`pending | uploading | processing | complete | failed`) with `recordUploadStart`, `recordUploadComplete`, `recordUploadFailed`, `cleanupStaleDrafts` endpoints.
+- **Abandoned upload cleanup**: `cleanupStaleDrafts` removes drafts older than 24 h that never reached `complete` state.
+- **Pre-upload validation hook** (`useFileValidator`): validates file size (image ≤ 50 MB, video ≤ 500 MB), MIME type (rejects unsupported), aspect ratio for reels (warns if not 9:16), and video duration (warns if > 10 min) — all before any bytes are sent.
+- **MIME-aware upload**: `useUploadFile` passes correct `Content-Type` header per file so CDN serves images/videos with the right type.
+- **Draft autosave in CreatePostPage**: every time caption or topic changes, autosave debounces to backend via `saveDraft`. A "Draft saved" confirmation badge appears. On mount, restores the last draft if one exists.
+- **Transactional post publish**: `publishDraft` in Motoko atomically moves a draft to a real post only if the mediaUrl is non-empty (i.e., upload succeeded). No partial posts.
+- **Actionable error messages**: upload errors include a plain-English reason (size, format, auth, network) plus whether the draft was saved and what to do next.
+- **Rate limiting by action**: `RateLimiter` module in Motoko tracks per-action counters (createPost, sendMessage) with separate windows, not a single per-user counter.
+- **Upload health monitor component**: `UploadHealthBanner` shown in CreatePostPage and Settings that displays live upload failure count, last error, and a "clear" button — visible to users so they know the system state.
 
 ### Modify
-- `buildBattle.ts`: Change `SEVEN_DAYS_MS` constant to `FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000`
-- `BuildBattlePage.tsx`: Update all UI text "7 days" → "5 days"
-- `vite.config.js`: Add `build.target` for cross-browser support; add `@vitejs/plugin-legacy` if available
-- `useMyProfile`: Merge backend profile with local cache, always returning most complete data (prefer non-empty avatar from cache if backend has empty)
-- `useUpdateProfile`: On success, immediately update the React Query cache in addition to invalidating, for instant UI response
+- `useUploadFile`: add correct `Content-Type` (image/jpeg, video/mp4, etc.) based on file MIME type; integrate with draft autosave lifecycle (record start → record complete/failed).
+- `CreatePostPage`: wire draft autosave, restore draft on mount, add validation step before upload begins, improve progress UI with stage labels (Validating → Uploading → Publishing).
+- `StorageClient.putFile`: pass `Content-Type` in `fileHeaders` from the actual file type rather than hardcoded `application/octet-stream`.
 
 ### Remove
-- Nothing removed
+- Hardcoded `application/octet-stream` as the `Content-Type` in `StorageClient.putFile` — replace with file-derived MIME type.
+- LocalStorage-only draft state — move to server-side drafts so clearing browser data doesn't lose work.
 
 ## Implementation Plan
-1. Update `buildBattle.ts`: rename `SEVEN_DAYS_MS` → `FIVE_DAYS_MS`, change value to 5 days
-2. Update `BuildBattlePage.tsx`: replace all "7 days" text references with "5 days"
-3. Update `vite.config.js`: add `build.target` for broad browser support; configure esbuild/rollup targets
-4. Update `useQueries.ts` (`useMyProfile`): merge backend + cache data, ensure avatar/banner survive backend resets; always cache on profile load
-5. Update `useQueries.ts` (`useUpdateProfile`): optimistically update query cache on success so UI doesn't flash empty data
-6. Update `profileCache.ts`: add `mergeProfile` helper that prefers non-empty fields from either source
-7. Build and validate
+1. Add `PostDraft`, `UploadRecord`, and `RateLimiter` types + state maps to `main.mo`.
+2. Add `saveDraft`, `getDraft`, `deleteDraft`, `publishDraft`, `recordUploadStart`, `recordUploadComplete`, `recordUploadFailed`, `cleanupStaleDrafts`, `getUploadStats` endpoints.
+3. Add per-action rate limiting to `createPost`, `createListing`, `sendMessage`.
+4. Update `StorageClient.putFile` to accept and pass `contentType` so files are served with correct MIME.
+5. Update `useUploadFile` to pass `contentType`, record upload start/complete/failed in the backend.
+6. Add `useFileValidator` hook with size, MIME, duration, and aspect-ratio checks.
+7. Add `useDraftPost` hook: debounced autosave to backend, restore on mount, clear on publish.
+8. Revamp `CreatePostPage` with multi-stage progress (Validating → Uploading → Publishing), draft restore banner, and actionable errors per failure type.
+9. Add `UploadHealthBanner` component showing live failure stats.
+10. Run typecheck + build to verify zero errors.
