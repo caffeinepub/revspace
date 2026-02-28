@@ -313,16 +313,11 @@ function ReelMedia({
       <video
         key={mediaUrl}
         ref={(el) => {
-          // Ensure video starts muted on mount regardless of React prop timing
-          if (el) {
-            el.muted = true;
-          }
-          // Also forward to the parent ref callback
+          // Forward to the parent ref callback
           if (typeof videoRef === "function") videoRef(el);
         }}
         src={mediaUrl}
         autoPlay
-        muted
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
@@ -371,7 +366,7 @@ export function ReelsPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [selectedTopic, setSelectedTopic] = useState("All");
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());

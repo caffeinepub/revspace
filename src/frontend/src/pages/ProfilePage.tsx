@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
-import { Car, Grid3X3, Info, MapPin, Settings, Wrench } from "lucide-react";
+import { Car, Grid3X3, Info, MapPin, Settings, Wrench, X } from "lucide-react";
 import { useState } from "react";
 import { FollowListModal } from "../components/FollowListModal";
 import { ProBadge } from "../components/ProBadge";
@@ -25,6 +25,10 @@ export function ProfilePage() {
   const [followListMode, setFollowListMode] = useState<
     "followers" | "following" | null
   >(null);
+  const [selectedMedia, setSelectedMedia] = useState<{
+    url: string;
+    type: "image" | "video";
+  } | null>(null);
 
   const { data: profile, isLoading: profileLoading } = useMyProfile();
   const { data: posts, isLoading: postsLoading } =
@@ -243,10 +247,22 @@ export function ProfilePage() {
           ) : (
             <div className="grid grid-cols-3 gap-1">
               {displayPosts.map((post) => (
-                <div
+                <button
                   key={post.id}
+                  type="button"
                   className="relative aspect-square overflow-hidden group cursor-pointer"
                   style={{ borderRadius: "4px" }}
+                  onClick={() => {
+                    if (post.mediaUrls[0]) {
+                      setSelectedMedia({
+                        url: post.mediaUrls[0],
+                        type:
+                          post.postType === "Video" || post.postType === "Reel"
+                            ? "video"
+                            : "image",
+                      });
+                    }
+                  }}
                 >
                   {post.mediaUrls[0] ? (
                     post.postType === "Video" || post.postType === "Reel" ? (
@@ -281,7 +297,7 @@ export function ProfilePage() {
                       ♥ {post.likes.length}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -330,11 +346,22 @@ export function ProfilePage() {
                   style={{ border: "1px solid oklch(var(--border))" }}
                 >
                   {car.imageUrls[0] ? (
-                    <img
-                      src={car.imageUrls[0]}
-                      alt={`${car.year} ${car.make} ${car.model}`}
-                      className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    <button
+                      type="button"
+                      className="w-full block"
+                      onClick={() =>
+                        setSelectedMedia({
+                          url: car.imageUrls[0],
+                          type: "image",
+                        })
+                      }
+                    >
+                      <img
+                        src={car.imageUrls[0]}
+                        alt={`${car.year} ${car.make} ${car.model}`}
+                        className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </button>
                   ) : (
                     <div
                       className="w-full h-28 flex items-center justify-center"
@@ -456,6 +483,65 @@ export function ProfilePage() {
         open={followListMode === "following"}
         onClose={() => setFollowListMode(null)}
       />
+
+      {/* Media lightbox */}
+      {selectedMedia && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{
+            background: "oklch(0 0 0 / 0.92)",
+            animation: "fadeInLightbox 0.2s ease both",
+          }}
+        >
+          {/* Backdrop button to dismiss */}
+          <button
+            type="button"
+            aria-label="Close lightbox"
+            className="absolute inset-0 w-full h-full"
+            onClick={() => setSelectedMedia(null)}
+          />
+
+          {/* Close X button */}
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setSelectedMedia(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: "oklch(1 0 0 / 0.12)" }}
+          >
+            <X size={20} color="white" />
+          </button>
+
+          {/* Media content — z-10 so it sits above backdrop button */}
+          <div className="relative z-10 flex items-center justify-center p-4 max-w-full max-h-full">
+            {selectedMedia.type === "video" ? (
+              <video
+                src={selectedMedia.url}
+                controls
+                autoPlay
+                className="max-w-full max-h-full rounded-lg"
+                style={{ maxHeight: "90vh" }}
+              >
+                <track kind="captions" />
+              </video>
+            ) : (
+              <img
+                src={selectedMedia.url}
+                alt=""
+                className="max-w-full max-h-full rounded-lg"
+                style={{ maxHeight: "90vh", objectFit: "contain" }}
+              />
+            )}
+          </div>
+
+          <style>{`
+            @keyframes fadeInLightbox {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }
