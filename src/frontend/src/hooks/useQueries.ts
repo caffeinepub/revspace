@@ -9,8 +9,8 @@ import {
   setCachedProfile,
 } from "../lib/profileCache";
 import { StorageClient } from "../utils/StorageClient";
-import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
+import { useRegisteredActor } from "./useRegisteredActor";
 
 // ========================
 // File Upload Hook
@@ -68,7 +68,7 @@ export function useUploadFile() {
 // Posts
 // ========================
 export function useGetAllPosts() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
@@ -76,11 +76,14 @@ export function useGetAllPosts() {
       return actor.getAllPosts();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 10_000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 
 export function useGetPostsByUser(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["posts", "user", user?.toString()],
     queryFn: async () => {
@@ -88,11 +91,14 @@ export function useGetPostsByUser(user: Principal | undefined) {
       return actor.getPostsByUser(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 10_000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 
 export function useGetComments(postId: string) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["comments", postId],
     queryFn: async () => {
@@ -104,7 +110,7 @@ export function useGetComments(postId: string) {
 }
 
 export function useLikePost() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (postId: string) => {
@@ -116,7 +122,7 @@ export function useLikePost() {
 }
 
 export function useUnlikePost() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (postId: string) => {
@@ -128,7 +134,7 @@ export function useUnlikePost() {
 }
 
 export function useAddComment() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -146,7 +152,7 @@ export function useAddComment() {
 }
 
 export function useCreatePost() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -168,7 +174,7 @@ export function useCreatePost() {
 }
 
 export function useDeletePost() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (postId: string) => {
@@ -183,7 +189,7 @@ export function useDeletePost() {
 // Profile
 // ========================
 export function useMyProfile() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   const { identity } = useInternetIdentity();
   const principalId = identity?.getPrincipal().toString() ?? "";
 
@@ -191,38 +197,44 @@ export function useMyProfile() {
     queryKey: ["profile", "me"],
     queryFn: async () => {
       if (!actor) return null;
-      const backendProfile = await actor.getMyProfile();
 
-      // If backend has data, merge with local cache to recover any lost fields
-      // (avatarUrl/bannerUrl may be wiped by canister resets but survive in cache)
+      let backendProfile: {
+        displayName: string;
+        bio: string;
+        avatarUrl: string;
+        bannerUrl: string;
+        location: string;
+      } | null = null;
+
+      // Try to fetch from backend — wrap in try/catch so any backend error
+      // (e.g. "Unauthorized" during cold-start race) still falls back to cache
+      try {
+        const raw = await actor.getMyProfile();
+        if (raw) {
+          backendProfile = {
+            displayName: (raw as any).displayName ?? "",
+            bio: (raw as any).bio ?? "",
+            avatarUrl: (raw as any).avatarUrl ?? "",
+            bannerUrl: (raw as any).bannerUrl ?? "",
+            location: (raw as any).location ?? "",
+          };
+        }
+      } catch {
+        // Backend threw (cold-start / not-registered / network) — fall through to cache
+      }
+
       if (backendProfile) {
-        const p = backendProfile as {
-          displayName: string;
-          bio: string;
-          avatarUrl: string;
-          bannerUrl: string;
-          location: string;
-        };
-
-        const rawProfile = {
-          displayName: p.displayName ?? "",
-          bio: p.bio ?? "",
-          avatarUrl: p.avatarUrl ?? "",
-          bannerUrl: p.bannerUrl ?? "",
-          location: p.location ?? "",
-        };
-
         // Merge: prefer backend values but fall back to cache for any empty fields
         const merged = principalId
-          ? mergeWithCache(principalId, rawProfile)
-          : rawProfile;
+          ? mergeWithCache(principalId, backendProfile)
+          : backendProfile;
 
         // If merge recovered fields not in the backend, push them back silently
         const needsRestore =
           principalId &&
-          (merged.avatarUrl !== rawProfile.avatarUrl ||
-            merged.bannerUrl !== rawProfile.bannerUrl ||
-            merged.displayName !== rawProfile.displayName);
+          (merged.avatarUrl !== backendProfile.avatarUrl ||
+            merged.bannerUrl !== backendProfile.bannerUrl ||
+            merged.displayName !== backendProfile.displayName);
 
         if (needsRestore) {
           try {
@@ -269,14 +281,17 @@ export function useMyProfile() {
       return null;
     },
     enabled: !!actor && !isFetching,
-    // Retry on failure to handle canister cold-starts
-    retry: 3,
+    // Keep data in memory for 5 minutes across page navigations
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+    // Retry on failure to handle canister cold-starts and "User is not registered" races
+    retry: 5,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
 }
 
 export function useGetProfile(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["profile", user?.toString()],
     queryFn: async () => {
@@ -284,11 +299,15 @@ export function useGetProfile(user: Principal | undefined) {
       return actor.getProfile(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 
 export function useUpdateProfile() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const { identity } = useInternetIdentity();
   const qc = useQueryClient();
   return useMutation({
@@ -308,6 +327,12 @@ export function useUpdateProfile() {
       if (!actor) throw new Error("Not connected");
       const profileData = { displayName, bio, avatarUrl, bannerUrl, location };
 
+      // Save to local cache FIRST so data is never lost even if backend call fails
+      const principalId = identity?.getPrincipal().toString() ?? "";
+      if (principalId && displayName) {
+        setCachedProfile(principalId, profileData);
+      }
+
       // Save to backend
       await actor.updateProfile(
         displayName,
@@ -317,18 +342,33 @@ export function useUpdateProfile() {
         bannerUrl,
       );
 
-      // Save to local cache immediately as backup
-      const principalId = identity?.getPrincipal().toString() ?? "";
-      if (principalId) {
-        setCachedProfile(principalId, profileData);
-      }
-
       return profileData;
     },
     onSuccess: (profileData) => {
       // Immediately update query cache so UI never flashes empty data
       qc.setQueryData(["profile", "me"], profileData);
       qc.invalidateQueries({ queryKey: ["profile"] });
+    },
+    onError: (_err, vars) => {
+      // Even on backend error, keep local cache up to date
+      const principalId = identity?.getPrincipal().toString() ?? "";
+      if (principalId && vars.displayName) {
+        setCachedProfile(principalId, {
+          displayName: vars.displayName,
+          bio: vars.bio,
+          avatarUrl: vars.avatarUrl,
+          bannerUrl: vars.bannerUrl,
+          location: vars.location,
+        });
+        // Update in-memory query cache too so UI shows current values
+        qc.setQueryData(["profile", "me"], {
+          displayName: vars.displayName,
+          bio: vars.bio,
+          avatarUrl: vars.avatarUrl,
+          bannerUrl: vars.bannerUrl,
+          location: vars.location,
+        });
+      }
     },
   });
 }
@@ -337,7 +377,7 @@ export function useUpdateProfile() {
 // Garage
 // ========================
 export function useMyGarage() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["garage", "me"],
     queryFn: async () => {
@@ -345,11 +385,14 @@ export function useMyGarage() {
       return actor.getMyGarage();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 30_000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 
 export function useGarageByUser(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["garage", user?.toString()],
     queryFn: async () => {
@@ -361,7 +404,7 @@ export function useGarageByUser(user: Principal | undefined) {
 }
 
 export function useAddCar() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (car: {
@@ -389,7 +432,7 @@ export function useAddCar() {
 }
 
 export function useRemoveCar() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (carId: string) => {
@@ -404,7 +447,7 @@ export function useRemoveCar() {
 // Events
 // ========================
 export function useAllEvents() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["events"],
     queryFn: async () => {
@@ -416,7 +459,7 @@ export function useAllEvents() {
 }
 
 export function useRsvpEvent() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (eventId: string) => {
@@ -428,7 +471,7 @@ export function useRsvpEvent() {
 }
 
 export function useUnrsvpEvent() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (eventId: string) => {
@@ -440,7 +483,7 @@ export function useUnrsvpEvent() {
 }
 
 export function useCreateEvent() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (event: {
@@ -468,7 +511,7 @@ export function useCreateEvent() {
 }
 
 export function useDeleteEvent() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (eventId: string) => {
@@ -480,7 +523,7 @@ export function useDeleteEvent() {
 }
 
 export function useAddEventPhoto() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -498,7 +541,7 @@ export function useAddEventPhoto() {
 }
 
 export function useGetEventPhotos(eventId: string | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["eventPhotos", eventId],
     queryFn: async () => {
@@ -513,7 +556,7 @@ export function useGetEventPhotos(eventId: string | null) {
 // Marketplace
 // ========================
 export function useAllListings() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["listings"],
     queryFn: async () => {
@@ -525,7 +568,7 @@ export function useAllListings() {
 }
 
 export function useCreateListing() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (listing: {
@@ -553,7 +596,7 @@ export function useCreateListing() {
 }
 
 export function useMarkListingSold() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (listingId: string) => {
@@ -565,7 +608,7 @@ export function useMarkListingSold() {
 }
 
 export function useDeleteListing() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (listingId: string) => {
@@ -580,7 +623,7 @@ export function useDeleteListing() {
 // Clubs
 // ========================
 export function useAllClubs() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["clubs"],
     queryFn: async () => {
@@ -592,7 +635,7 @@ export function useAllClubs() {
 }
 
 export function useJoinClub() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (clubId: string) => {
@@ -604,7 +647,7 @@ export function useJoinClub() {
 }
 
 export function useLeaveClub() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (clubId: string) => {
@@ -616,7 +659,7 @@ export function useLeaveClub() {
 }
 
 export function useCreateClub() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (club: {
@@ -641,7 +684,7 @@ export function useCreateClub() {
 // Social
 // ========================
 export function useFollowUser() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (user: Principal) => {
@@ -657,7 +700,7 @@ export function useFollowUser() {
 }
 
 export function useUnfollowUser() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (user: Principal) => {
@@ -673,7 +716,7 @@ export function useUnfollowUser() {
 }
 
 export function useGetFollowers(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["followers", user?.toString()],
     queryFn: async () => {
@@ -685,7 +728,7 @@ export function useGetFollowers(user: Principal | undefined) {
 }
 
 export function useGetFollowing(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["following", user?.toString()],
     queryFn: async () => {
@@ -697,7 +740,7 @@ export function useGetFollowing(user: Principal | undefined) {
 }
 
 export function useIsFollowing(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["isFollowing", user?.toString()],
     queryFn: async () => {
@@ -712,7 +755,7 @@ export function useIsFollowing(user: Principal | undefined) {
 // Notifications
 // ========================
 export function useMyNotifications() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -725,7 +768,7 @@ export function useMyNotifications() {
 }
 
 export function useMarkNotificationRead() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (notificationId: string) => {
@@ -737,7 +780,7 @@ export function useMarkNotificationRead() {
 }
 
 export function useSendNotificationToUser() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   return useMutation({
     mutationFn: async ({
       targetUser,
@@ -765,7 +808,7 @@ export function useSendNotificationToUser() {
 // Messages
 // ========================
 export function useGetConversations() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["conversations"],
     queryFn: async () => {
@@ -777,7 +820,7 @@ export function useGetConversations() {
 }
 
 export function useGetMessages(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useRegisteredActor();
   return useQuery({
     queryKey: ["messages", user?.toString()],
     queryFn: async () => {
@@ -790,7 +833,7 @@ export function useGetMessages(user: Principal | undefined) {
 }
 
 export function useSendMessage() {
-  const { actor } = useActor();
+  const { actor } = useRegisteredActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({

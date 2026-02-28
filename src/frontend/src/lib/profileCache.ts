@@ -41,6 +41,9 @@ export function setCachedProfile(
  * Merge a backend profile with the local cache, preferring non-empty values.
  * This ensures that if the backend loses avatar/banner URLs (e.g. after a
  * canister reset), the local cache fills them back in.
+ *
+ * Critical: empty strings from backend should be treated as missing —
+ * fall back to cache values for any field that is empty/blank in backend.
  */
 export function mergeWithCache(
   principalId: string,
@@ -49,12 +52,15 @@ export function mergeWithCache(
   const cached = getCachedProfile(principalId);
   if (!cached) return backendProfile;
 
+  const trimmed = (s: string) => (s ?? "").trim();
+
   return {
-    displayName: backendProfile.displayName || cached.displayName,
-    bio: backendProfile.bio || cached.bio,
-    avatarUrl: backendProfile.avatarUrl || cached.avatarUrl,
-    bannerUrl: backendProfile.bannerUrl || cached.bannerUrl,
-    location: backendProfile.location || cached.location,
+    // Prefer backend value if it has actual content, otherwise fall back to cache
+    displayName: trimmed(backendProfile.displayName) || cached.displayName,
+    bio: trimmed(backendProfile.bio) || cached.bio,
+    avatarUrl: trimmed(backendProfile.avatarUrl) || cached.avatarUrl,
+    bannerUrl: trimmed(backendProfile.bannerUrl) || cached.bannerUrl,
+    location: trimmed(backendProfile.location) || cached.location,
   };
 }
 
