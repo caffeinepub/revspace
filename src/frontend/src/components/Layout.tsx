@@ -1,6 +1,7 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
   Bell,
+  BookOpen,
   Calendar,
   Car,
   Compass,
@@ -40,6 +41,7 @@ const ALL_NAV_ITEMS = [
   { to: "/mechanics", label: "Mechanics", icon: Wrench },
   { to: "/shop", label: "Performance Shop", icon: Store },
   { to: "/about", label: "About RevSpace", icon: Info },
+  { to: "/guide", label: "Guide", icon: BookOpen },
   { to: "/messages", label: "Messages", icon: MessageCircle },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/profile", label: "Profile", icon: User },

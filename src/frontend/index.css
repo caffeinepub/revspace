@@ -287,4 +287,10 @@
   .urban-overlay {
     background: linear-gradient(135deg, oklch(0 0 0 / 0.7) 0%, oklch(0.08 0.02 290 / 0.5) 100%);
   }
+
+  @keyframes fadeOutHint {
+    0%   { opacity: 1; transform: scale(1); }
+    60%  { opacity: 0.9; transform: scale(1.1); }
+    100% { opacity: 0; transform: scale(1.15); }
+  }
 }

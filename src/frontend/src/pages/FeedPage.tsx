@@ -9,7 +9,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { Principal } from "@icp-sdk/core/principal";
 import { Link } from "@tanstack/react-router";
-import { Car } from "lucide-react";
+import { Car, Crown } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -170,21 +170,42 @@ export function FeedPage() {
           style={{ objectPosition: "center 55%" }}
         />
         <div
-          className="absolute inset-0 flex flex-col justify-end p-6"
+          className="absolute inset-0 flex flex-col justify-between p-6"
           style={{
             background:
-              "linear-gradient(to top, oklch(0 0 0 / 0.75) 0%, transparent 60%)",
+              "linear-gradient(to top, oklch(0 0 0 / 0.75) 0%, oklch(0 0 0 / 0.25) 100%)",
           }}
         >
-          <h1
-            className="tag-text text-4xl md:text-6xl text-white"
-            style={{ textShadow: "0 0 30px oklch(var(--orange) / 0.8)" }}
-          >
-            RevSpace
-          </h1>
-          <p className="text-white/70 text-sm font-medium mt-1">
-            The streets are watching
-          </p>
+          {/* Go Pro button at top right */}
+          <div className="flex justify-end">
+            <Link to="/pro">
+              <Button
+                size="sm"
+                className="font-bold tracking-wide shadow-lg"
+                style={{
+                  background: "linear-gradient(135deg, #f59e0b, #f97316)",
+                  color: "#000",
+                  border: "none",
+                }}
+              >
+                <Crown size={14} className="mr-1.5" />
+                Go Pro
+              </Button>
+            </Link>
+          </div>
+
+          {/* Title at bottom */}
+          <div>
+            <h1
+              className="tag-text text-4xl md:text-6xl text-white"
+              style={{ textShadow: "0 0 30px oklch(var(--orange) / 0.8)" }}
+            >
+              RevSpace
+            </h1>
+            <p className="text-white/70 text-sm font-medium mt-1">
+              The streets are watching
+            </p>
+          </div>
         </div>
       </div>
 

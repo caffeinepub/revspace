@@ -117,8 +117,10 @@ export function CreatePostPage() {
       try {
         const url = await uploadFile(file, (pct) => setUploadProgress(pct));
         mediaUrls = [url];
-      } catch {
-        toast.error("Failed to upload media");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload media",
+        );
         setIsUploading(false);
         setUploadProgress(null);
         return;

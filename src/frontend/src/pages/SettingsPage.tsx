@@ -208,8 +208,10 @@ export function SettingsPage() {
       const url = await uploadFile(file, (pct) => setAvatarProgress(pct));
       setForm((f) => ({ ...f, avatarUrl: url }));
       toast.success("Avatar uploaded!");
-    } catch {
-      toast.error("Failed to upload avatar");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to upload avatar",
+      );
     } finally {
       setAvatarUploading(false);
       setAvatarProgress(null);
@@ -227,8 +229,10 @@ export function SettingsPage() {
       const url = await uploadFile(file, (pct) => setBannerProgress(pct));
       setForm((f) => ({ ...f, bannerUrl: url }));
       toast.success("Banner uploaded!");
-    } catch {
-      toast.error("Failed to upload banner");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to upload banner",
+      );
     } finally {
       setBannerUploading(false);
       setBannerProgress(null);

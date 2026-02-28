@@ -44,9 +44,14 @@ export function useUploadFile() {
         agent,
       );
 
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const { hash } = await storageClient.putFile(bytes, onProgress);
-      return storageClient.getDirectURL(hash);
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const { hash } = await storageClient.putFile(bytes, onProgress);
+        return storageClient.getDirectURL(hash);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Upload failed: ${msg}`);
+      }
     },
     [identity],
   );

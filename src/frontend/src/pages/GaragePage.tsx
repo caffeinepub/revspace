@@ -190,8 +190,10 @@ function AddCarModal({
           setUploadProgress(pct),
         );
         imageUrls = [url];
-      } catch {
-        toast.error("Failed to upload image");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload image",
+        );
         setIsUploading(false);
         setUploadProgress(null);
         return;

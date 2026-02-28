@@ -14,11 +14,13 @@ import { EventsPage } from "./pages/EventsPage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { FeedPage } from "./pages/FeedPage";
 import { GaragePage } from "./pages/GaragePage";
+import { GuidePage } from "./pages/GuidePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { MechanicsPage } from "./pages/MechanicsPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
+import { ProPage } from "./pages/ProPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ReelsPage } from "./pages/ReelsPage";
 import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
@@ -211,6 +213,18 @@ const adminRoute = createRoute({
   component: AdminPage,
 });
 
+const guideRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/guide",
+  component: GuidePage,
+});
+
+const proRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pro",
+  component: ProPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -230,6 +244,8 @@ const routeTree = rootRoute.addChildren([
   mechanicsRoute,
   aboutRoute,
   adminRoute,
+  guideRoute,
+  proRoute,
 ]);
 
 const router = createRouter({ routeTree });

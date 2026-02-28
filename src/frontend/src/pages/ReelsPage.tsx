@@ -270,7 +270,6 @@ interface ReelMediaProps {
   mediaUrl: string | undefined;
   postId: string;
   postType: string;
-  isMuted: boolean;
   videoRef?: (el: HTMLVideoElement | null) => void;
   onTimeUpdate?: (postId: string, progress: number) => void;
 }
@@ -279,10 +278,11 @@ function ReelMedia({
   mediaUrl,
   postId,
   postType,
-  isMuted,
   videoRef,
   onTimeUpdate,
 }: ReelMediaProps) {
+  const [videoError, setVideoError] = useState(false);
+
   if (!mediaUrl) {
     return (
       <div
@@ -297,13 +297,32 @@ function ReelMedia({
   const isVideoType = postType === "Reel" || postType === "Video";
 
   if (isVideoType) {
+    if (videoError) {
+      return (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+          style={{ background: "#111" }}
+        >
+          <Film size={40} className="text-white/20" />
+          <p className="text-white/40 text-sm font-medium">Video unavailable</p>
+        </div>
+      );
+    }
+
     return (
       <video
         key={mediaUrl}
-        ref={videoRef}
+        ref={(el) => {
+          // Ensure video starts muted on mount regardless of React prop timing
+          if (el) {
+            el.muted = true;
+          }
+          // Also forward to the parent ref callback
+          if (typeof videoRef === "function") videoRef(el);
+        }}
         src={mediaUrl}
         autoPlay
-        muted={isMuted}
+        muted
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
@@ -314,6 +333,7 @@ function ReelMedia({
             onTimeUpdate?.(postId, pct);
           }
         }}
+        onError={() => setVideoError(true)}
       >
         <track kind="captions" />
       </video>
@@ -513,7 +533,6 @@ export function ReelsPage() {
                 mediaUrl={post.mediaUrls[0]}
                 postId={post.id}
                 postType={post.postType}
-                isMuted={isMuted}
                 videoRef={(el) => {
                   if (el) {
                     videoRefs.current.set(post.id, el);

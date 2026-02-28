@@ -6,12 +6,11 @@ import {
   Heart,
   MessageCircle,
   MoreHorizontal,
-  Play,
   Share2,
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PostView } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -59,10 +58,23 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const liked = optimisticLiked !== null ? optimisticLiked : hasLiked;
 
   const [videoMuted, setVideoMuted] = useState(true);
+  const [videoPaused, setVideoPaused] = useState(false);
+  const [showPlayPauseHint, setShowPlayPauseHint] = useState<
+    "play" | "pause" | null
+  >(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ensure video starts muted on mount (React's muted prop is unreliable on initial render)
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = true;
+    }
+  }, []);
 
   // Directly set the DOM property since React's muted prop isn't always reliable
-  const handleVideoMuteToggle = () => {
+  const handleVideoMuteToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setVideoMuted((m) => {
       const next = !m;
       if (videoRef.current) {
@@ -70,6 +82,23 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       }
       return next;
     });
+  };
+
+  const handleVideoClick = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play();
+      setVideoPaused(false);
+      setShowPlayPauseHint("play");
+    } else {
+      video.pause();
+      setVideoPaused(true);
+      setShowPlayPauseHint("pause");
+    }
+    // Clear any previous timeout and fade out the hint after 600ms
+    if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+    hintTimeoutRef.current = setTimeout(() => setShowPlayPauseHint(null), 600);
   };
 
   const likeMutation = useLikePost();
@@ -161,15 +190,18 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       {post.mediaUrls.length > 0 && (
         <div className="relative">
           {isVideoPost ? (
+            // biome-ignore lint/a11y/useKeyWithClickEvents: video tap-to-play is standard UX
             <video
               key={post.mediaUrls[0]}
               ref={videoRef}
               src={post.mediaUrls[0]}
               autoPlay
-              muted={videoMuted}
+              muted
               loop
               playsInline
-              className="feed-image aspect-[4/3] w-full object-cover"
+              onClick={handleVideoClick}
+              className="feed-image aspect-[4/3] w-full object-cover cursor-pointer"
+              onError={() => setVideoPaused(true)}
             >
               <track kind="captions" />
             </video>
@@ -183,14 +215,70 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
           )}
           {isVideoPost && (
             <>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Play/pause tap feedback — fades out automatically */}
+              {showPlayPauseHint && (
                 <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center"
-                  style={{ background: "oklch(0 0 0 / 0.4)" }}
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  style={{ animation: "fadeOutHint 0.6s ease-out forwards" }}
                 >
-                  <Play size={22} className="text-white ml-1" fill="white" />
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{ background: "oklch(0 0 0 / 0.5)" }}
+                  >
+                    {showPlayPauseHint === "pause" ? (
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="white"
+                        role="img"
+                        aria-label="Paused"
+                      >
+                        <title>Paused</title>
+                        <rect x="6" y="4" width="4" height="16" rx="1" />
+                        <rect x="14" y="4" width="4" height="16" rx="1" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="white"
+                        role="img"
+                        aria-label="Playing"
+                      >
+                        <title>Playing</title>
+                        <polygon points="5,3 19,12 5,21" />
+                      </svg>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+              {/* Paused state — persistent play icon so user knows it's paused */}
+              {videoPaused && !showPlayPauseHint && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  style={{ background: "oklch(0 0 0 / 0.25)" }}
+                >
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{ background: "oklch(0 0 0 / 0.5)" }}
+                  >
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                      role="img"
+                      aria-label="Play"
+                    >
+                      <title>Play</title>
+                      <polygon points="5,3 19,12 5,21" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+              {/* Mute toggle button */}
               <button
                 type="button"
                 aria-label={videoMuted ? "Unmute video" : "Mute video"}
