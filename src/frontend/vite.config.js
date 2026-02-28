@@ -17,16 +17,7 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: false,
-    minify: true,
-    // Ensure every deploy gets unique, content-hashed filenames so browsers
-    // never serve stale JS/CSS after a new deployment.
-    rollupOptions: {
-      output: {
-        entryFileNames: "assets/[name]-[hash].js",
-        chunkFileNames: "assets/[name]-[hash].js",
-        assetFileNames: "assets/[name]-[hash][extname]",
-      },
-    },
+    minify: false,
   },
   css: {
     postcss: "./postcss.config.js",
