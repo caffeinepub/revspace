@@ -28,9 +28,14 @@ export function useUploadFile() {
 
       // Mirror exactly how config.ts builds its agent so identity, host and
       // root-key behaviour are identical to every other canister call.
+      // shouldSyncTime: true ensures the agent syncs its clock with the
+      // replica before the first call, preventing ingress-expiry errors
+      // that cause the v3 endpoint to fail and fall back to v2 (which
+      // breaks StorageClient's getCertificate check).
       const agent = new HttpAgent({
         identity,
         host: config.backend_host,
+        shouldSyncTime: true,
       });
 
       if (config.backend_host?.includes("localhost")) {
