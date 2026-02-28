@@ -206,6 +206,7 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
               muted
               loop
               playsInline
+              preload="metadata"
               onClick={handleVideoClick}
               className="feed-image aspect-[4/3] w-full object-cover cursor-pointer"
               onError={() => setVideoPaused(true)}

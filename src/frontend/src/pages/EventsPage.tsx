@@ -42,7 +42,7 @@ import {
   useUnrsvpEvent,
   useUploadFile,
 } from "../hooks/useQueries";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 import { formatDate, formatPrice } from "../utils/format";
 
 const EVENT_CATEGORIES = ["All", "Cruise", "Show", "Track", "Meetup"];
@@ -115,7 +115,7 @@ function EventDetailModal({
   const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     setIsUploadingPhoto(true);
     setPhotoUploadPct(0);
     try {
@@ -210,7 +210,7 @@ function EventDetailModal({
                   <input
                     ref={photoInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif,.webp"
                     className="hidden"
                     onChange={handleAddPhoto}
                   />
@@ -408,7 +408,7 @@ function CreateEventModal({
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     setIsUploadingCover(true);
     setCoverUploadPct(0);
     try {
@@ -586,7 +586,7 @@ function CreateEventModal({
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,.webp"
               className="hidden"
               onChange={handleCoverUpload}
             />

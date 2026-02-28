@@ -176,7 +176,8 @@
   }
 
   .main-content {
-    @apply pt-24 md:pt-0 md:pl-64;
+    /* mobile: top bar ~53px + eBay ad strip ~45px = ~98px; add safe extra */
+    @apply pt-[108px] md:pt-0 md:pl-64;
     min-height: 100vh;
   }
 

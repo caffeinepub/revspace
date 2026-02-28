@@ -41,7 +41,7 @@ import {
   useMarkListingSold,
   useUploadFile,
 } from "../hooks/useQueries";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 import { formatPrice, truncatePrincipal } from "../utils/format";
 
 // Helper component: shows seller's display name on listing cards
@@ -295,7 +295,7 @@ function CreateListingModal({
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
@@ -333,8 +333,10 @@ function CreateListingModal({
           setUploadProgress(pct),
         );
         imageUrls = [url];
-      } catch {
-        toast.error("Failed to upload photo");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload photo",
+        );
         setIsUploading(false);
         setUploadProgress(null);
         return;
@@ -513,7 +515,7 @@ function CreateListingModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,.webp"
               className="hidden"
               onChange={handleImageChange}
             />

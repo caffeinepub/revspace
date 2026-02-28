@@ -20,7 +20,7 @@ import {
   useRemoveCar,
   useUploadFile,
 } from "../hooks/useQueries";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 
 function CarDetailModal({
   car,
@@ -151,7 +151,7 @@ function AddCarModal({
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
@@ -354,7 +354,7 @@ function AddCarModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,.webp"
               className="hidden"
               onChange={handleImageChange}
             />

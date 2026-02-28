@@ -16,11 +16,21 @@ function cacheKey(principalId: string) {
   return `revspace_profile_${principalId}`;
 }
 
+function backupCacheKey(principalId: string) {
+  return `revspace_profile_backup_${principalId}`;
+}
+
 export function getCachedProfile(principalId: string): CachedProfile | null {
   try {
     const raw = localStorage.getItem(cacheKey(principalId));
-    if (!raw) return null;
-    return JSON.parse(raw) as CachedProfile;
+    if (raw) return JSON.parse(raw) as CachedProfile;
+    // Primary key missing — check backup key and restore primary from it
+    const backup = localStorage.getItem(backupCacheKey(principalId));
+    if (backup) {
+      localStorage.setItem(cacheKey(principalId), backup);
+      return JSON.parse(backup) as CachedProfile;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -31,7 +41,9 @@ export function setCachedProfile(
   profile: CachedProfile,
 ): void {
   try {
-    localStorage.setItem(cacheKey(principalId), JSON.stringify(profile));
+    const serialized = JSON.stringify(profile);
+    localStorage.setItem(cacheKey(principalId), serialized);
+    localStorage.setItem(backupCacheKey(principalId), serialized);
   } catch {
     // silently ignore storage quota errors
   }

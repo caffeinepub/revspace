@@ -23,13 +23,22 @@ import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreatePost, useUploadFile } from "../hooks/useQueries";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 import { awardPostCreation } from "../lib/revbucks";
 
+// Explicit extensions alongside the MIME wildcard so iOS Safari and Android
+// WebView both show video files in the native picker correctly.
+const VIDEO_ACCEPT = "video/*,.mov,.mkv,.mp4,.avi,.webm";
+
 const POST_TYPES = [
-  { value: "Photo", icon: Image, label: "Photo", accept: "image/*" },
-  { value: "Video", icon: Video, label: "Video", accept: "video/*" },
-  { value: "Reel", icon: Film, label: "Reel", accept: "video/*" },
+  {
+    value: "Photo",
+    icon: Image,
+    label: "Photo",
+    accept: "image/*,.heic,.heif,.webp",
+  },
+  { value: "Video", icon: Video, label: "Video", accept: VIDEO_ACCEPT },
+  { value: "Reel", icon: Film, label: "Reel", accept: VIDEO_ACCEPT },
 ];
 
 const REEL_TOPICS = [
@@ -67,9 +76,9 @@ export function CreatePostPage() {
       let selected = e.target.files?.[0];
       if (!selected) return;
 
-      // Convert HEIC/HEIF to JPEG so browsers can display and upload it
+      // Convert HEIC/HEIF/WebP to JPEG so all browsers can display and upload it
       if (!selected.type.startsWith("video/")) {
-        selected = await convertHeicToJpeg(selected);
+        selected = await convertToJpegIfNeeded(selected);
       }
 
       // Revoke previous preview URL

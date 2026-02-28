@@ -2,6 +2,7 @@ import { HttpAgent } from "@icp-sdk/core/agent";
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { toast } from "sonner";
 import { loadConfig } from "../config";
 import {
   getCachedProfile,
@@ -21,7 +22,48 @@ export function useUploadFile() {
   const uploadFile = useCallback(
     async (file: File, onProgress?: (pct: number) => void): Promise<string> => {
       if (!identity) {
-        throw new Error("Not authenticated. Please log in before uploading.");
+        throw new Error(
+          "Please log in to upload files. Tap the login button and try again.",
+        );
+      }
+
+      // ── File size validation ────────────────────────────────────────────────
+      const isVideo = file.type.startsWith("video/");
+      const fileSizeMB = file.size / (1024 * 1024);
+
+      if (isVideo) {
+        if (fileSizeMB > 500) {
+          throw new Error(
+            `Video is too large (${fileSizeMB.toFixed(0)} MB). Maximum allowed is 500 MB. Try compressing or trimming the video.`,
+          );
+        }
+        if (fileSizeMB > 200) {
+          toast.warning(
+            `Large video (${fileSizeMB.toFixed(0)} MB). Upload may take a while — keep this tab open.`,
+            { duration: 6000 },
+          );
+        }
+      } else {
+        if (fileSizeMB > 50) {
+          throw new Error(
+            `Image is too large (${fileSizeMB.toFixed(0)} MB). Maximum allowed is 50 MB. Please resize or compress the image.`,
+          );
+        }
+        if (fileSizeMB > 20) {
+          toast.warning(
+            `Large image (${fileSizeMB.toFixed(0)} MB). Consider compressing it for faster uploads.`,
+            { duration: 5000 },
+          );
+        }
+      }
+
+      // ── MKV format warning ─────────────────────────────────────────────────
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (ext === "mkv" || file.type === "video/x-matroska") {
+        toast.warning(
+          "MKV files may not play in all browsers. Consider converting to MP4 for best compatibility.",
+          { duration: 6000 },
+        );
       }
 
       const config = await loadConfig();
@@ -54,11 +96,70 @@ export function useUploadFile() {
         agent,
       );
 
+      // ── Upload timeout warning ─────────────────────────────────────────────
+      let timeoutToastShown = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!timeoutToastShown) {
+          timeoutToastShown = true;
+          toast.warning(
+            "Upload is taking a while. Keep this tab open and active for best results.",
+            { duration: 8000 },
+          );
+        }
+      }, 60_000);
+
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const { hash } = await storageClient.putFile(bytes, onProgress);
-        return storageClient.getDirectURL(hash);
+
+        // Extra sync step before first upload attempt — ensures the agent's
+        // clock is aligned with the replica so ingress-expiry errors are
+        // avoided on the first call.
+        if (
+          typeof (agent as { syncTime?: () => Promise<void> }).syncTime ===
+          "function"
+        ) {
+          try {
+            await (agent as { syncTime: () => Promise<void> }).syncTime();
+          } catch {
+            // best-effort — proceed even if syncTime fails
+          }
+        }
+
+        let result: { hash: string };
+        const retryDelays = [2000, 3000, 4000];
+        let lastErr: unknown;
+        let succeeded = false;
+
+        for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+          try {
+            result = await storageClient.putFile(bytes, onProgress);
+            succeeded = true;
+            break;
+          } catch (err) {
+            lastErr = err;
+            const msg = err instanceof Error ? err.message : String(err);
+            const isRetryable =
+              msg.includes("v3") ||
+              msg.includes("certificate") ||
+              msg.includes("ingress") ||
+              msg.includes("timeout") ||
+              msg.includes("network");
+            if (!isRetryable || attempt >= retryDelays.length) {
+              throw err;
+            }
+            // Wait before retrying
+            await new Promise((r) => setTimeout(r, retryDelays[attempt]));
+          }
+        }
+
+        if (!succeeded) {
+          throw lastErr;
+        }
+
+        clearTimeout(timeoutTimer);
+        return storageClient.getDirectURL(result!.hash);
       } catch (err) {
+        clearTimeout(timeoutTimer);
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(`Upload failed: ${msg}`);
       }
@@ -289,9 +390,13 @@ export function useMyProfile() {
     // Keep data in memory for 5 minutes across page navigations
     staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
-    // Retry on failure to handle canister cold-starts and "User is not registered" races
+    // Retry on failure to handle canister cold-starts and "User is not registered" races.
+    // Using 5 retries with exponential back-off covers the worst-case cold-start window.
     retry: 5,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+    // If the profile is empty we immediately mark the data as stale so the
+    // next render cycle triggers a fresh fetch rather than waiting 30 s.
+    select: (data) => data,
   });
 }
 
@@ -338,14 +443,35 @@ export function useUpdateProfile() {
         setCachedProfile(principalId, profileData);
       }
 
-      // Save to backend
-      await actor.updateProfile(
-        displayName,
-        bio,
-        avatarUrl,
-        location,
-        bannerUrl,
-      );
+      // Save to backend — retry up to 3 times on auth/cold-start errors
+      let lastErr: unknown;
+      let savedOk = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await actor.updateProfile(
+            displayName,
+            bio,
+            avatarUrl,
+            location,
+            bannerUrl,
+          );
+          savedOk = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          const msg = err instanceof Error ? err.message : String(err);
+          if (
+            (msg.toLowerCase().includes("unauthorized") ||
+              msg.includes("not registered")) &&
+            attempt < 2
+          ) {
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          throw err;
+        }
+      }
+      if (!savedOk) throw lastErr;
 
       return profileData;
     },

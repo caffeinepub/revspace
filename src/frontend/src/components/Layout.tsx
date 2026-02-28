@@ -4,11 +4,13 @@ import {
   BookOpen,
   Calendar,
   Car,
+  Clapperboard,
   Coins,
   Compass,
   Film,
   Home,
   Info,
+  LayoutGrid,
   Menu,
   MessageCircle,
   Plus,
@@ -38,6 +40,8 @@ const ALL_NAV_ITEMS = [
   { to: "/", label: "Feed", icon: Home },
   { to: "/explore", label: "Explore", icon: Compass },
   { to: "/reels", label: "Reels", icon: Film },
+  { to: "/model-reels", label: "Model Reels", icon: Clapperboard },
+  { to: "/model-gallery", label: "Model Gallery", icon: LayoutGrid },
   { to: "/garage", label: "My Garage", icon: Car },
   { to: "/events", label: "Events", icon: Calendar },
   { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
@@ -184,15 +188,15 @@ function MobileNav() {
       <div
         className="fixed top-0 left-0 h-full z-[101] flex flex-col md:hidden transition-transform duration-300"
         style={{
-          width: "72vw",
-          maxWidth: 280,
+          width: "80vw",
+          maxWidth: 300,
           background: "oklch(var(--carbon))",
           borderRight: "1px solid oklch(var(--border))",
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
       >
         {/* Drawer header */}
-        <div className="flex items-center justify-between px-4 py-4 mb-2">
+        <div className="flex items-center justify-between px-4 py-3 shrink-0">
           <Link
             to="/"
             onClick={() => setOpen(false)}
@@ -218,7 +222,11 @@ function MobileNav() {
         </div>
 
         {/* Create Post */}
-        <Link to="/create" onClick={() => setOpen(false)} className="mx-4 mb-4">
+        <Link
+          to="/create"
+          onClick={() => setOpen(false)}
+          className="mx-4 mb-2 shrink-0"
+        >
           <div
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold"
             style={{
@@ -232,8 +240,11 @@ function MobileNav() {
           </div>
         </Link>
 
-        {/* All nav links */}
-        <div className="flex flex-col gap-0.5 px-2 overflow-y-auto flex-1">
+        {/* All nav links — takes all remaining height and scrolls */}
+        <nav
+          className="flex flex-col gap-0.5 px-2 overflow-y-auto"
+          style={{ flex: "1 1 0", minHeight: 0, paddingBottom: 8 }}
+        >
           {ALL_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -287,51 +298,35 @@ function MobileNav() {
               </div>
             </Link>
           )}
-        </div>
+        </nav>
 
-        {/* Ad banner */}
-        <div className="px-4 pb-2">
-          <p
-            className="text-[10px] uppercase tracking-wider mb-1"
-            style={{ color: "oklch(var(--steel))" }}
-          >
-            Sponsored
-          </p>
+        {/* Ad banner — shrinks but never pushes nav off screen */}
+        <div
+          className="px-3 py-2 shrink-0"
+          style={{ borderTop: "1px solid oklch(var(--border))" }}
+        >
           <a
             href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
             target="_blank"
             rel="noopener noreferrer"
-            className="block rounded-lg overflow-hidden transition-all duration-200 hover:opacity-90 hover:scale-[1.02] cursor-pointer"
+            className="flex items-center gap-2 rounded-lg overflow-hidden px-2 py-1.5 transition-opacity hover:opacity-80"
             style={{
               border: "1px solid oklch(var(--border))",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+              background: "#000",
             }}
           >
             <img
               src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
-              alt="JDM Store - Parts and Accessories"
-              className="w-full object-contain"
-              style={{ height: 90, background: "#000" }}
+              alt="JDM Store"
+              style={{ height: 28, width: "auto", objectFit: "contain" }}
             />
-          </a>
-        </div>
-
-        <div
-          className="px-4 py-4 text-[11px]"
-          style={{ color: "oklch(var(--steel))" }}
-        >
-          <p>© 2026 RevSpace</p>
-          <p>
-            Built with ❤️ using{" "}
-            <a
-              href="https://caffeine.ai"
-              target="_blank"
-              rel="noopener noreferrer"
+            <span
+              className="text-[10px] font-semibold"
               style={{ color: "oklch(var(--orange))" }}
             >
-              caffeine.ai
-            </a>
-          </p>
+              Shop Parts & Accessories →
+            </span>
+          </a>
         </div>
       </div>
     </>
@@ -518,8 +513,13 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      {/* paddingBottom: 68px to clear fixed BullBoost banner (52px) + a little breathing room */}
-      <main className="main-content" style={{ paddingBottom: 68 }}>
+      {/* paddingBottom clears the fixed BullBoost banner (52px) + safe-area + breathing room */}
+      <main
+        className="main-content"
+        style={{
+          paddingBottom: "calc(68px + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
         {children}
       </main>
     </div>

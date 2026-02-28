@@ -25,25 +25,43 @@ export interface ReceivedGift {
 function balanceKey(principalId: string) {
   return `revbucks_balance_${principalId}`;
 }
+function balanceBackupKey(principalId: string) {
+  return `revspace_rb_backup_${principalId}`;
+}
 
 function txnKey(principalId: string) {
   return `revbucks_txns_${principalId}`;
 }
+function txnBackupKey(principalId: string) {
+  return `revspace_rb_txns_backup_${principalId}`;
+}
 
 function giftsKey(principalId: string) {
   return `revbucks_gifts_${principalId}`;
+}
+function giftsBackupKey(principalId: string) {
+  return `revspace_rb_gifts_backup_${principalId}`;
 }
 
 // ─── Balance ─────────────────────────────────────────────────────────────────
 
 export function getBalance(principalId: string): number {
   const raw = localStorage.getItem(balanceKey(principalId));
-  return raw ? Number(raw) : 0;
+  if (raw) return Number(raw);
+  // Primary key missing — check backup and restore from it
+  const backup = localStorage.getItem(balanceBackupKey(principalId));
+  if (backup) {
+    localStorage.setItem(balanceKey(principalId), backup);
+    return Number(backup);
+  }
+  return 0;
 }
 
 export function addBalance(principalId: string, amount: number): void {
   const current = getBalance(principalId);
-  localStorage.setItem(balanceKey(principalId), String(current + amount));
+  const next = String(current + amount);
+  localStorage.setItem(balanceKey(principalId), next);
+  localStorage.setItem(balanceBackupKey(principalId), next);
 }
 
 /**
@@ -53,7 +71,9 @@ export function addBalance(principalId: string, amount: number): void {
 export function deductBalance(principalId: string, amount: number): boolean {
   const current = getBalance(principalId);
   if (current < amount) return false;
-  localStorage.setItem(balanceKey(principalId), String(current - amount));
+  const next = String(current - amount);
+  localStorage.setItem(balanceKey(principalId), next);
+  localStorage.setItem(balanceBackupKey(principalId), next);
   return true;
 }
 
@@ -61,12 +81,25 @@ export function deductBalance(principalId: string, amount: number): boolean {
 
 export function getTransactionHistory(principalId: string): Transaction[] {
   const raw = localStorage.getItem(txnKey(principalId));
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as Transaction[];
-  } catch {
-    return [];
+  if (raw) {
+    try {
+      return JSON.parse(raw) as Transaction[];
+    } catch {
+      // fall through to backup
+    }
   }
+  // Primary key missing or corrupt — try backup
+  const backup = localStorage.getItem(txnBackupKey(principalId));
+  if (backup) {
+    try {
+      const parsed = JSON.parse(backup) as Transaction[];
+      localStorage.setItem(txnKey(principalId), backup);
+      return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 export function addTransaction(
@@ -82,19 +115,34 @@ export function addTransaction(
   history.unshift(full); // newest first
   // Keep last 200 transactions
   if (history.length > 200) history.splice(200);
-  localStorage.setItem(txnKey(principalId), JSON.stringify(history));
+  const serialized = JSON.stringify(history);
+  localStorage.setItem(txnKey(principalId), serialized);
+  localStorage.setItem(txnBackupKey(principalId), serialized);
 }
 
 // ─── Gifts ────────────────────────────────────────────────────────────────────
 
 export function getReceivedGifts(principalId: string): ReceivedGift[] {
   const raw = localStorage.getItem(giftsKey(principalId));
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as ReceivedGift[];
-  } catch {
-    return [];
+  if (raw) {
+    try {
+      return JSON.parse(raw) as ReceivedGift[];
+    } catch {
+      // fall through to backup
+    }
   }
+  // Primary key missing or corrupt — try backup
+  const backup = localStorage.getItem(giftsBackupKey(principalId));
+  if (backup) {
+    try {
+      const parsed = JSON.parse(backup) as ReceivedGift[];
+      localStorage.setItem(giftsKey(principalId), backup);
+      return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 export function addReceivedGift(
@@ -108,7 +156,9 @@ export function addReceivedGift(
     timestamp: Date.now(),
   };
   gifts.unshift(full);
-  localStorage.setItem(giftsKey(principalId), JSON.stringify(gifts));
+  const serialized = JSON.stringify(gifts);
+  localStorage.setItem(giftsKey(principalId), serialized);
+  localStorage.setItem(giftsBackupKey(principalId), serialized);
 }
 
 /**

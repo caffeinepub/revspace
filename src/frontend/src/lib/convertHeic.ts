@@ -1,6 +1,11 @@
 /**
- * Converts a HEIC/HEIF file to a JPEG File object using canvas.
- * Falls back to returning the original file if it's not HEIC or conversion fails.
+ * Converts HEIC/HEIF and WebP files to JPEG using canvas.
+ * Falls back to returning the original file if conversion is not needed or fails.
+ *
+ * - HEIC/HEIF: Apple's image format — browsers can't natively display or upload these,
+ *   so we always convert to JPEG.
+ * - WebP: Natively supported in modern browsers but some older Android WebViews
+ *   can fail to upload WebP. Converting to JPEG avoids silent upload failures.
  */
 
 // Use a neutral dynamic importer to avoid TypeScript module-not-found errors
@@ -8,32 +13,52 @@
 const dynamicImport = (mod: string): Promise<any> =>
   new Function("m", "return import(m)")(mod);
 
-export async function convertHeicToJpeg(file: File): Promise<File> {
-  const isHeic =
-    file.type === "image/heic" ||
-    file.type === "image/heif" ||
-    file.name.toLowerCase().endsWith(".heic") ||
-    file.name.toLowerCase().endsWith(".heif");
-
-  if (!isHeic) return file;
-
+/** Convert any image Blob to JPEG via canvas. Returns null if conversion fails. */
+async function canvasToJpeg(
+  blob: Blob,
+  outputName: string,
+): Promise<File | null> {
   try {
-    // Try canvas-based fallback first (no external deps needed)
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
+    if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0);
     const jpegBlob = await new Promise<Blob | null>((res) =>
       canvas.toBlob(res, "image/jpeg", 0.92),
     );
-    if (!jpegBlob) return file;
-    const jpegName = file.name.replace(/\.(heic|heif)$/i, ".jpg");
-    return new File([jpegBlob], jpegName, { type: "image/jpeg" });
+    if (!jpegBlob) return null;
+    return new File([jpegBlob], outputName, { type: "image/jpeg" });
   } catch {
-    // canvas approach didn't work; try heic2any if available
+    return null;
+  }
+}
+
+export async function convertHeicToJpeg(file: File): Promise<File> {
+  const nameLower = file.name.toLowerCase();
+
+  const isHeic =
+    file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    nameLower.endsWith(".heic") ||
+    nameLower.endsWith(".heif");
+
+  const isWebp = file.type === "image/webp" || nameLower.endsWith(".webp");
+
+  // Pass through anything that doesn't need conversion
+  if (!isHeic && !isWebp) return file;
+
+  const outputName = file.name.replace(/\.(heic|heif|webp)$/i, ".jpg");
+
+  if (isHeic) {
+    // Try canvas-based conversion first
+    const canvasResult = await canvasToJpeg(file, outputName);
+    if (canvasResult) return canvasResult;
+
+    // Canvas failed (e.g. Safari can't decode HEIC via createImageBitmap in some versions);
+    // fall back to heic2any library if available
     try {
       const mod = await dynamicImport("heic2any").catch(() => null);
       if (mod) {
@@ -44,13 +69,30 @@ export async function convertHeicToJpeg(file: File): Promise<File> {
           quality: 0.92,
         });
         const resultBlob = Array.isArray(blob) ? blob[0] : blob;
-        const jpegName = file.name.replace(/\.(heic|heif)$/i, ".jpg");
-        return new File([resultBlob], jpegName, { type: "image/jpeg" });
+        return new File([resultBlob], outputName, { type: "image/jpeg" });
       }
     } catch {
       // fall through
     }
-    // If all conversion fails, return the original and let the upload try anyway
+    // If all conversion fails, return original and let the upload try anyway
     return file;
   }
+
+  if (isWebp) {
+    // Canvas conversion is always sufficient for WebP since the browser
+    // already understands WebP for rendering purposes
+    const canvasResult = await canvasToJpeg(file, outputName);
+    return canvasResult ?? file;
+  }
+
+  return file;
+}
+
+/**
+ * Convenience wrapper used by upload handlers that need to normalise any
+ * image format before sending to storage. Handles HEIC, HEIF, and WebP.
+ */
+export async function convertToJpegIfNeeded(file: File): Promise<File> {
+  if (file.type.startsWith("video/")) return file;
+  return convertHeicToJpeg(file);
 }

@@ -270,6 +270,7 @@ interface ReelMediaProps {
   mediaUrl: string | undefined;
   postId: string;
   postType: string;
+  isMuted?: boolean;
   videoRef?: (el: HTMLVideoElement | null) => void;
   onTimeUpdate?: (postId: string, progress: number) => void;
 }
@@ -278,6 +279,7 @@ function ReelMedia({
   mediaUrl,
   postId,
   postType,
+  isMuted = true,
   videoRef,
   onTimeUpdate,
 }: ReelMediaProps) {
@@ -313,14 +315,18 @@ function ReelMedia({
       <video
         key={mediaUrl}
         ref={(el) => {
+          // Apply current muted state immediately on mount so the video
+          // respects the toggle without waiting for a useEffect cycle
+          if (el) el.muted = isMuted;
           // Forward to the parent ref callback
           if (typeof videoRef === "function") videoRef(el);
         }}
         src={mediaUrl}
         autoPlay
-        muted
+        muted={isMuted}
         loop
         playsInline
+        preload="metadata"
         className="absolute inset-0 w-full h-full object-cover"
         onTimeUpdate={(e) => {
           const video = e.currentTarget;
@@ -336,13 +342,7 @@ function ReelMedia({
     );
   }
 
-  return (
-    <img
-      src={mediaUrl ?? `https://picsum.photos/seed/${postId}/600/900`}
-      alt=""
-      className="w-full h-full object-cover"
-    />
-  );
+  return <img src={mediaUrl} alt="" className="w-full h-full object-cover" />;
 }
 
 const REEL_TOPICS = [
@@ -377,7 +377,10 @@ export function ReelsPage() {
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
-  const allPosts = posts ?? [];
+  // Only show Reel and Video posts — not Photos — on the Reels page
+  const allPosts = (posts ?? []).filter(
+    (p) => p.postType === "Reel" || p.postType === "Video",
+  );
   const displayPosts =
     selectedTopic === "All"
       ? allPosts
@@ -531,8 +534,12 @@ export function ReelsPage() {
                 mediaUrl={post.mediaUrls[0]}
                 postId={post.id}
                 postType={post.postType}
+                isMuted={isMuted}
                 videoRef={(el) => {
                   if (el) {
+                    // Apply current muted state immediately so newly-mounted
+                    // videos respect the toggle without waiting for the effect
+                    el.muted = isMuted;
                     videoRefs.current.set(post.id, el);
                   } else {
                     videoRefs.current.delete(post.id);

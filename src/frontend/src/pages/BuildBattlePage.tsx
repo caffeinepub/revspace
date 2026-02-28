@@ -37,6 +37,7 @@ import {
   getMyVote,
   isBattleActive,
 } from "../lib/buildBattle";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 
 // ─── Small helpers ─────────────────────────────────────────────────────────────
 
@@ -77,14 +78,16 @@ interface CarFormProps {
 function CarForm({ label, accentColor, data, onChange }: CarFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file) return;
+    // Convert HEIC/HEIF/WebP to JPEG for broader browser compatibility
+    file = await convertToJpegIfNeeded(file);
     const reader = new FileReader();
     reader.onload = (ev) => {
       onChange({
         ...data,
-        imageFile: file,
+        imageFile: file as File,
         imagePreview: ev.target?.result as string,
       });
     };
@@ -165,7 +168,7 @@ function CarForm({ label, accentColor, data, onChange }: CarFormProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif,.webp"
         className="sr-only"
         onChange={handleFileChange}
       />

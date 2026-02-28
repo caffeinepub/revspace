@@ -7,25 +7,334 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   AlertTriangle,
   Camera,
+  Car,
   Check,
   Crown,
   FileText,
   ImagePlus,
   Loader2,
   MapPin,
+  Sparkles,
   User,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useMyProfile,
   useUpdateProfile,
   useUploadFile,
 } from "../hooks/useQueries";
-import { convertHeicToJpeg } from "../lib/convertHeic";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
+import {
+  getModelAccountData,
+  isModelAccount,
+  setModelAccount,
+  setModelAccountData,
+} from "../lib/modelAccount";
 import { isUserPro } from "../lib/pro";
+import { getCachedProfile } from "../lib/profileCache";
 import { getInitials } from "../utils/format";
+
+const MODEL_SPECIALTIES = ["JDM", "Euro", "Stance", "Muscle", "Other"];
+
+function ModelAccountCard() {
+  const currentIsModel = isModelAccount();
+  const [isModel, setIsModel] = useState(currentIsModel);
+  const currentData = getModelAccountData();
+  const [modelData, setModelData] = useState(currentData);
+
+  const handleSave = () => {
+    setModelAccount(isModel);
+    if (isModel) {
+      setModelAccountData(modelData);
+    }
+    toast.success("Account type saved!");
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-5 mt-6"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.14 0.06 310 / 0.7) 0%, oklch(0.12 0.03 310 / 0.9) 100%)",
+        border: "1px solid oklch(0.5 0.18 310 / 0.35)",
+        boxShadow: "0 0 24px oklch(0.5 0.18 310 / 0.08)",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-5">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "oklch(0.5 0.18 310 / 0.2)" }}
+        >
+          <Camera size={20} style={{ color: "oklch(0.75 0.2 310)" }} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <p
+              className="font-bold text-base"
+              style={{ color: "oklch(0.82 0.16 310)" }}
+            >
+              Account Type
+            </p>
+            {isModel && (
+              <span
+                className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full tracking-wide"
+                style={{
+                  background: "oklch(0.3 0.15 310 / 0.5)",
+                  color: "oklch(0.82 0.2 310)",
+                  border: "1px solid oklch(0.55 0.2 310 / 0.5)",
+                }}
+              >
+                MODEL
+              </span>
+            )}
+          </div>
+          <p className="text-xs" style={{ color: "oklch(0.55 0.08 310)" }}>
+            Switch between enthusiast and model account
+          </p>
+        </div>
+      </div>
+
+      {/* Account type selector */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {/* Car Enthusiast */}
+        <button
+          type="button"
+          onClick={() => setIsModel(false)}
+          className="rounded-xl p-3 flex flex-col items-center gap-2 transition-all"
+          style={
+            !isModel
+              ? {
+                  background: "oklch(0.22 0.06 50 / 0.5)",
+                  border: "1.5px solid oklch(var(--orange) / 0.6)",
+                  boxShadow: "0 0 12px oklch(var(--orange) / 0.15)",
+                }
+              : {
+                  background: "oklch(var(--surface))",
+                  border: "1.5px solid oklch(var(--border))",
+                }
+          }
+        >
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{
+              background: !isModel
+                ? "oklch(var(--orange) / 0.2)"
+                : "oklch(var(--surface-elevated))",
+            }}
+          >
+            <Car
+              size={18}
+              style={{
+                color: !isModel
+                  ? "oklch(var(--orange))"
+                  : "oklch(var(--steel))",
+              }}
+            />
+          </div>
+          <span
+            className="text-xs font-semibold text-center leading-tight"
+            style={{
+              color: !isModel
+                ? "oklch(var(--orange-bright))"
+                : "oklch(var(--steel))",
+            }}
+          >
+            Car Enthusiast
+          </span>
+          {!isModel && (
+            <div
+              className="w-4 h-4 rounded-full flex items-center justify-center"
+              style={{ background: "oklch(var(--orange))" }}
+            >
+              <Check size={9} color="black" />
+            </div>
+          )}
+        </button>
+
+        {/* Import Car Model */}
+        <button
+          type="button"
+          onClick={() => setIsModel(true)}
+          className="rounded-xl p-3 flex flex-col items-center gap-2 transition-all"
+          style={
+            isModel
+              ? {
+                  background: "oklch(0.22 0.1 310 / 0.4)",
+                  border: "1.5px solid oklch(0.6 0.22 310 / 0.6)",
+                  boxShadow: "0 0 12px oklch(0.6 0.22 310 / 0.15)",
+                }
+              : {
+                  background: "oklch(var(--surface))",
+                  border: "1.5px solid oklch(var(--border))",
+                }
+          }
+        >
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{
+              background: isModel
+                ? "oklch(0.6 0.22 310 / 0.2)"
+                : "oklch(var(--surface-elevated))",
+            }}
+          >
+            <Sparkles
+              size={18}
+              style={{
+                color: isModel ? "oklch(0.72 0.2 310)" : "oklch(var(--steel))",
+              }}
+            />
+          </div>
+          <span
+            className="text-xs font-semibold text-center leading-tight"
+            style={{
+              color: isModel ? "oklch(0.82 0.18 310)" : "oklch(var(--steel))",
+            }}
+          >
+            Import Car Model
+          </span>
+          {isModel && (
+            <div
+              className="w-4 h-4 rounded-full flex items-center justify-center"
+              style={{ background: "oklch(0.6 0.22 310)" }}
+            >
+              <Check size={9} color="white" />
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* Model-specific fields */}
+      {isModel && (
+        <div className="space-y-4 mb-5">
+          {/* Specialty dropdown */}
+          <div>
+            <label
+              htmlFor="model-specialty"
+              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
+              style={{ color: "oklch(0.6 0.08 310)" }}
+            >
+              Specialty
+            </label>
+            <select
+              id="model-specialty"
+              value={modelData.specialty}
+              onChange={(e) =>
+                setModelData((d) => ({ ...d, specialty: e.target.value }))
+              }
+              className="w-full rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none"
+              style={{
+                background: "oklch(var(--surface))",
+                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+                color: "oklch(var(--foreground))",
+              }}
+            >
+              {MODEL_SPECIALTIES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Years Active */}
+          <div>
+            <label
+              htmlFor="model-years-active"
+              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
+              style={{ color: "oklch(0.6 0.08 310)" }}
+            >
+              Years Active
+            </label>
+            <input
+              id="model-years-active"
+              type="text"
+              value={modelData.yearsActive}
+              onChange={(e) =>
+                setModelData((d) => ({ ...d, yearsActive: e.target.value }))
+              }
+              placeholder="e.g. 2019 – Present"
+              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+              style={{
+                background: "oklch(var(--surface))",
+                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+              }}
+            />
+          </div>
+
+          {/* Instagram Handle */}
+          <div>
+            <label
+              htmlFor="model-social-handle"
+              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
+              style={{ color: "oklch(0.6 0.08 310)" }}
+            >
+              Instagram Handle
+            </label>
+            <input
+              id="model-social-handle"
+              type="text"
+              value={modelData.socialHandle}
+              onChange={(e) =>
+                setModelData((d) => ({ ...d, socialHandle: e.target.value }))
+              }
+              placeholder="@yourusername"
+              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+              style={{
+                background: "oklch(var(--surface))",
+                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+              }}
+            />
+          </div>
+
+          {/* Booking Contact */}
+          <div>
+            <label
+              htmlFor="model-booking-contact"
+              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
+              style={{ color: "oklch(0.6 0.08 310)" }}
+            >
+              Booking Contact
+            </label>
+            <input
+              id="model-booking-contact"
+              type="text"
+              value={modelData.bookingContact}
+              onChange={(e) =>
+                setModelData((d) => ({ ...d, bookingContact: e.target.value }))
+              }
+              placeholder="Email or phone for bookings"
+              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+              style={{
+                background: "oklch(var(--surface))",
+                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Save button */}
+      <button
+        type="button"
+        onClick={handleSave}
+        className="w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98]"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.58 0.22 310) 0%, oklch(0.5 0.2 300) 100%)",
+          color: "white",
+          boxShadow: "0 4px 20px oklch(0.58 0.22 310 / 0.3)",
+        }}
+      >
+        <Camera size={14} />
+        Save Account Type
+      </button>
+    </div>
+  );
+}
 
 const STRIPE_LINK = "https://buy.stripe.com/bJe9AUd3V0kIfpjcFp9EI00";
 
@@ -165,6 +474,7 @@ function ProCard() {
 }
 
 export function SettingsPage() {
+  const { identity } = useInternetIdentity();
   const { data: profile, isLoading } = useMyProfile();
   const updateProfile = useUpdateProfile();
   const uploadFile = useUploadFile();
@@ -196,13 +506,29 @@ export function SettingsPage() {
         location: profile.location ?? "",
       });
       setInitialized(true);
+    } else if (!profile && !initialized && identity) {
+      // Backend is still loading or returned empty — try the local cache so the
+      // form isn't blank while we wait for the canister to respond.
+      const principalId = identity.getPrincipal().toString();
+      const cached = getCachedProfile(principalId);
+      if (cached?.displayName) {
+        setForm({
+          displayName: cached.displayName,
+          bio: cached.bio ?? "",
+          avatarUrl: cached.avatarUrl ?? "",
+          bannerUrl: cached.bannerUrl ?? "",
+          location: cached.location ?? "",
+        });
+        // Don't set initialized=true here: when the real backend profile
+        // arrives we'll overwrite the form with the authoritative data.
+      }
     }
-  }, [profile, initialized]);
+  }, [profile, initialized, identity]);
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     setAvatarUploading(true);
     setAvatarProgress(0);
     try {
@@ -223,7 +549,7 @@ export function SettingsPage() {
   const handleBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
-    file = await convertHeicToJpeg(file);
+    file = await convertToJpegIfNeeded(file);
     setBannerUploading(true);
     setBannerProgress(0);
     try {
@@ -446,14 +772,14 @@ export function SettingsPage() {
         <input
           ref={avatarInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif,.webp"
           className="hidden"
           onChange={handleAvatarFile}
         />
         <input
           ref={bannerInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif,.webp"
           className="hidden"
           onChange={handleBannerFile}
         />
@@ -587,6 +913,9 @@ export function SettingsPage() {
 
         {/* RevSpace Pro upgrade card */}
         <ProCard />
+
+        {/* Model Account section */}
+        <ModelAccountCard />
       </div>
 
       {/* Footer */}

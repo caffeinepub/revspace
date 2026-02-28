@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useUploadFile } from "../hooks/useQueries";
+import { convertToJpegIfNeeded } from "../lib/convertHeic";
 import {
   FEATURE_COST_RB,
   type FeaturedCar,
@@ -315,16 +316,19 @@ function SubmitModal({
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file) return;
+
+    // Convert HEIC/HEIF/WebP to JPEG for broader browser compatibility
+    file = await convertToJpegIfNeeded(file);
 
     // Preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       setForm((prev) => ({
         ...prev,
-        imageFile: file,
+        imageFile: file as File,
         imagePreview: ev.target?.result as string,
       }));
     };
@@ -527,7 +531,7 @@ function SubmitModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,.webp"
               className="sr-only"
               onChange={handleFileChange}
             />

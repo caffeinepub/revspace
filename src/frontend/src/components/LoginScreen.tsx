@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 interface LoginScreenProps {
@@ -12,6 +13,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const onLoginSuccessRef = useRef(onLoginSuccess);
   onLoginSuccessRef.current = onLoginSuccess;
 
+  // Track whether the app is in a canister cold-start state so we can show
+  // a "Loading your data..." message rather than confusing the user.
+  const [loadingData, setLoadingData] = useState(false);
+
   // When identity appears AFTER clicking Login (popup flow), notify parent.
   // This does NOT fire on mount for returning users — they use the button instead.
   useEffect(() => {
@@ -20,9 +25,14 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     }
   }, [identity]);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (identity) {
-      // Returning user: already authenticated, skip the II popup
+      // Returning user: already authenticated — show a brief "loading data"
+      // state so they understand the canister may need to warm up.
+      setLoadingData(true);
+      // Give the canister 1 s to start waking before we navigate away.
+      // The actual data fetch will retry in the background via React Query.
+      await new Promise((r) => setTimeout(r, 800));
       onLoginSuccess?.();
     } else {
       // New login: open Internet Identity popup
@@ -60,7 +70,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-6">
         <Button
           onClick={handleClick}
-          disabled={isLoggingIn}
+          disabled={isLoggingIn || loadingData}
           className="w-full h-14 text-lg font-bold rounded-2xl mb-4"
           style={{
             background: "oklch(var(--orange))",
@@ -68,10 +78,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             boxShadow: "0 0 40px oklch(var(--orange) / 0.5)",
           }}
         >
-          {isLoggingIn ? (
+          {isLoggingIn || loadingData ? (
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-              Connecting...
+              <Loader2 className="w-5 h-5 animate-spin" />
+              {loadingData ? "Loading your data..." : "Connecting..."}
             </div>
           ) : identity ? (
             "Continue to RevSpace"
@@ -82,6 +92,11 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         <p className="text-[11px] text-white/60 text-center">
           Powered by Internet Identity — no passwords, no tracking.
         </p>
+        {identity && (
+          <p className="text-[11px] text-white/40 text-center mt-1">
+            Returning user — your profile and posts will restore automatically.
+          </p>
+        )}
       </div>
     </div>
   );

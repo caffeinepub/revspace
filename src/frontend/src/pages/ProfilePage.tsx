@@ -5,10 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Car,
   Gift,
   Grid3X3,
   Info,
+  Loader2,
   MapPin,
   Settings,
   Wrench,
@@ -40,12 +42,20 @@ export function ProfilePage() {
     type: "image" | "video";
   } | null>(null);
 
-  const { data: profile, isLoading: profileLoading } = useMyProfile();
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isFetching: profileFetching,
+  } = useMyProfile();
   const { data: posts, isLoading: postsLoading } =
     useGetPostsByUser(myPrincipal);
   const { data: garage, isLoading: garageLoading } = useMyGarage();
   const { data: followers } = useGetFollowers(myPrincipal);
   const { data: following } = useGetFollowing(myPrincipal);
+
+  // True when we're authenticated but the profile hasn't loaded yet (cold-start / restore)
+  const isRestoringProfile =
+    !!myPrincipalStr && !profileLoading && !profile && profileFetching;
 
   const displayName = profile?.displayName || truncatePrincipal(myPrincipalStr);
   const avatarUrl = profile?.avatarUrl ?? "";
@@ -72,6 +82,55 @@ export function ProfilePage() {
           </Link>
         </div>
       </header>
+
+      {/* Profile restore notice — shown when canister is waking up after idle */}
+      {isRestoringProfile && (
+        <div
+          className="mx-4 mt-2 mb-1 flex items-center gap-3 rounded-xl px-4 py-3"
+          style={{
+            background: "oklch(0.18 0.04 220 / 0.6)",
+            border: "1px solid oklch(0.55 0.12 220 / 0.5)",
+          }}
+        >
+          <Loader2
+            size={15}
+            className="animate-spin shrink-0"
+            style={{ color: "oklch(0.75 0.14 220)" }}
+          />
+          <p className="text-xs" style={{ color: "oklch(0.8 0.08 220)" }}>
+            Restoring your profile data… If this takes too long, go to{" "}
+            <Link to="/settings" className="underline font-semibold">
+              Settings
+            </Link>{" "}
+            to re-enter your info.
+          </p>
+        </div>
+      )}
+
+      {/* Profile empty state notice (not loading, not fetching, genuinely blank) */}
+      {!!myPrincipalStr && !profileLoading && !profileFetching && !profile && (
+        <div
+          className="mx-4 mt-2 mb-1 flex items-start gap-3 rounded-xl px-4 py-3"
+          style={{
+            background: "oklch(0.22 0.08 55 / 0.25)",
+            border: "1px solid oklch(0.72 0.18 55 / 0.5)",
+          }}
+        >
+          <AlertTriangle
+            size={15}
+            className="shrink-0 mt-0.5"
+            style={{ color: "oklch(0.82 0.18 65)" }}
+          />
+          <p className="text-xs" style={{ color: "oklch(0.75 0.1 65)" }}>
+            Your profile data wasn't found. Visit{" "}
+            <Link to="/settings" className="underline font-semibold">
+              Settings
+            </Link>{" "}
+            to set your display name — it will be saved so it doesn't disappear
+            again.
+          </p>
+        </div>
+      )}
 
       {/* Banner */}
       <div className="relative">
