@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { isModelAccount } from "../lib/modelAccount";
 import {
+  MODEL_GIFT_ITEMS,
   RARITY_CONFIG,
   SHOP_CATEGORIES,
   SHOP_ITEMS,
@@ -452,6 +453,33 @@ function ShopTab({
             </div>
           );
         })}
+
+        {/* Send to a Model section — visible to all users */}
+        <div>
+          <h3
+            className="text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"
+            style={{ color: "oklch(0.75 0.18 330)" }}
+          >
+            <span
+              className="flex-1 h-px"
+              style={{ background: "oklch(0.45 0.14 330 / 0.45)" }}
+            />
+            💝 Send to a Model
+            <span
+              className="flex-1 h-px"
+              style={{ background: "oklch(0.45 0.14 330 / 0.45)" }}
+            />
+          </h3>
+          <p
+            className="text-[11px] text-center mb-3"
+            style={{ color: "oklch(0.55 0.10 330)" }}
+          >
+            Gift these to any model account — anyone can send
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {MODEL_GIFT_ITEMS.map((item) => renderItemCard(item))}
+          </div>
+        </div>
 
         {/* Model Exclusives section */}
         <div>
