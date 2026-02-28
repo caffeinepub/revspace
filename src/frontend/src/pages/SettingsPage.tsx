@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertTriangle,
   Camera,
   Check,
   Crown,
@@ -249,6 +250,7 @@ export function SettingsPage() {
   };
 
   const isBusy = avatarUploading || bannerUploading;
+  const profileMissing = !isLoading && !form.displayName;
 
   return (
     <div className="min-h-screen">
@@ -257,6 +259,36 @@ export function SettingsPage() {
       </header>
 
       <div className="p-4 max-w-xl mx-auto">
+        {profileMissing && (
+          <div
+            className="flex items-start gap-3 rounded-xl p-4 mb-5"
+            style={{
+              background: "oklch(0.22 0.08 55 / 0.25)",
+              border: "1px solid oklch(0.72 0.18 55 / 0.5)",
+            }}
+          >
+            <AlertTriangle
+              size={18}
+              className="shrink-0 mt-0.5"
+              style={{ color: "oklch(0.82 0.18 65)" }}
+            />
+            <div>
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "oklch(0.88 0.14 65)" }}
+              >
+                Profile not set yet
+              </p>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "oklch(0.7 0.08 65)" }}
+              >
+                Fill in your display name below and tap Save Profile. It will be
+                stored both on-chain and locally so it won't disappear again.
+              </p>
+            </div>
+          </div>
+        )}
         {/* Avatar & Banner Preview Card */}
         <div
           className="rounded-xl overflow-hidden mb-6"

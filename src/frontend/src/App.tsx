@@ -8,10 +8,12 @@ import { LoginScreen } from "./components/LoginScreen";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { setUserPro } from "./lib/pro";
 import { AdminPage } from "./pages/AdminPage";
+import { BuildBattlePage } from "./pages/BuildBattlePage";
 import { ClubsPage } from "./pages/ClubsPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
 import { EventsPage } from "./pages/EventsPage";
 import { ExplorePage } from "./pages/ExplorePage";
+import { FeaturedCarPage } from "./pages/FeaturedCarPage";
 import { FeedPage } from "./pages/FeedPage";
 import { GaragePage } from "./pages/GaragePage";
 import { GuidePage } from "./pages/GuidePage";
@@ -232,6 +234,18 @@ const revbucksRoute = createRoute({
   component: RevBucksPage,
 });
 
+const featuredCarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/featured",
+  component: FeaturedCarPage,
+});
+
+const buildBattleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/buildbattle",
+  component: BuildBattlePage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -254,6 +268,8 @@ const routeTree = rootRoute.addChildren([
   guideRoute,
   proRoute,
   revbucksRoute,
+  featuredCarRoute,
+  buildBattleRoute,
 ]);
 
 const router = createRouter({ routeTree });

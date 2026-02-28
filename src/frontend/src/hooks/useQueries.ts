@@ -3,6 +3,11 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { loadConfig } from "../config";
+import {
+  getCachedProfile,
+  mergeWithCache,
+  setCachedProfile,
+} from "../lib/profileCache";
 import { StorageClient } from "../utils/StorageClient";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
@@ -179,13 +184,94 @@ export function useDeletePost() {
 // ========================
 export function useMyProfile() {
   const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  const principalId = identity?.getPrincipal().toString() ?? "";
+
   return useQuery({
     queryKey: ["profile", "me"],
     queryFn: async () => {
       if (!actor) return null;
-      return actor.getMyProfile();
+      const backendProfile = await actor.getMyProfile();
+
+      // If backend has data, merge with local cache to recover any lost fields
+      // (avatarUrl/bannerUrl may be wiped by canister resets but survive in cache)
+      if (backendProfile) {
+        const p = backendProfile as {
+          displayName: string;
+          bio: string;
+          avatarUrl: string;
+          bannerUrl: string;
+          location: string;
+        };
+
+        const rawProfile = {
+          displayName: p.displayName ?? "",
+          bio: p.bio ?? "",
+          avatarUrl: p.avatarUrl ?? "",
+          bannerUrl: p.bannerUrl ?? "",
+          location: p.location ?? "",
+        };
+
+        // Merge: prefer backend values but fall back to cache for any empty fields
+        const merged = principalId
+          ? mergeWithCache(principalId, rawProfile)
+          : rawProfile;
+
+        // If merge recovered fields not in the backend, push them back silently
+        const needsRestore =
+          principalId &&
+          (merged.avatarUrl !== rawProfile.avatarUrl ||
+            merged.bannerUrl !== rawProfile.bannerUrl ||
+            merged.displayName !== rawProfile.displayName);
+
+        if (needsRestore) {
+          try {
+            await actor.updateProfile(
+              merged.displayName,
+              merged.bio,
+              merged.avatarUrl,
+              merged.location,
+              merged.bannerUrl,
+            );
+          } catch {
+            // best-effort — don't block
+          }
+        }
+
+        // Always keep cache up to date with latest merged data
+        if (principalId && merged.displayName) {
+          setCachedProfile(principalId, merged);
+        }
+
+        return merged;
+      }
+
+      // Backend returned nothing — fall back to local cache entirely
+      if (principalId) {
+        const cached = getCachedProfile(principalId);
+        if (cached?.displayName) {
+          // Re-save to backend silently so it repopulates after a canister reset
+          try {
+            await actor.updateProfile(
+              cached.displayName,
+              cached.bio,
+              cached.avatarUrl,
+              cached.location,
+              cached.bannerUrl,
+            );
+          } catch {
+            // ignore — best-effort restore
+          }
+          return cached;
+        }
+      }
+
+      return null;
     },
     enabled: !!actor && !isFetching,
+    // Retry on failure to handle canister cold-starts
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
 }
 
@@ -203,6 +289,7 @@ export function useGetProfile(user: Principal | undefined) {
 
 export function useUpdateProfile() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -219,15 +306,30 @@ export function useUpdateProfile() {
       bannerUrl: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateProfile(
+      const profileData = { displayName, bio, avatarUrl, bannerUrl, location };
+
+      // Save to backend
+      await actor.updateProfile(
         displayName,
         bio,
         avatarUrl,
         location,
         bannerUrl,
       );
+
+      // Save to local cache immediately as backup
+      const principalId = identity?.getPrincipal().toString() ?? "";
+      if (principalId) {
+        setCachedProfile(principalId, profileData);
+      }
+
+      return profileData;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
+    onSuccess: (profileData) => {
+      // Immediately update query cache so UI never flashes empty data
+      qc.setQueryData(["profile", "me"], profileData);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
 }
 

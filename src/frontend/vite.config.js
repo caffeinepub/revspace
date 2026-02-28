@@ -17,7 +17,10 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: false,
-    minify: false,
+    minify: true,
+    // Target modern browsers that support BigInt (required by ICP SDK)
+    // Safari 14+, Chrome 85+, Firefox 79+, Edge 85+ all support BigInt natively
+    target: ["es2020", "chrome85", "firefox79", "safari14", "edge85"],
   },
   css: {
     postcss: "./postcss.config.js",
