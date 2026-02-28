@@ -7,6 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { Car, Grid3X3, Info, MapPin, Settings, Wrench } from "lucide-react";
 import { useState } from "react";
 import { FollowListModal } from "../components/FollowListModal";
+import { ProBadge } from "../components/ProBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetFollowers,
@@ -120,8 +121,9 @@ export function ProfilePage() {
           <>
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="font-display text-2xl font-bold text-foreground">
+                <h2 className="font-display text-2xl font-bold text-foreground flex items-center gap-1.5 flex-wrap">
                   {displayName}
+                  <ProBadge />
                 </h2>
                 {location && (
                   <div className="flex items-center gap-1 text-steel text-xs mt-0.5">

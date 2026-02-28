@@ -6,11 +6,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Camera,
+  Check,
+  Crown,
   FileText,
   ImagePlus,
   Loader2,
   MapPin,
   User,
+  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -20,7 +23,145 @@ import {
   useUploadFile,
 } from "../hooks/useQueries";
 import { convertHeicToJpeg } from "../lib/convertHeic";
+import { isUserPro } from "../lib/pro";
 import { getInitials } from "../utils/format";
+
+const STRIPE_LINK = "https://buy.stripe.com/bJe9AUd3V0kIfpjcFp9EI00";
+
+const PRO_PERKS = [
+  "Verified Pro badge on your profile",
+  "Priority placement in Leaderboard",
+  "Ad-free experience",
+  "Exclusive Pro member crown",
+  "Support RevSpace development",
+];
+
+function ProCard() {
+  const isPro = isUserPro();
+
+  if (isPro) {
+    return (
+      <div
+        className="rounded-2xl p-5 mt-6"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.16 0.04 90 / 0.9) 0%, oklch(0.13 0.02 260 / 0.95) 100%)",
+          border: "1px solid oklch(0.78 0.18 85 / 0.5)",
+          boxShadow:
+            "0 0 32px oklch(0.78 0.18 85 / 0.15), inset 0 1px 0 oklch(0.78 0.18 85 / 0.2)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "oklch(0.78 0.18 85 / 0.2)" }}
+          >
+            <Crown size={20} style={{ color: "oklch(0.82 0.18 85)" }} />
+          </div>
+          <div>
+            <p
+              className="font-bold text-base"
+              style={{ color: "oklch(0.82 0.18 85)" }}
+            >
+              RevSpace Pro Member
+            </p>
+            <p
+              className="text-xs"
+              style={{ color: "oklch(0.78 0.18 85 / 0.7)" }}
+            >
+              You're unlocked. All Pro perks are active.
+            </p>
+          </div>
+          <div className="ml-auto">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ background: "oklch(0.78 0.18 85 / 0.2)" }}
+            >
+              <Check size={14} style={{ color: "oklch(0.82 0.18 85)" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-5 mt-6"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.14 0.03 85 / 0.6) 0%, oklch(0.12 0.01 260 / 0.9) 100%)",
+        border: "1px solid oklch(0.75 0.16 85 / 0.35)",
+        boxShadow: "0 0 24px oklch(0.75 0.16 85 / 0.08)",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "oklch(0.78 0.18 85 / 0.15)" }}
+        >
+          <Crown size={20} style={{ color: "oklch(0.82 0.18 85)" }} />
+        </div>
+        <div>
+          <p
+            className="font-bold text-base"
+            style={{ color: "oklch(0.82 0.18 85)" }}
+          >
+            RevSpace Pro
+          </p>
+          <p className="text-xs" style={{ color: "oklch(0.6 0.08 85)" }}>
+            Unlock the full RevSpace experience
+          </p>
+        </div>
+      </div>
+
+      {/* Perks */}
+      <ul className="space-y-2 mb-5">
+        {PRO_PERKS.map((perk) => (
+          <li key={perk} className="flex items-center gap-2.5">
+            <div
+              className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "oklch(0.78 0.18 85 / 0.2)" }}
+            >
+              <Check size={9} style={{ color: "oklch(0.82 0.18 85)" }} />
+            </div>
+            <span className="text-sm" style={{ color: "oklch(0.8 0.04 260)" }}>
+              {perk}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {/* CTA Button */}
+      <button
+        type="button"
+        onClick={() => {
+          window.location.href = STRIPE_LINK;
+        }}
+        className="w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98]"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.78 0.18 85) 0%, oklch(0.72 0.16 65) 100%)",
+          color: "oklch(0.12 0.03 85)",
+          boxShadow:
+            "0 4px 24px oklch(0.78 0.18 85 / 0.35), 0 1px 0 oklch(1 0 0 / 0.3) inset",
+        }}
+      >
+        <Zap size={15} />
+        Upgrade to Pro
+        <Crown size={14} />
+      </button>
+
+      <p
+        className="text-center text-[11px] mt-3"
+        style={{ color: "oklch(0.5 0.04 260)" }}
+      >
+        One-time payment · Instant badge activation
+      </p>
+    </div>
+  );
+}
 
 export function SettingsPage() {
   const { data: profile, isLoading } = useMyProfile();
@@ -407,6 +548,9 @@ export function SettingsPage() {
             )}
           </Button>
         </form>
+
+        {/* RevSpace Pro upgrade card */}
+        <ProCard />
       </div>
 
       {/* Footer */}

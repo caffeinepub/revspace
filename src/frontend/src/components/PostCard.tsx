@@ -17,6 +17,7 @@ import type { PostView } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetProfile, useLikePost, useUnlikePost } from "../hooks/useQueries";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
+import { ProBadge } from "./ProBadge";
 
 interface PostCardProps {
   post: PostView;
@@ -140,6 +141,7 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
                   {displayName}
                 </span>
               )}
+              {!profileLoading && authorKey === myPrincipal && <ProBadge />}
               <PostTypeBadge type={post.postType} />
             </div>
             <span className="text-xs text-steel">

@@ -1,27 +1,21 @@
 # RevSpace
 
 ## Current State
-- MessagesPage shows conversations using truncated Principal IDs (e.g. "xk3ab...1f23") instead of display names
-- Sending a new message does NOT create a notification for the recipient
-- FeedPage renders posts in the order returned by `getAllPosts()` — newest posts appear at the bottom unless the backend already returns them sorted descending
-- NotificationsPage handles like/comment/follow/message types but does not handle new inbound message notifications specifically
+Full-stack car enthusiast social platform with feed, reels, marketplace, garage, events, clubs, messaging, notifications, leaderboard, mechanics Q&A, forum, admin panel, and shop page. Settings page has profile editing (name, bio, location, avatar, banner). No Pro/subscription tier exists yet.
 
 ## Requested Changes (Diff)
 
 ### Add
-- When a message is sent, fire a notification to the recipient with type `"message"` and a text like `"<senderName> sent you a message"`
-- In MessagesPage, look up the display name of each conversation partner via `getProfile(principal)` and show it instead of the truncated principal
+- "RevSpace Pro" upgrade section in Settings page with a prominent upgrade button
+- Pro upgrade modal/card that shows what Pro includes (verified badge, ad-free, priority in leaderboard, extended video, exclusive Pro badge)
+- Clicking "Upgrade to Pro" redirects to Stripe payment link: https://buy.stripe.com/bJe9AUd3V0kIfpjcFp9EI00
+- Pro badge display on profiles for users who have upgraded (tracked via localStorage flag `revspace_pro` set after returning from Stripe)
+- After Stripe redirect returns (detect via URL param `?pro=success`), set local pro flag and show a congratulations toast/banner
+- Pro badge (crown or star icon) next to display name in: Profile page, UserProfilePage, Reels, Feed posts, Leaderboard
 
 ### Modify
-- MessagesPage `ConversationList` and `ChatView` headers: resolve and display the other user's `displayName` (falling back to truncated principal if no profile set)
-- FeedPage: sort `displayPosts` by `createdAt` descending so newest posts are always at the top
-- `useSendMessage` mutation: after success, call `sendNotificationToUser` for the receiver with type `"message"` and a message string that includes the sender's display name
+- SettingsPage: Add a "RevSpace Pro" card section below the Save Profile button, showing current status (free vs pro) and upgrade CTA
+- ProfilePage: Show Pro badge next to name if user is Pro
 
 ### Remove
 - Nothing removed
-
-## Implementation Plan
-1. **MessagesPage** -- Create a small helper component `ConversationItem` that calls `useGetProfile(principal)` and renders the resolved display name + avatar. Use it in `ConversationList` and in the `ChatView` header.
-2. **FeedPage** -- After loading posts, sort by `createdAt` descending before rendering: `[...displayPosts].sort((a, b) => Number(b.createdAt - a.createdAt))`
-3. **Message notification** -- In `useSendMessage` (useQueries.ts), after success invalidate queries as before AND call `actor.sendNotificationToUser(receiver, "message", "<principal> sent you a message", "")`. Since we don't easily have the sender display name in the hook, use the short principal. Alternatively, wire it in `MessagesPage` ChatView after the `sendMessage` success by also calling `useSendNotificationToUser`.
-4. Wire the notification send in `ChatView.handleSend`: on success, also mutate `useSendNotificationToUser` with `{ targetUser: recipient, notifType: "message", message: "${senderDisplayName} sent you a message", relatedId: "" }`.

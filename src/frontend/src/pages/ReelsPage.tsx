@@ -17,8 +17,10 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ProBadge } from "../components/ProBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddComment,
@@ -212,9 +214,10 @@ function ReelsCommentsPanel({ postId, onClose }: ReelsCommentsPanelProps) {
 // ─── ReelAuthorInfo ──────────────────────────────────────────────────────────
 interface ReelAuthorInfoProps {
   authorPrincipal: Principal;
+  myPrincipal?: string;
 }
 
-function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
+function ReelAuthorInfo({ authorPrincipal, myPrincipal }: ReelAuthorInfoProps) {
   const { data: profile, isLoading } = useGetProfile(authorPrincipal);
   const authorKey = authorPrincipal.toString();
 
@@ -254,8 +257,9 @@ function ReelAuthorInfo({ authorPrincipal }: ReelAuthorInfoProps) {
           {displayName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <p className="text-white text-sm font-semibold group-hover:underline underline-offset-2">
+      <p className="text-white text-sm font-semibold flex items-center gap-1.5 group-hover:underline underline-offset-2">
         {displayName}
+        {authorKey === myPrincipal && <ProBadge />}
       </p>
     </Link>
   );
@@ -530,7 +534,10 @@ export function ReelsPage() {
 
             {/* Content overlay */}
             <div className="absolute bottom-24 left-0 right-16 px-4">
-              <ReelAuthorInfo authorPrincipal={post.author} />
+              <ReelAuthorInfo
+                authorPrincipal={post.author}
+                myPrincipal={myPrincipal}
+              />
               {post.topic && (
                 <span
                   className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-2"

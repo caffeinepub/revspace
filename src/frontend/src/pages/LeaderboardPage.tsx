@@ -4,6 +4,8 @@ import { Principal } from "@icp-sdk/core/principal";
 import { Link } from "@tanstack/react-router";
 import { Trophy } from "lucide-react";
 import { useState } from "react";
+import { ProBadge } from "../components/ProBadge";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
 import { truncatePrincipal } from "../utils/format";
 
@@ -49,6 +51,7 @@ interface LeaderRowUserInfoProps {
   rank: number;
   sortMode: SortMode;
   maxValue: number;
+  myPrincipal: string;
 }
 
 function LeaderRowUserInfo({
@@ -56,6 +59,7 @@ function LeaderRowUserInfo({
   rank,
   sortMode,
   maxValue,
+  myPrincipal,
 }: LeaderRowUserInfoProps) {
   const principal = (() => {
     try {
@@ -128,8 +132,9 @@ function LeaderRowUserInfo({
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate group-hover:underline underline-offset-2">
-                {displayName}
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1 group-hover:underline underline-offset-2">
+                <span className="truncate">{displayName}</span>
+                {entry.principal === myPrincipal && <ProBadge />}
               </p>
               <div className="flex items-center gap-3 mt-0.5">
                 <span
@@ -198,6 +203,8 @@ function RankBadge({ rank }: { rank: number }) {
 export function LeaderboardPage() {
   const [sortMode, setSortMode] = useState<SortMode>("posts");
   const { data: posts, isLoading } = useGetAllPosts();
+  const { identity } = useInternetIdentity();
+  const myPrincipal = identity?.getPrincipal().toString() ?? "";
 
   const entries = posts ? computeLeaderboard(posts) : [];
 
@@ -307,6 +314,7 @@ export function LeaderboardPage() {
                 rank={rank}
                 sortMode={sortMode}
                 maxValue={maxValue}
+                myPrincipal={myPrincipal}
               />
             );
           })

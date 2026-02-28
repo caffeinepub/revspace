@@ -1,10 +1,12 @@
 import { Toaster } from "@/components/ui/sonner";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { Outlet, createRootRoute, createRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { setUserPro } from "./lib/pro";
 import { AdminPage } from "./pages/AdminPage";
 import { ClubsPage } from "./pages/ClubsPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
@@ -238,9 +240,26 @@ declare module "@tanstack/react-router" {
   }
 }
 
+function ProSuccessHandler() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("pro") === "success") {
+      setUserPro();
+      toast.success("Welcome to RevSpace Pro! Your badge is now active. 👑", {
+        duration: 5000,
+      });
+      // Clean the URL param without reloading
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState(null, "", cleanUrl);
+    }
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <>
+      <ProSuccessHandler />
       <RouterProvider router={router} />
       <Toaster position="top-center" theme="dark" />
       <BullBoostBanner />
