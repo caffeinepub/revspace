@@ -4,6 +4,7 @@ import {
   BookOpen,
   Calendar,
   Car,
+  Coins,
   Compass,
   Film,
   Home,
@@ -23,7 +24,9 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useActor } from "../hooks/useActor";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useMyNotifications } from "../hooks/useQueries";
+import { getBalance } from "../lib/revbucks";
 
 interface LayoutProps {
   children: ReactNode;
@@ -38,6 +41,7 @@ const ALL_NAV_ITEMS = [
   { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { to: "/clubs", label: "Car Clubs", icon: Users },
   { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { to: "/revbucks", label: "RevBucks", icon: Coins },
   { to: "/mechanics", label: "Mechanics", icon: Wrench },
   { to: "/shop", label: "Performance Shop", icon: Store },
   { to: "/about", label: "About RevSpace", icon: Info },
@@ -61,12 +65,27 @@ function useIsAdmin(): boolean {
   return isAdmin;
 }
 
+function useRevBucksBalance(): number {
+  const { identity } = useInternetIdentity();
+  const [balance, setBalance] = useState(0);
+  useEffect(() => {
+    const principal = identity?.getPrincipal().toText();
+    if (!principal) return;
+    setBalance(getBalance(principal));
+    // Poll every 5s so balance stays fresh after sends/earns
+    const id = setInterval(() => setBalance(getBalance(principal)), 5000);
+    return () => clearInterval(id);
+  }, [identity]);
+  return balance;
+}
+
 function MobileNav() {
   const [open, setOpen] = useState(false);
   const matchRoute = useMatchRoute();
   const { data: notifications } = useMyNotifications();
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
   const isAdmin = useIsAdmin();
+  const rbBalance = useRevBucksBalance();
 
   return (
     <>
@@ -209,7 +228,7 @@ function MobileNav() {
           </div>
         </Link>
 
-        {/* All 13 nav links */}
+        {/* All nav links */}
         <div className="flex flex-col gap-0.5 px-2 overflow-y-auto flex-1">
           {ALL_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -229,7 +248,19 @@ function MobileNav() {
                       </span>
                     )}
                   </div>
-                  <span>{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {item.label === "RevBucks" && (
+                    <span
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: "oklch(var(--orange) / 0.15)",
+                        color: "oklch(var(--orange-bright))",
+                        border: "1px solid oklch(var(--orange) / 0.3)",
+                      }}
+                    >
+                      ⚡{rbBalance}
+                    </span>
+                  )}
                 </div>
               </Link>
             );
@@ -308,6 +339,7 @@ function Sidebar() {
   const { data: notifications } = useMyNotifications();
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
   const isAdmin = useIsAdmin();
+  const rbBalance = useRevBucksBalance();
 
   return (
     <aside className="sidebar-nav">
@@ -359,7 +391,19 @@ function Sidebar() {
                     </span>
                   )}
                 </div>
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.label === "RevBucks" && (
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: "oklch(var(--orange) / 0.15)",
+                      color: "oklch(var(--orange-bright))",
+                      border: "1px solid oklch(var(--orange) / 0.3)",
+                    }}
+                  >
+                    ⚡{rbBalance}
+                  </span>
+                )}
               </div>
             </Link>
           );
@@ -470,7 +514,8 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="main-content" style={{ paddingBottom: 60 }}>
+      {/* paddingBottom: 68px to clear fixed BullBoost banner (52px) + a little breathing room */}
+      <main className="main-content" style={{ paddingBottom: 68 }}>
         {children}
       </main>
     </div>

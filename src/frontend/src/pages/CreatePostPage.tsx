@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreatePost, useUploadFile } from "../hooks/useQueries";
 import { convertHeicToJpeg } from "../lib/convertHeic";
+import { awardPostCreation } from "../lib/revbucks";
 
 const POST_TYPES = [
   { value: "Photo", icon: Image, label: "Photo", accept: "image/*" },
@@ -45,6 +47,7 @@ const REEL_TOPICS = [
 
 export function CreatePostPage() {
   const navigate = useNavigate();
+  const { identity } = useInternetIdentity();
   const [postType, setPostType] = useState("Photo");
   const [topic, setTopic] = useState("Other");
   const [content, setContent] = useState("");
@@ -140,6 +143,12 @@ export function CreatePostPage() {
       {
         onSuccess: () => {
           toast.success("Post published! 🔥");
+          // Award RevBucks for creating a post
+          const principal = identity?.getPrincipal().toText();
+          if (principal) {
+            awardPostCreation(principal);
+            toast.success("+10 RevBucks earned! ⚡", { duration: 3000 });
+          }
           clearFile();
           void navigate({ to: "/" });
         },

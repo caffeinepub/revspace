@@ -8,6 +8,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Car,
+  Gift,
   Grid3X3,
   Info,
   Loader2,
@@ -30,6 +31,7 @@ import {
   useIsFollowing,
   useUnfollowUser,
 } from "../hooks/useQueries";
+import { getGiftSummary } from "../lib/revbucks";
 import { getInitials, truncatePrincipal } from "../utils/format";
 
 interface UserProfilePageProps {
@@ -341,6 +343,10 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
             <Car size={14} />
             Garage
           </TabsTrigger>
+          <TabsTrigger value="gifts" className="flex-1 gap-1.5">
+            <Gift size={14} />
+            Items
+          </TabsTrigger>
           <TabsTrigger value="about" className="flex-1 gap-1.5">
             <Info size={14} />
             About
@@ -487,6 +493,82 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="gifts">
+          {(() => {
+            const giftSummary = getGiftSummary(userId);
+            if (giftSummary.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
+                    style={{ background: "oklch(var(--surface))" }}
+                  >
+                    <Gift size={24} className="text-steel" />
+                  </div>
+                  <p className="text-foreground font-semibold text-sm">
+                    No items yet
+                  </p>
+                  <p className="text-steel text-xs mt-1">
+                    {isOwnProfile
+                      ? "Items gifted to you will appear here"
+                      : "This user hasn't received any gifts yet"}
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="pb-6">
+                <p className="text-xs text-steel mb-3">
+                  {giftSummary.reduce((acc, g) => acc + g.count, 0)} items
+                  collected
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {giftSummary.map((gift) => (
+                    <div
+                      key={gift.giftId}
+                      className="flex flex-col items-center gap-2 p-4 rounded-xl relative overflow-hidden"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(var(--surface)), oklch(var(--surface-elevated)))",
+                        border: "1px solid oklch(var(--border))",
+                      }}
+                    >
+                      {/* Count badge */}
+                      {gift.count > 1 && (
+                        <span
+                          className="absolute top-2 right-2 min-w-[20px] h-5 rounded-full text-[10px] font-black flex items-center justify-center px-1.5"
+                          style={{
+                            background: "oklch(var(--orange))",
+                            color: "oklch(var(--carbon))",
+                          }}
+                        >
+                          x{gift.count}
+                        </span>
+                      )}
+                      <span className="text-4xl">{gift.giftEmoji}</span>
+                      <p className="text-xs font-semibold text-foreground text-center leading-tight">
+                        {gift.giftName}
+                      </p>
+                      <Badge
+                        className="text-[9px] px-2 py-0"
+                        style={{
+                          background: "oklch(var(--orange) / 0.12)",
+                          color: "oklch(var(--orange-bright))",
+                          border: "1px solid oklch(var(--orange) / 0.25)",
+                        }}
+                      >
+                        {gift.count === 1
+                          ? "1 received"
+                          : `${gift.count} received`}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="about">

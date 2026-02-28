@@ -318,6 +318,7 @@ function ReelMedia({
         }}
         src={mediaUrl}
         autoPlay
+        muted
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
@@ -366,7 +367,9 @@ export function ReelsPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  // Start muted so autoplay works on mobile (browsers block autoplay with sound).
+  // Users can unmute by tapping the sound button.
+  const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [selectedTopic, setSelectedTopic] = useState("All");
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());

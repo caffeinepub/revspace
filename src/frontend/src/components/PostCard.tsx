@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import type { PostView } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetProfile, useLikePost, useUnlikePost } from "../hooks/useQueries";
+import { awardLikeReceived } from "../lib/revbucks";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
 import { ProBadge } from "./ProBadge";
 
@@ -120,7 +121,13 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       });
     } else {
       setOptimisticLiked(true);
-      setLikeCount((c) => c + 1);
+      const newCount = likeCount + 1;
+      setLikeCount(newCount);
+      // Award author RevBucks every 10 likes
+      if (newCount > 0 && newCount % 10 === 0) {
+        const authorPrincipal = post.author.toString();
+        awardLikeReceived(authorPrincipal);
+      }
       likeMutation.mutate(post.id, {
         onError: () => {
           setOptimisticLiked(null);

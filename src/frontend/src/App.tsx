@@ -23,6 +23,7 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { ProPage } from "./pages/ProPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ReelsPage } from "./pages/ReelsPage";
+import { RevBucksPage } from "./pages/RevBucksPage";
 import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ShopPage } from "./pages/ShopPage";
@@ -225,6 +226,12 @@ const proRoute = createRoute({
   component: ProPage,
 });
 
+const revbucksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/revbucks",
+  component: RevBucksPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -246,6 +253,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   guideRoute,
   proRoute,
+  revbucksRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -259,10 +267,14 @@ declare module "@tanstack/react-router" {
 function ProSuccessHandler() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("pro") === "success") {
+    const isProSuccess =
+      params.get("pro") === "success" ||
+      params.get("upgraded") === "true" ||
+      params.get("success") === "true";
+    if (isProSuccess && window.location.pathname === "/pro") {
       setUserPro();
-      toast.success("Welcome to RevSpace Pro! Your badge is now active. 👑", {
-        duration: 5000,
+      toast.success("Welcome to RevSpace Pro! Your crown is now active.", {
+        duration: 6000,
       });
       // Clean the URL param without reloading
       const cleanUrl = window.location.pathname + window.location.hash;

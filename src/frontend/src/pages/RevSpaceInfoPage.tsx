@@ -1,7 +1,5 @@
 import {
   Car,
-  Check,
-  Copy,
   DollarSign,
   Flame,
   Heart,
@@ -11,8 +9,6 @@ import {
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
-import { toast } from "sonner";
 
 const features = [
   {
@@ -65,42 +61,6 @@ const itemVariants = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
-
-function CopyableTag({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      toast.success("Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy");
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-lg transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2"
-      style={{
-        background: "oklch(var(--orange) / 0.15)",
-        border: "1px solid oklch(var(--orange) / 0.4)",
-        color: "oklch(var(--orange-bright))",
-        fontFamily: "'Barlow Condensed', sans-serif",
-        letterSpacing: "0.05em",
-        boxShadow: "0 0 16px oklch(var(--orange) / 0.15)",
-        outline: "none",
-      }}
-      aria-label={`Copy ${value} to clipboard`}
-    >
-      {copied ? <Check size={16} /> : <Copy size={16} />}
-      {value}
-    </button>
-  );
-}
 
 export function RevSpaceInfoPage() {
   return (
@@ -411,22 +371,6 @@ export function RevSpaceInfoPage() {
               like to support development, server costs, and future features,
               donations are always appreciated.
             </p>
-
-            <div>
-              <p
-                className="text-xs uppercase tracking-widest mb-3 font-semibold"
-                style={{ color: "oklch(var(--steel))" }}
-              >
-                Cash App
-              </p>
-              <CopyableTag value="$alteredsol" />
-              <p
-                className="text-xs mt-2"
-                style={{ color: "oklch(var(--steel))" }}
-              >
-                Tap to copy
-              </p>
-            </div>
           </motion.div>
 
           {/* Contact Card */}

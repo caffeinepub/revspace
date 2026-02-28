@@ -12,7 +12,9 @@ import {
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { isUserPro } from "../lib/pro";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { isUserPro, setUserPro } from "../lib/pro";
 
 const PRO_PERKS = [
   {
@@ -79,7 +81,27 @@ const FREE_VS_PRO = [
 ];
 
 export function ProPage() {
-  const isPro = isUserPro();
+  const [isPro, setIsPro] = useState(isUserPro());
+
+  // Detect Stripe redirect success: supports ?upgraded=true, ?success=true, ?pro=success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const justUpgraded =
+      params.get("upgraded") === "true" ||
+      params.get("success") === "true" ||
+      params.get("pro") === "success";
+    if (justUpgraded && !isUserPro()) {
+      setUserPro();
+      setIsPro(true);
+      toast.success("Welcome to RevSpace Pro! Your crown is now active.", {
+        duration: 6000,
+      });
+      window.history.replaceState(null, "", "/pro");
+    } else if (justUpgraded && isUserPro()) {
+      // Already pro, just clean the URL
+      window.history.replaceState(null, "", "/pro");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen pb-20">
