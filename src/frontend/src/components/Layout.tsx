@@ -80,18 +80,16 @@ function useRevBucksBalance(): number {
     const principal = identity?.getPrincipal().toText();
     if (!principal) return;
     setBalance(getBalance(principal));
-    // Poll every 5s so balance stays fresh after sends/earns
-    const id = setInterval(() => setBalance(getBalance(principal)), 5000);
+    // Poll every 30s — frequent polling was causing UI freezes
+    const id = setInterval(() => setBalance(getBalance(principal)), 30000);
     return () => clearInterval(id);
   }, [identity]);
   return balance;
 }
 
-function MobileNav() {
+function MobileNav({ unreadCount }: { unreadCount: number }) {
   const [open, setOpen] = useState(false);
   const matchRoute = useMatchRoute();
-  const { data: notifications } = useMyNotifications();
-  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
   const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
 
@@ -333,10 +331,8 @@ function MobileNav() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ unreadCount }: { unreadCount: number }) {
   const matchRoute = useMatchRoute();
-  const { data: notifications } = useMyNotifications();
-  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
   const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
 
@@ -509,10 +505,14 @@ export function BullBoostBanner() {
 }
 
 export function Layout({ children }: LayoutProps) {
+  // Single shared notifications subscription for both Sidebar and MobileNav
+  const { data: notifications } = useMyNotifications();
+  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar />
-      <MobileNav />
+      <Sidebar unreadCount={unreadCount} />
+      <MobileNav unreadCount={unreadCount} />
       {/* paddingBottom clears the fixed BullBoost banner (52px) + safe-area + breathing room */}
       <main
         className="main-content"

@@ -294,6 +294,11 @@ export function useDeletePost() {
 // ========================
 // Profile
 // ========================
+
+// Gate profile restore writes to once per session per principal to avoid
+// repeated write calls on every 30s background refetch.
+const profileRestoredThisSession = new Set<string>();
+
 export function useMyProfile() {
   const { actor, isFetching } = useRegisteredActor();
   const { identity } = useInternetIdentity();
@@ -335,14 +340,17 @@ export function useMyProfile() {
           ? mergeWithCache(principalId, backendProfile)
           : backendProfile;
 
-        // If merge recovered fields not in the backend, push them back silently
+        // If merge recovered fields not in the backend, push them back silently.
+        // Only do this once per session to avoid repeated write calls on every refetch.
         const needsRestore =
           principalId &&
+          !profileRestoredThisSession.has(principalId) &&
           (merged.avatarUrl !== backendProfile.avatarUrl ||
             merged.bannerUrl !== backendProfile.bannerUrl ||
             merged.displayName !== backendProfile.displayName);
 
         if (needsRestore) {
+          profileRestoredThisSession.add(principalId);
           try {
             await actor.updateProfile(
               merged.displayName,
@@ -368,17 +376,21 @@ export function useMyProfile() {
       if (principalId) {
         const cached = getCachedProfile(principalId);
         if (cached?.displayName) {
-          // Re-save to backend silently so it repopulates after a canister reset
-          try {
-            await actor.updateProfile(
-              cached.displayName,
-              cached.bio,
-              cached.avatarUrl,
-              cached.location,
-              cached.bannerUrl,
-            );
-          } catch {
-            // ignore — best-effort restore
+          // Re-save to backend silently so it repopulates after a canister reset.
+          // Only once per session to avoid repeated write calls.
+          if (!profileRestoredThisSession.has(principalId)) {
+            profileRestoredThisSession.add(principalId);
+            try {
+              await actor.updateProfile(
+                cached.displayName,
+                cached.bio,
+                cached.avatarUrl,
+                cached.location,
+                cached.bannerUrl,
+              );
+            } catch {
+              // ignore — best-effort restore
+            }
           }
           return cached;
         }
@@ -476,9 +488,12 @@ export function useUpdateProfile() {
       return profileData;
     },
     onSuccess: (profileData) => {
-      // Immediately update query cache so UI never flashes empty data
+      // Directly set the query cache — this is the source of truth after a save.
+      // We do NOT call invalidateQueries here because a background refetch from
+      // the backend could race and overwrite the freshly saved data with stale/empty
+      // results (e.g. if the canister is cold-starting or the update hasn't
+      // propagated yet).  The query will naturally re-fetch on next stale check.
       qc.setQueryData(["profile", "me"], profileData);
-      qc.invalidateQueries({ queryKey: ["profile"] });
     },
     onError: (_err, vars) => {
       // Even on backend error, keep local cache up to date
@@ -894,7 +909,8 @@ export function useMyNotifications() {
       return actor.listMyNotifications();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -959,7 +975,8 @@ export function useGetMessages(user: Principal | undefined) {
       return actor.getMessagesWithUser(user);
     },
     enabled: !!actor && !isFetching && !!user,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 }
 

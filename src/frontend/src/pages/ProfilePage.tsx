@@ -27,6 +27,7 @@ import {
   useMyGarage,
   useMyProfile,
 } from "../hooks/useQueries";
+import { getCachedProfile } from "../lib/profileCache";
 import { getGiftSummary } from "../lib/revbucks";
 import { getInitials, truncatePrincipal } from "../utils/format";
 
@@ -57,11 +58,18 @@ export function ProfilePage() {
   const isRestoringProfile =
     !!myPrincipalStr && !profileLoading && !profile && profileFetching;
 
-  const displayName = profile?.displayName || truncatePrincipal(myPrincipalStr);
-  const avatarUrl = profile?.avatarUrl ?? "";
-  const bannerUrl = profile?.bannerUrl ?? "";
-  const bio = profile?.bio ?? "";
-  const location = profile?.location ?? "";
+  // Fall back to localStorage cache if the backend profile hasn't loaded yet.
+  // This mirrors what SettingsPage does so the two pages always show the same data.
+  const cachedProfile =
+    !profile && myPrincipalStr ? getCachedProfile(myPrincipalStr) : null;
+  const effectiveProfile = profile ?? cachedProfile ?? null;
+
+  const displayName =
+    effectiveProfile?.displayName || truncatePrincipal(myPrincipalStr);
+  const avatarUrl = effectiveProfile?.avatarUrl ?? "";
+  const bannerUrl = effectiveProfile?.bannerUrl ?? "";
+  const bio = effectiveProfile?.bio ?? "";
+  const location = effectiveProfile?.location ?? "";
 
   const displayPosts = posts ?? [];
   const displayGarage = garage ?? [];
@@ -107,30 +115,33 @@ export function ProfilePage() {
         </div>
       )}
 
-      {/* Profile empty state notice (not loading, not fetching, genuinely blank) */}
-      {!!myPrincipalStr && !profileLoading && !profileFetching && !profile && (
-        <div
-          className="mx-4 mt-2 mb-1 flex items-start gap-3 rounded-xl px-4 py-3"
-          style={{
-            background: "oklch(0.22 0.08 55 / 0.25)",
-            border: "1px solid oklch(0.72 0.18 55 / 0.5)",
-          }}
-        >
-          <AlertTriangle
-            size={15}
-            className="shrink-0 mt-0.5"
-            style={{ color: "oklch(0.82 0.18 65)" }}
-          />
-          <p className="text-xs" style={{ color: "oklch(0.75 0.1 65)" }}>
-            Your profile data wasn't found. Visit{" "}
-            <Link to="/settings" className="underline font-semibold">
-              Settings
-            </Link>{" "}
-            to set your display name — it will be saved so it doesn't disappear
-            again.
-          </p>
-        </div>
-      )}
+      {/* Profile empty state notice (not loading, not fetching, genuinely blank — no backend or cache data) */}
+      {!!myPrincipalStr &&
+        !profileLoading &&
+        !profileFetching &&
+        !effectiveProfile && (
+          <div
+            className="mx-4 mt-2 mb-1 flex items-start gap-3 rounded-xl px-4 py-3"
+            style={{
+              background: "oklch(0.22 0.08 55 / 0.25)",
+              border: "1px solid oklch(0.72 0.18 55 / 0.5)",
+            }}
+          >
+            <AlertTriangle
+              size={15}
+              className="shrink-0 mt-0.5"
+              style={{ color: "oklch(0.82 0.18 65)" }}
+            />
+            <p className="text-xs" style={{ color: "oklch(0.75 0.1 65)" }}>
+              Your profile data wasn't found. Visit{" "}
+              <Link to="/settings" className="underline font-semibold">
+                Settings
+              </Link>{" "}
+              to set your display name — it will be saved so it doesn't
+              disappear again.
+            </p>
+          </div>
+        )}
 
       {/* Banner */}
       <div className="relative">

@@ -52,7 +52,7 @@ export function getModelAccountData(): ModelAccountData {
     return backup;
   }
   return {
-    specialty: "JDM",
+    specialty: "Just here for the vibes 🌟",
     yearsActive: "",
     socialHandle: "",
     bookingContact: "",

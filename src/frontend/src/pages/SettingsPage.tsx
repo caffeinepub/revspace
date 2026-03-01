@@ -38,7 +38,15 @@ import { getCachedProfile } from "../lib/profileCache";
 import { validateFile } from "../lib/uploadValidator";
 import { getInitials } from "../utils/format";
 
-const MODEL_SPECIALTIES = ["JDM", "Euro", "Stance", "Muscle", "Other"];
+const MODEL_VIBES = [
+  "JDM girl 🌸",
+  "Euro scene 💜",
+  "Stance & style 🎀",
+  "Muscle & power 🔥",
+  "All about aesthetics ✨",
+  "Just here for the vibes 🌟",
+  "Car lover, full stop 🖤",
+];
 
 function ModelAccountCard() {
   const currentIsModel = isModelAccount();
@@ -51,7 +59,7 @@ function ModelAccountCard() {
     if (isModel) {
       setModelAccountData(modelData);
     }
-    toast.success("Account type saved!");
+    toast.success("Saved!");
   };
 
   return (
@@ -65,20 +73,20 @@ function ModelAccountCard() {
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-3 mb-4">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
           style={{ background: "oklch(0.5 0.18 310 / 0.2)" }}
         >
-          <Camera size={20} style={{ color: "oklch(0.75 0.2 310)" }} />
+          <Sparkles size={20} style={{ color: "oklch(0.75 0.2 310)" }} />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <p
               className="font-bold text-base"
-              style={{ color: "oklch(0.82 0.16 310)" }}
+              style={{ color: "oklch(0.88 0.16 310)" }}
             >
-              Account Type
+              Are you a model?
             </p>
             {isModel && (
               <span
@@ -93,15 +101,16 @@ function ModelAccountCard() {
               </span>
             )}
           </div>
-          <p className="text-xs" style={{ color: "oklch(0.55 0.08 310)" }}>
-            Switch between enthusiast and model account
+          <p className="text-xs" style={{ color: "oklch(0.6 0.08 310)" }}>
+            Turn this on if you post car content, shoot with builders, or just
+            love the scene
           </p>
         </div>
       </div>
 
       {/* Account type selector */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        {/* Car Enthusiast */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Regular */}
         <button
           type="button"
           onClick={() => setIsModel(false)}
@@ -144,7 +153,7 @@ function ModelAccountCard() {
                 : "oklch(var(--steel))",
             }}
           >
-            Car Enthusiast
+            Just a fan
           </span>
           {!isModel && (
             <div
@@ -156,7 +165,7 @@ function ModelAccountCard() {
           )}
         </button>
 
-        {/* Import Car Model */}
+        {/* Model */}
         <button
           type="button"
           onClick={() => setIsModel(true)}
@@ -195,7 +204,7 @@ function ModelAccountCard() {
               color: isModel ? "oklch(0.82 0.18 310)" : "oklch(var(--steel))",
             }}
           >
-            Import Car Model
+            I'm a model ✨
           </span>
           {isModel && (
             <div
@@ -210,112 +219,120 @@ function ModelAccountCard() {
 
       {/* Model-specific fields */}
       {isModel && (
-        <div className="space-y-4 mb-5">
-          {/* Specialty dropdown */}
-          <div>
-            <label
-              htmlFor="model-specialty"
-              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
-              style={{ color: "oklch(0.6 0.08 310)" }}
-            >
-              Specialty
-            </label>
-            <select
-              id="model-specialty"
-              value={modelData.specialty}
-              onChange={(e) =>
-                setModelData((d) => ({ ...d, specialty: e.target.value }))
-              }
-              className="w-full rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none"
-              style={{
-                background: "oklch(var(--surface))",
-                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
-                color: "oklch(var(--foreground))",
-              }}
-            >
-              {MODEL_SPECIALTIES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+        <>
+          <p className="text-xs mb-4" style={{ color: "oklch(0.65 0.1 310)" }}>
+            Fill in whatever feels right — none of this is required 💜
+          </p>
+          <div className="space-y-4 mb-5">
+            {/* Vibe selector */}
+            <div>
+              <label
+                htmlFor="model-specialty"
+                className="text-xs font-semibold mb-1.5 block"
+                style={{ color: "oklch(0.72 0.12 310)" }}
+              >
+                Your vibe
+              </label>
+              <select
+                id="model-specialty"
+                value={modelData.specialty}
+                onChange={(e) =>
+                  setModelData((d) => ({ ...d, specialty: e.target.value }))
+                }
+                className="w-full rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none"
+                style={{
+                  background: "oklch(var(--surface))",
+                  border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+                  color: "oklch(var(--foreground))",
+                }}
+              >
+                {MODEL_VIBES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Years Active */}
-          <div>
-            <label
-              htmlFor="model-years-active"
-              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
-              style={{ color: "oklch(0.6 0.08 310)" }}
-            >
-              Years Active
-            </label>
-            <input
-              id="model-years-active"
-              type="text"
-              value={modelData.yearsActive}
-              onChange={(e) =>
-                setModelData((d) => ({ ...d, yearsActive: e.target.value }))
-              }
-              placeholder="e.g. 2019 – Present"
-              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
-              style={{
-                background: "oklch(var(--surface))",
-                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
-              }}
-            />
-          </div>
+            {/* How long you've been shooting */}
+            <div>
+              <label
+                htmlFor="model-years-active"
+                className="text-xs font-semibold mb-1.5 block"
+                style={{ color: "oklch(0.72 0.12 310)" }}
+              >
+                How long you've been doing this
+              </label>
+              <input
+                id="model-years-active"
+                type="text"
+                value={modelData.yearsActive}
+                onChange={(e) =>
+                  setModelData((d) => ({ ...d, yearsActive: e.target.value }))
+                }
+                placeholder="e.g. just started, a year, since forever lol"
+                className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+                style={{
+                  background: "oklch(var(--surface))",
+                  border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+                }}
+              />
+            </div>
 
-          {/* Instagram Handle */}
-          <div>
-            <label
-              htmlFor="model-social-handle"
-              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
-              style={{ color: "oklch(0.6 0.08 310)" }}
-            >
-              Instagram Handle
-            </label>
-            <input
-              id="model-social-handle"
-              type="text"
-              value={modelData.socialHandle}
-              onChange={(e) =>
-                setModelData((d) => ({ ...d, socialHandle: e.target.value }))
-              }
-              placeholder="@yourusername"
-              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
-              style={{
-                background: "oklch(var(--surface))",
-                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
-              }}
-            />
-          </div>
+            {/* Socials */}
+            <div>
+              <label
+                htmlFor="model-social-handle"
+                className="text-xs font-semibold mb-1.5 block"
+                style={{ color: "oklch(0.72 0.12 310)" }}
+              >
+                Your socials (Instagram, TikTok, whatever)
+              </label>
+              <input
+                id="model-social-handle"
+                type="text"
+                value={modelData.socialHandle}
+                onChange={(e) =>
+                  setModelData((d) => ({ ...d, socialHandle: e.target.value }))
+                }
+                placeholder="@yourhandle"
+                className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+                style={{
+                  background: "oklch(var(--surface))",
+                  border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+                }}
+              />
+            </div>
 
-          {/* Booking Contact */}
-          <div>
-            <label
-              htmlFor="model-booking-contact"
-              className="text-xs font-semibold uppercase tracking-wider mb-1.5 block"
-              style={{ color: "oklch(0.6 0.08 310)" }}
-            >
-              Booking Contact
-            </label>
-            <input
-              id="model-booking-contact"
-              type="text"
-              value={modelData.bookingContact}
-              onChange={(e) =>
-                setModelData((d) => ({ ...d, bookingContact: e.target.value }))
-              }
-              placeholder="Email or phone for bookings"
-              className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
-              style={{
-                background: "oklch(var(--surface))",
-                border: "1px solid oklch(0.45 0.1 310 / 0.4)",
-              }}
-            />
+            {/* How to reach you */}
+            <div>
+              <label
+                htmlFor="model-booking-contact"
+                className="text-xs font-semibold mb-1.5 block"
+                style={{ color: "oklch(0.72 0.12 310)" }}
+              >
+                Best way to reach you
+              </label>
+              <input
+                id="model-booking-contact"
+                type="text"
+                value={modelData.bookingContact}
+                onChange={(e) =>
+                  setModelData((d) => ({
+                    ...d,
+                    bookingContact: e.target.value,
+                  }))
+                }
+                placeholder="DMs, email, link — whatever works for you"
+                className="w-full rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-steel focus:outline-none"
+                style={{
+                  background: "oklch(var(--surface))",
+                  border: "1px solid oklch(0.45 0.1 310 / 0.4)",
+                }}
+              />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Save button */}
@@ -330,8 +347,8 @@ function ModelAccountCard() {
           boxShadow: "0 4px 20px oklch(0.58 0.22 310 / 0.3)",
         }}
       >
-        <Camera size={14} />
-        Save Account Type
+        <Sparkles size={14} />
+        {isModel ? "Save my model profile" : "Save"}
       </button>
     </div>
   );
