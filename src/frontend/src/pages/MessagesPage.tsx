@@ -31,7 +31,7 @@ import {
   useSendMessage,
   useSendNotificationToUser,
 } from "../hooks/useQueries";
-import { timeAgo, truncatePrincipal } from "../utils/format";
+import { timeAgo } from "../utils/format";
 
 function ConversationItem({
   principal,
@@ -42,7 +42,7 @@ function ConversationItem({
 }) {
   const { data: profile } = useGetProfile(principal);
   const key = principal.toString();
-  const name = profile?.displayName ?? truncatePrincipal(key);
+  const name = profile?.displayName ?? "RevSpace User";
   const initial = name.slice(0, 2).toUpperCase();
 
   return (
@@ -118,9 +118,8 @@ function ChatView({
   const { data: recipientProfile } = useGetProfile(recipient);
   const { data: myProfile } = useMyProfile();
 
-  const recipientName =
-    recipientProfile?.displayName ?? truncatePrincipal(recipient.toString());
-  const senderName = myProfile?.displayName ?? truncatePrincipal(myPrincipal);
+  const recipientName = recipientProfile?.displayName ?? "RevSpace User";
+  const senderName = myProfile?.displayName ?? "RevSpace User";
 
   const displayMessages = messages ?? [];
 

@@ -26,7 +26,7 @@ function UserListItem({ principal }: { principal: Principal }) {
   const principalStr = principal.toString();
   const { data: profile, isLoading } = useGetProfile(principal);
 
-  const displayName = profile?.displayName || truncatePrincipal(principalStr);
+  const displayName = profile?.displayName || "RevSpace User";
   const avatarUrl = profile?.avatarUrl ?? "";
 
   const handleViewProfile = () => {
