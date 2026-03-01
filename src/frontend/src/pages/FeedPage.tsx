@@ -159,6 +159,10 @@ export function FeedPage() {
     Number(b.timestamp - a.timestamp),
   );
 
+  const memberCount = posts
+    ? new Set(posts.map((p) => p.author.toString())).size
+    : null;
+
   return (
     <div className="min-h-screen">
       {/* Header Banner */}
@@ -205,6 +209,18 @@ export function FeedPage() {
             <p className="text-white/70 text-sm font-medium mt-1">
               The streets are watching
             </p>
+            {memberCount !== null && memberCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                style={{
+                  background: "oklch(var(--orange) / 0.15)",
+                  color: "oklch(var(--orange))",
+                  border: "1px solid oklch(var(--orange) / 0.4)",
+                }}
+              >
+                {memberCount.toLocaleString()} members
+              </span>
+            )}
           </div>
         </div>
       </div>
