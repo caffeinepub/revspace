@@ -94,6 +94,13 @@ function mapErrorMessage(err: unknown): string {
   if (lower.includes("log in") || lower.includes("identity")) {
     return "You need to be logged in. Tap the login button and try again.";
   }
+  if (
+    lower.includes("v3") ||
+    lower.includes("certificate") ||
+    lower.includes("expected v3")
+  ) {
+    return "Upload ran into a sync issue — retrying automatically. If it keeps failing, try refreshing the page.";
+  }
   if (lower.includes("size") || lower.includes("mb")) {
     return "File is too large. Try compressing or trimming it before uploading.";
   }

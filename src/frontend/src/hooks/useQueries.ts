@@ -68,33 +68,47 @@ export function useUploadFile() {
 
       const config = await loadConfig();
 
-      // Mirror exactly how config.ts builds its agent so identity, host and
-      // root-key behaviour are identical to every other canister call.
-      // shouldSyncTime: true ensures the agent syncs its clock with the
-      // replica before the first call, preventing ingress-expiry errors
-      // that cause the v3 endpoint to fail and fall back to v2 (which
-      // breaks StorageClient's getCertificate check).
-      const agent = new HttpAgent({
-        identity,
-        host: config.backend_host,
-        shouldSyncTime: true,
-      });
-
-      if (config.backend_host?.includes("localhost")) {
-        try {
-          await agent.fetchRootKey();
-        } catch (err) {
-          console.warn("Unable to fetch root key for storage agent", err);
+      // ── Fresh synced agent factory ────────────────────────────────────────
+      // Creates a brand-new HttpAgent and immediately syncs its clock with
+      // the replica. Called on every upload and on every retry so that
+      // post-deploy clock drift never causes a persistent "Expected v3
+      // response body" error.
+      const makeFreshAgent = async (): Promise<HttpAgent> => {
+        const a = new HttpAgent({
+          identity,
+          host: config.backend_host,
+          shouldSyncTime: true,
+        });
+        if (config.backend_host?.includes("localhost")) {
+          try {
+            await a.fetchRootKey();
+          } catch {
+            // best-effort — only needed for local replica
+          }
         }
-      }
+        // Force an explicit time-sync so the very first call after a new
+        // deploy doesn't hit ingress-expiry / v3-certificate errors.
+        if (
+          typeof (a as { syncTime?: () => Promise<void> }).syncTime ===
+          "function"
+        ) {
+          try {
+            await (a as { syncTime: () => Promise<void> }).syncTime();
+          } catch {
+            // best-effort
+          }
+        }
+        return a;
+      };
 
-      const storageClient = new StorageClient(
-        config.bucket_name,
-        config.storage_gateway_url,
-        config.backend_canister_id,
-        config.project_id,
-        agent,
-      );
+      const makeStorageClient = (a: HttpAgent): StorageClient =>
+        new StorageClient(
+          config.bucket_name,
+          config.storage_gateway_url,
+          config.backend_canister_id,
+          config.project_id,
+          a,
+        );
 
       // ── Upload timeout warning ─────────────────────────────────────────────
       let timeoutToastShown = false;
@@ -111,28 +125,30 @@ export function useUploadFile() {
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
 
-        // Extra sync step before first upload attempt — ensures the agent's
-        // clock is aligned with the replica so ingress-expiry errors are
-        // avoided on the first call.
-        if (
-          typeof (agent as { syncTime?: () => Promise<void> }).syncTime ===
-          "function"
-        ) {
-          try {
-            await (agent as { syncTime: () => Promise<void> }).syncTime();
-          } catch {
-            // best-effort — proceed even if syncTime fails
-          }
-        }
-
         let result: { hash: string };
         const retryDelays = [2000, 3000, 4000];
         let lastErr: unknown;
         let succeeded = false;
 
         for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+          // On every attempt (including the first) create a fresh agent with
+          // a current time sync. This permanently eliminates the "Expected v3
+          // response body" / ingress-expiry error that hits right after a new
+          // deploy, regardless of how long the user waited before uploading.
+          let activeStorageClient: StorageClient;
           try {
-            result = await storageClient.putFile(bytes, onProgress);
+            const freshAgent = await makeFreshAgent();
+            activeStorageClient = makeStorageClient(freshAgent);
+          } catch {
+            // If agent creation itself fails, fall back to a plain agent and
+            // let the upload attempt surface the real error.
+            activeStorageClient = makeStorageClient(
+              new HttpAgent({ identity, host: config.backend_host }),
+            );
+          }
+
+          try {
+            result = await activeStorageClient.putFile(bytes, onProgress);
             succeeded = true;
             break;
           } catch (err) {
@@ -147,7 +163,7 @@ export function useUploadFile() {
             if (!isRetryable || attempt >= retryDelays.length) {
               throw err;
             }
-            // Wait before retrying
+            // Wait before retrying with a fresh agent on the next iteration
             await new Promise((r) => setTimeout(r, retryDelays[attempt]));
           }
         }
@@ -156,8 +172,11 @@ export function useUploadFile() {
           throw lastErr;
         }
 
+        // Use the last successful client to build the URL
         clearTimeout(timeoutTimer);
-        return storageClient.getDirectURL(result!.hash);
+        const lastAgent = await makeFreshAgent();
+        const urlClient = makeStorageClient(lastAgent);
+        return urlClient.getDirectURL(result!.hash);
       } catch (err) {
         clearTimeout(timeoutTimer);
         const msg = err instanceof Error ? err.message : String(err);
