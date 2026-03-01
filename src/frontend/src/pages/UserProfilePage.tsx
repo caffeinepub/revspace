@@ -20,6 +20,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { FollowListModal } from "../components/FollowListModal";
+import { FriendBadge } from "../components/FriendBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useFollowUser,
@@ -227,8 +228,9 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
           <>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h2 className="font-display text-2xl font-bold text-foreground truncate">
+                <h2 className="font-display text-2xl font-bold text-foreground flex items-center gap-1.5 flex-wrap">
                   {displayName}
+                  <FriendBadge principalStr={userId} />
                 </h2>
                 {location && (
                   <div className="flex items-center gap-1 text-steel text-xs mt-0.5">

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { FollowListModal } from "../components/FollowListModal";
+import { FriendBadge } from "../components/FriendBadge";
 import { ProBadge } from "../components/ProBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
@@ -208,6 +209,7 @@ export function ProfilePage() {
                 <h2 className="font-display text-2xl font-bold text-foreground flex items-center gap-1.5 flex-wrap">
                   {displayName}
                   <ProBadge />
+                  <FriendBadge principalStr={myPrincipalStr} />
                 </h2>
                 {location && (
                   <div className="flex items-center gap-1 text-steel text-xs mt-0.5">

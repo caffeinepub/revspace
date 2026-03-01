@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  Copy,
+  Link2,
   Loader2,
   Package,
   ShieldCheck,
@@ -762,6 +764,76 @@ export function AdminPage() {
           </span>
         </div>
       </div>
+
+      {/* Creator Invite Link */}
+      <Card
+        className="mb-4 border-0"
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(0.45 0.15 290 / 0.4)",
+        }}
+      >
+        <CardHeader className="pb-3 pt-4 px-4">
+          <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "oklch(0.45 0.15 290 / 0.15)",
+                border: "1px solid oklch(0.45 0.15 290 / 0.35)",
+              }}
+            >
+              <Link2 size={14} style={{ color: "oklch(0.72 0.18 290)" }} />
+            </div>
+            <span style={{ color: "oklch(0.72 0.18 290)" }}>
+              Creator Invite Link
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-0 space-y-3">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Share this link with your friends. Anyone who opens it will get the{" "}
+            <span
+              className="font-semibold"
+              style={{ color: "oklch(0.72 0.18 290)" }}
+            >
+              Friends with Creator
+            </span>{" "}
+            ✨ badge on their profile.
+          </p>
+          <div className="flex items-center gap-2">
+            <div
+              className="flex-1 rounded-lg px-3 py-2 text-xs font-mono truncate select-all"
+              style={{
+                background: "oklch(var(--carbon))",
+                border: "1px solid oklch(var(--border))",
+                color: "oklch(0.75 0.05 290)",
+              }}
+            >
+              https://revspace-2ah.caffeine.xyz/?ref=FRIENDOFCREATOR
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs font-bold"
+              style={{
+                background: "oklch(0.45 0.15 290 / 0.2)",
+                border: "1px solid oklch(0.45 0.15 290 / 0.5)",
+                color: "oklch(0.72 0.18 290)",
+              }}
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(
+                    "https://revspace-2ah.caffeine.xyz/?ref=FRIENDOFCREATOR",
+                  )
+                  .then(() => toast.success("Link copied!"));
+              }}
+            >
+              <Copy size={12} />
+              Copy
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card
         className="border-0"

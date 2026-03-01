@@ -83,13 +83,10 @@ const FREE_VS_PRO = [
 export function ProPage() {
   const [isPro, setIsPro] = useState(isUserPro());
 
-  // Detect Stripe redirect success: supports ?upgraded=true, ?success=true, ?pro=success
+  // Detect Stripe redirect success
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const justUpgraded =
-      params.get("upgraded") === "true" ||
-      params.get("success") === "true" ||
-      params.get("pro") === "success";
+    const justUpgraded = params.get("rs_pro") === "XR9k2mVp";
     if (justUpgraded && !isUserPro()) {
       setUserPro();
       setIsPro(true);

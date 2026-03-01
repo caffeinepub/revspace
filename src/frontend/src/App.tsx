@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { setFriendOfCreator } from "./lib/friendBadge";
 import { setUserPro } from "./lib/pro";
 import { AdminPage } from "./pages/AdminPage";
 import { BuildBattlePage } from "./pages/BuildBattlePage";
@@ -299,10 +300,7 @@ declare module "@tanstack/react-router" {
 function ProSuccessHandler() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const isProSuccess =
-      params.get("pro") === "success" ||
-      params.get("upgraded") === "true" ||
-      params.get("success") === "true";
+    const isProSuccess = params.get("rs_pro") === "XR9k2mVp";
     if (isProSuccess && window.location.pathname === "/pro") {
       setUserPro();
       toast.success("Welcome to RevSpace Pro! Your crown is now active.", {
@@ -316,10 +314,36 @@ function ProSuccessHandler() {
   return null;
 }
 
+function FriendBadgeActivator() {
+  const { identity } = useInternetIdentity();
+
+  useEffect(() => {
+    if (!identity) return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref?.toUpperCase() === "FRIENDOFCREATOR") {
+      const principalStr = identity.getPrincipal().toString();
+      setFriendOfCreator(principalStr);
+      toast.success(
+        "You've been added as a Friend of the Creator! 💜 Check your profile for the badge.",
+        { duration: 6000 },
+      );
+      // Clean the URL param without reloading
+      const cleanUrl =
+        window.location.pathname +
+        (window.location.hash ? window.location.hash : "");
+      window.history.replaceState(null, "", cleanUrl);
+    }
+  }, [identity]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <>
       <ProSuccessHandler />
+      <FriendBadgeActivator />
       <RouterProvider router={router} />
       <Toaster position="top-center" theme="dark" />
       <BullBoostBanner />
