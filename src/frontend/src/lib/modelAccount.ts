@@ -1,6 +1,14 @@
 /**
- * Model Account state — stored in localStorage with backup keys.
+ * Model Account state.
+ * Primary source of truth: on-chain profile via useUserMeta hook.
+ * Fallback: localStorage for instant reads while profile loads.
  */
+import type { UserMetaData } from "./userMeta";
+
+/** Read model status from already-decoded on-chain meta. */
+export function isModelAccountFromMeta(meta: UserMetaData): boolean {
+  return meta.isModel;
+}
 
 const MODEL_KEY = "revspace_model_account";
 const MODEL_KEY_BACKUP = "revspace_model_account_v2";

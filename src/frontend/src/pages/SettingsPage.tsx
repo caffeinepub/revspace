@@ -26,16 +26,17 @@ import {
   useUpdateProfile,
   useUploadFile,
 } from "../hooks/useQueries";
+import { useUserMeta } from "../hooks/useUserMeta";
 import { convertToJpegIfNeeded } from "../lib/convertHeic";
-import {
-  getModelAccountData,
-  isModelAccount,
-  setModelAccount,
-  setModelAccountData,
-} from "../lib/modelAccount";
-import { isUserPro } from "../lib/pro";
+import { setModelAccount, setModelAccountData } from "../lib/modelAccount";
+import { setUserPro } from "../lib/pro";
 import { getCachedProfile } from "../lib/profileCache";
 import { validateFile } from "../lib/uploadValidator";
+import {
+  decodeMetaFromLocation,
+  encodeMetaToLocation,
+  getDisplayLocation,
+} from "../lib/userMeta";
 import { getInitials } from "../utils/format";
 
 const MODEL_VIBES = [
@@ -49,17 +50,51 @@ const MODEL_VIBES = [
 ];
 
 function ModelAccountCard() {
-  const currentIsModel = isModelAccount();
-  const [isModel, setIsModel] = useState(currentIsModel);
-  const currentData = getModelAccountData();
-  const [modelData, setModelData] = useState(currentData);
+  const { meta, isLoading: metaLoading, saveMeta, isSaving } = useUserMeta();
 
-  const handleSave = () => {
-    setModelAccount(isModel);
-    if (isModel) {
-      setModelAccountData(modelData);
+  // Local editing state — initialized from on-chain meta when it loads
+  const [isModel, setIsModel] = useState(false);
+  const [modelData, setModelData] = useState({
+    specialty: "Just here for the vibes 🌟",
+    yearsActive: "",
+    socialHandle: "",
+    bookingContact: "",
+  });
+  const [metaInitialized, setMetaInitialized] = useState(false);
+
+  // Sync local state from on-chain meta (once, when loaded)
+  useEffect(() => {
+    if (!metaLoading && !metaInitialized) {
+      setIsModel(meta.isModel);
+      setModelData({
+        specialty: meta.modelSpecialty || "Just here for the vibes 🌟",
+        yearsActive: meta.modelYearsActive || "",
+        socialHandle: meta.modelSocialHandle || "",
+        bookingContact: meta.modelBookingContact || "",
+      });
+      setMetaInitialized(true);
     }
-    toast.success("Saved!");
+  }, [meta, metaLoading, metaInitialized]);
+
+  const handleSave = async () => {
+    // Save to on-chain profile (primary) + localStorage (backup)
+    try {
+      await saveMeta({
+        isModel,
+        modelSpecialty: modelData.specialty,
+        modelSocialHandle: modelData.socialHandle,
+        modelBookingContact: modelData.bookingContact,
+        modelYearsActive: modelData.yearsActive,
+      });
+      // Backup to localStorage for instant reads during profile load
+      setModelAccount(isModel);
+      if (isModel) {
+        setModelAccountData(modelData);
+      }
+      toast.success("Saved!");
+    } catch {
+      toast.error("Failed to save. Please try again.");
+    }
   };
 
   return (
@@ -338,8 +373,11 @@ function ModelAccountCard() {
       {/* Save button */}
       <button
         type="button"
-        onClick={handleSave}
-        className="w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98]"
+        onClick={() => {
+          void handleSave();
+        }}
+        disabled={isSaving || metaLoading}
+        className="w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
         style={{
           background:
             "linear-gradient(135deg, oklch(0.58 0.22 310) 0%, oklch(0.5 0.2 300) 100%)",
@@ -347,8 +385,12 @@ function ModelAccountCard() {
           boxShadow: "0 4px 20px oklch(0.58 0.22 310 / 0.3)",
         }}
       >
-        <Sparkles size={14} />
-        {isModel ? "Save my model profile" : "Save"}
+        {isSaving ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <Sparkles size={14} />
+        )}
+        {isSaving ? "Saving..." : isModel ? "Save my model profile" : "Save"}
       </button>
     </div>
   );
@@ -365,7 +407,9 @@ const PRO_PERKS = [
 ];
 
 function ProCard() {
-  const isPro = isUserPro();
+  const { meta, isLoading: metaLoading } = useUserMeta();
+  // Use on-chain meta as primary source; fall back to localStorage during load
+  const isPro = metaLoading ? false : meta.isPro;
 
   if (isPro) {
     return (
@@ -502,6 +546,7 @@ export function SettingsPage() {
     bio: "",
     avatarUrl: "",
     bannerUrl: "",
+    // The location field in the form always holds the DISPLAY location (no __meta__ prefix)
     location: "",
   });
 
@@ -521,7 +566,8 @@ export function SettingsPage() {
         bio: profile.bio ?? "",
         avatarUrl: profile.avatarUrl ?? "",
         bannerUrl: profile.bannerUrl ?? "",
-        location: profile.location ?? "",
+        // Strip __meta__ prefix so the user sees/edits only their real location
+        location: getDisplayLocation(profile.location ?? ""),
       });
       setInitialized(true);
     } else if (!profile && !initialized && identity) {
@@ -535,7 +581,7 @@ export function SettingsPage() {
           bio: cached.bio ?? "",
           avatarUrl: cached.avatarUrl ?? "",
           bannerUrl: cached.bannerUrl ?? "",
-          location: cached.location ?? "",
+          location: getDisplayLocation(cached.location ?? ""),
         });
         // Don't set initialized=true here: when the real backend profile
         // arrives we'll overwrite the form with the authoritative data.
@@ -615,10 +661,19 @@ export function SettingsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile.mutate(form, {
-      onSuccess: () => toast.success("Profile updated! ✅"),
-      onError: () => toast.error("Failed to update profile"),
+    // Re-encode location: preserve existing __meta__ data, update only loc
+    const currentMeta = decodeMetaFromLocation(profile?.location ?? "");
+    const encodedLocation = encodeMetaToLocation({
+      ...currentMeta,
+      loc: form.location,
     });
+    updateProfile.mutate(
+      { ...form, location: encodedLocation },
+      {
+        onSuccess: () => toast.success("Profile updated! ✅"),
+        onError: () => toast.error("Failed to update profile"),
+      },
+    );
   };
 
   const isBusy = avatarUploading || bannerUploading;
@@ -754,7 +809,7 @@ export function SettingsPage() {
                 {form.displayName || "Your Name"}
               </p>
               <p className="text-xs text-steel">
-                {form.location || "No location set"}
+                {getDisplayLocation(form.location) || "No location set"}
               </p>
             </div>
           </div>

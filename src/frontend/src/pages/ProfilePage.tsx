@@ -30,6 +30,7 @@ import {
 } from "../hooks/useQueries";
 import { getCachedProfile } from "../lib/profileCache";
 import { getGiftSummary } from "../lib/revbucks";
+import { getDisplayLocation } from "../lib/userMeta";
 import { getInitials, truncatePrincipal } from "../utils/format";
 
 export function ProfilePage() {
@@ -70,7 +71,7 @@ export function ProfilePage() {
   const avatarUrl = effectiveProfile?.avatarUrl ?? "";
   const bannerUrl = effectiveProfile?.bannerUrl ?? "";
   const bio = effectiveProfile?.bio ?? "";
-  const location = effectiveProfile?.location ?? "";
+  const location = getDisplayLocation(effectiveProfile?.location ?? "");
 
   const displayPosts = posts ?? [];
   const displayGarage = garage ?? [];

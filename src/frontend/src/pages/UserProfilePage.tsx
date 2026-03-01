@@ -33,6 +33,7 @@ import {
   useUnfollowUser,
 } from "../hooks/useQueries";
 import { getGiftSummary } from "../lib/revbucks";
+import { getDisplayLocation } from "../lib/userMeta";
 import { getInitials, truncatePrincipal } from "../utils/format";
 
 interface UserProfilePageProps {
@@ -77,7 +78,7 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
   const avatarUrl = profile?.avatarUrl ?? "";
   const bannerUrl = profile?.bannerUrl ?? "";
   const bio = profile?.bio ?? "";
-  const location = profile?.location ?? "";
+  const location = getDisplayLocation(profile?.location ?? "");
 
   const displayPosts = posts ?? [];
   const displayGarage = garage ?? [];

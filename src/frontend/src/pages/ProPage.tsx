@@ -5,6 +5,7 @@ import {
   CheckCircle,
   Crown,
   Film,
+  Loader2,
   MessageCircle,
   Shield,
   Star,
@@ -14,7 +15,8 @@ import {
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { isUserPro, setUserPro } from "../lib/pro";
+import { useUserMeta } from "../hooks/useUserMeta";
+import { setUserPro } from "../lib/pro";
 
 const PRO_PERKS = [
   {
@@ -81,24 +83,41 @@ const FREE_VS_PRO = [
 ];
 
 export function ProPage() {
-  const [isPro, setIsPro] = useState(isUserPro());
+  const { meta, isLoading: metaLoading, saveMeta } = useUserMeta();
+  const [upgradeHandled, setUpgradeHandled] = useState(false);
 
-  // Detect Stripe redirect success
+  // Derive isPro from on-chain meta (primary) once loaded
+  const isPro = meta.isPro;
+
+  // Detect Stripe redirect success — save on-chain + localStorage backup
   useEffect(() => {
+    if (metaLoading || upgradeHandled) return;
     const params = new URLSearchParams(window.location.search);
     const justUpgraded = params.get("rs_pro") === "XR9k2mVp";
-    if (justUpgraded && !isUserPro()) {
-      setUserPro();
-      setIsPro(true);
-      toast.success("Welcome to RevSpace Pro! Your crown is now active.", {
-        duration: 6000,
-      });
+    if (justUpgraded) {
+      setUpgradeHandled(true);
       window.history.replaceState(null, "", "/pro");
-    } else if (justUpgraded && isUserPro()) {
-      // Already pro, just clean the URL
-      window.history.replaceState(null, "", "/pro");
+      if (!meta.isPro) {
+        // Save Pro status on-chain
+        saveMeta({ isPro: true })
+          .then(() => {
+            toast.success(
+              "Welcome to RevSpace Pro! Your crown is now active.",
+              {
+                duration: 6000,
+              },
+            );
+          })
+          .catch(() => {
+            toast.error(
+              "Could not save Pro status. Please visit Settings to save your profile.",
+            );
+          });
+        // Also write localStorage backup for instant reads during load
+        setUserPro();
+      }
     }
-  }, []);
+  }, [metaLoading, upgradeHandled, meta.isPro, saveMeta]);
 
   return (
     <div className="min-h-screen pb-20">
@@ -152,7 +171,16 @@ export function ProPage() {
             who want to stand out.
           </motion.p>
 
-          {isPro ? (
+          {metaLoading ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="inline-flex items-center gap-2 px-6 py-3 text-white/60"
+            >
+              <Loader2 size={20} className="animate-spin" />
+              Loading status…
+            </motion.div>
+          ) : isPro ? (
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

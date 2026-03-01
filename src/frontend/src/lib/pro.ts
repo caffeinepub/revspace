@@ -1,11 +1,18 @@
 /**
  * RevSpace Pro membership utilities.
- * Pro status is tracked in localStorage for instant access.
+ * Primary source of truth: on-chain profile via useUserMeta hook.
+ * Fallback: localStorage for instant reads while profile loads.
  * Written to TWO keys so it survives independent cache-clear events.
  */
+import type { UserMetaData } from "./userMeta";
 
 const PRO_KEY = "revspace_pro";
 const PRO_KEY_V2 = "revspace_pro_v2";
+
+/** Read Pro status from already-decoded on-chain meta. */
+export function isUserProFromMeta(meta: UserMetaData): boolean {
+  return meta.isPro;
+}
 
 export function isUserPro(): boolean {
   const primary = localStorage.getItem(PRO_KEY) === "true";

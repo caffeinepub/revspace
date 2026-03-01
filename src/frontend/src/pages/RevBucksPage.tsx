@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import {
   Coins,
   ExternalLink,
+  Loader2,
   Lock,
   Package,
   ShoppingBag,
@@ -22,7 +23,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { isModelAccount } from "../lib/modelAccount";
+import { useUserMeta } from "../hooks/useUserMeta";
+import { isModelAccountFromMeta } from "../lib/modelAccount";
 import {
   MODEL_GIFT_ITEMS,
   RARITY_CONFIG,
@@ -58,12 +60,14 @@ function SendGiftModal({
   myBalance,
   onClose,
   onSent,
+  onDeductBalance,
 }: {
   item: ShopItem | null;
   myPrincipal: string;
   myBalance: number;
   onClose: () => void;
   onSent: () => void;
+  onDeductBalance?: (cost: number) => void;
 }) {
   const [recipient, setRecipient] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -104,11 +108,13 @@ function SendGiftModal({
         giftEmoji: item.emoji,
         fromPrincipal: myPrincipal,
       });
+      // Propagate balance change to on-chain (best-effort)
+      onDeductBalance?.(item.cost);
       toast.success(`${item.emoji} ${item.name} sent!`);
       setIsSending(false);
       onSent();
     }, 600);
-  }, [item, recipient, canAfford, myPrincipal, onSent]);
+  }, [item, recipient, canAfford, myPrincipal, onSent, onDeductBalance]);
 
   const rarityConfig = item ? RARITY_CONFIG[item.rarity] : null;
 
@@ -317,13 +323,16 @@ function ShopTab({
   myPrincipal,
   balance,
   onBalanceChange,
+  isModel,
+  onDeductBalance,
 }: {
   myPrincipal: string;
   balance: number;
   onBalanceChange: () => void;
+  isModel: boolean;
+  onDeductBalance?: (cost: number) => void;
 }) {
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
-  const isModel = isModelAccount();
 
   const renderItemCard = (item: ShopItem) => {
     const canAfford = balance >= item.cost;
@@ -555,6 +564,7 @@ function ShopTab({
         myPrincipal={myPrincipal}
         myBalance={balance}
         onClose={() => setSelectedItem(null)}
+        onDeductBalance={onDeductBalance}
         onSent={() => {
           setSelectedItem(null);
           onBalanceChange();
@@ -823,36 +833,82 @@ function HistoryTab({ myPrincipal }: { myPrincipal: string }) {
 export function RevBucksPage() {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toText() ?? "";
-  const [balanceTick, setBalanceTick] = useState(0);
-  const balance = getBalance(myPrincipal);
+  const {
+    meta,
+    isLoading: metaLoading,
+    saveMeta,
+    profileLoaded,
+  } = useUserMeta();
 
-  const refreshBalance = useCallback(() => setBalanceTick((t) => t + 1), []);
-  // Suppress unused variable lint — balanceTick is intentionally used as
-  // a re-render trigger; the actual balance is read inline from localStorage.
-  void balanceTick;
+  // On-chain balance is primary; fall back to localStorage while profile loads
+  const onChainBalance = meta.rb;
+  const localBalance = getBalance(myPrincipal);
+  // Show on-chain balance once loaded, otherwise show localStorage balance
+  const balance = profileLoaded ? onChainBalance : localBalance;
+  const isModel = isModelAccountFromMeta(meta);
+
+  // Track if the Stripe redirect has been handled to avoid double-crediting
+  const [purchaseHandled, setPurchaseHandled] = useState(false);
+
+  const refreshBalance = useCallback(() => {
+    // Force a React Query cache invalidation by triggering re-render
+    // (on-chain balance comes from React Query so it auto-refreshes)
+  }, []);
 
   // Auto-credit 550 RB when Stripe redirects back with ?purchased=true or ?success=true.
+  // Save BOTH on-chain (primary) AND localStorage (backup).
   // This is the ONLY place credits are issued — the Stripe link button does NOT credit RB
-  // on click to prevent double-counting (once on click, once on return).
+  // on click to prevent double-counting.
   useEffect(() => {
-    if (!myPrincipal) return;
+    if (!myPrincipal || metaLoading || purchaseHandled || !profileLoaded)
+      return;
     const params = new URLSearchParams(window.location.search);
     if (
       params.get("purchased") === "true" ||
       params.get("success") === "true"
     ) {
-      recordPurchase(myPrincipal, 550, "RevBucks Pack");
-      refreshBalance();
-      toast.success("⚡ 550 RevBucks added to your balance!", {
-        duration: 5000,
-      });
-      // Remove the query param so it doesn't re-credit on refresh
+      setPurchaseHandled(true);
+      // Remove query params immediately to prevent re-crediting on refresh
       const url = new URL(window.location.href);
       url.searchParams.delete("purchased");
       url.searchParams.delete("success");
       window.history.replaceState({}, "", url.toString());
+
+      const newBalance = onChainBalance + 550;
+      // Save on-chain (primary)
+      saveMeta({ rb: newBalance })
+        .then(() => {
+          toast.success("⚡ 550 RevBucks added to your balance!", {
+            duration: 5000,
+          });
+        })
+        .catch(() => {
+          toast.error(
+            "Could not save balance on-chain. Check your balance in Settings.",
+          );
+        });
+      // Also update localStorage backup
+      recordPurchase(myPrincipal, 550, "RevBucks Pack");
     }
-  }, [myPrincipal, refreshBalance]);
+  }, [
+    myPrincipal,
+    metaLoading,
+    purchaseHandled,
+    profileLoaded,
+    onChainBalance,
+    saveMeta,
+  ]);
+
+  const handleDeductBalance = useCallback(
+    (cost: number) => {
+      const newBalance = Math.max(0, onChainBalance - cost);
+      // Save on-chain asynchronously (best-effort — localStorage is already updated)
+      saveMeta({ rb: newBalance }).catch(() => {
+        // Silently fail — localStorage is still updated as backup
+      });
+    },
+    [onChainBalance, saveMeta],
+  );
 
   if (!myPrincipal) {
     return (
@@ -878,8 +934,14 @@ export function RevBucksPage() {
             color: "oklch(var(--orange-bright))",
           }}
         >
-          <Zap size={14} />
-          {balance.toLocaleString()} RB
+          {metaLoading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <>
+              <Zap size={14} />
+              {balance.toLocaleString()} RB
+            </>
+          )}
         </div>
       </header>
 
@@ -909,7 +971,9 @@ export function RevBucksPage() {
               <ShopTab
                 myPrincipal={myPrincipal}
                 balance={balance}
+                isModel={isModel}
                 onBalanceChange={refreshBalance}
+                onDeductBalance={handleDeductBalance}
               />
             </TabsContent>
             <TabsContent value="balance">
@@ -922,6 +986,7 @@ export function RevBucksPage() {
         </Tabs>
       </div>
 
+      {/* Hidden: pass deduct handler to SendGiftModal via ShopTab context — handled via prop */}
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © {new Date().getFullYear()}. Built with ❤️ using{" "}

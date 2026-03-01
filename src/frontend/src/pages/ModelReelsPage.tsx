@@ -7,11 +7,12 @@ import {
   Film,
   Heart,
   MessageCircle,
+  Settings,
   Share2,
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
@@ -20,10 +21,19 @@ import {
   useLikePost,
   useUnlikePost,
 } from "../hooks/useQueries";
-import { isModelAccount } from "../lib/modelAccount";
+import { useUserMeta } from "../hooks/useUserMeta";
+import { decodeMetaFromLocation } from "../lib/userMeta";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
 const MODEL_SPECIALTIES = ["All", "JDM", "Euro", "Stance", "Muscle", "Other"];
+
+// ─── Hook: check if a profile's location encodes isModel: true ────────────────
+function useIsModelAuthor(author: Principal | undefined) {
+  const { data: profile } = useGetProfile(author);
+  if (!profile) return null; // null = still loading
+  const meta = decodeMetaFromLocation(profile.location ?? "");
+  return meta.isModel;
+}
 
 // ─── Author row for model reels ───────────────────────────────────────────────
 function ModelReelAuthor({ author }: { author: Principal }) {
@@ -277,6 +287,41 @@ function ModelVideoCard({
   );
 }
 
+// ─── Model-gated wrapper: only renders if author is a model account ────────────
+function ModelReelCardGated({
+  post,
+  isMuted,
+  onToggleMute,
+  myPrincipal,
+  onConfirmModel,
+}: {
+  post: ModelVideoCardProps["post"];
+  isMuted: boolean;
+  onToggleMute: () => void;
+  myPrincipal?: string;
+  onConfirmModel: (authorId: string, isModel: boolean) => void;
+}) {
+  const isModelAuthor = useIsModelAuthor(post.author);
+
+  useEffect(() => {
+    if (isModelAuthor !== null) {
+      onConfirmModel(post.author.toString(), isModelAuthor);
+    }
+  }, [isModelAuthor, post.author, onConfirmModel]);
+
+  // Show card while still loading (optimistic), hide once confirmed non-model
+  if (isModelAuthor === false) return null;
+
+  return (
+    <ModelVideoCard
+      post={post}
+      isMuted={isMuted}
+      onToggleMute={onToggleMute}
+      myPrincipal={myPrincipal}
+    />
+  );
+}
+
 // ─── ModelReelsPage ────────────────────────────────────────────────────────────
 export function ModelReelsPage() {
   const { data: posts, isLoading } = useGetAllPosts();
@@ -284,20 +329,51 @@ export function ModelReelsPage() {
   const myPrincipal = identity?.getPrincipal().toString();
   const [selectedSpecialty, setSelectedSpecialty] = useState("All");
   const [isMuted, setIsMuted] = useState(true);
-  const isModel = isModelAccount();
+  const { meta } = useUserMeta();
+  const isMyAccountModel = meta.isModel;
+
+  // Track which authors we've confirmed as model or non-model
+  const [authorModelStatus, setAuthorModelStatus] = useState<
+    Record<string, boolean>
+  >({});
+
+  const handleConfirmModel = (authorId: string, isModel: boolean) => {
+    setAuthorModelStatus((prev) => {
+      if (prev[authorId] === isModel) return prev; // no change
+      return { ...prev, [authorId]: isModel };
+    });
+  };
 
   // Filter to video/reel posts only
-  const videoPosts = (posts ?? []).filter(
-    (p) => p.postType === "Reel" || p.postType === "Video",
+  const videoPosts = useMemo(
+    () =>
+      (posts ?? []).filter(
+        (p) => p.postType === "Reel" || p.postType === "Video",
+      ),
+    [posts],
   );
 
   // Filter by specialty/topic
-  const displayPosts =
-    selectedSpecialty === "All"
-      ? videoPosts
-      : videoPosts.filter(
-          (p) => p.topic.toLowerCase() === selectedSpecialty.toLowerCase(),
-        );
+  const topicFilteredPosts = useMemo(
+    () =>
+      selectedSpecialty === "All"
+        ? videoPosts
+        : videoPosts.filter(
+            (p) => p.topic.toLowerCase() === selectedSpecialty.toLowerCase(),
+          ),
+    [videoPosts, selectedSpecialty],
+  );
+
+  // The posts that we know are from model accounts (exclude confirmed non-models)
+  const displayPosts = useMemo(
+    () =>
+      topicFilteredPosts.filter((p) => {
+        const status = authorModelStatus[p.author.toString()];
+        // Show if: confirmed model, OR not yet checked (optimistic display)
+        return status !== false;
+      }),
+    [topicFilteredPosts, authorModelStatus],
+  );
 
   return (
     <div className="min-h-screen">
@@ -307,7 +383,7 @@ export function ModelReelsPage() {
           <Clapperboard size={22} style={{ color: "oklch(0.72 0.2 310)" }} />
           <h1 className="font-display text-2xl font-bold">Model Reels</h1>
         </div>
-        {isModel && (
+        {isMyAccountModel && (
           <span
             className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wide"
             style={{
@@ -322,8 +398,50 @@ export function ModelReelsPage() {
       </header>
 
       <div className="px-4 pb-6">
-        {/* Model account banner */}
-        {isModel && (
+        {/* Model-only notice */}
+        {!isMyAccountModel && (
+          <div
+            className="rounded-xl p-4 mb-5 flex items-start gap-3"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.14 0.06 310 / 0.5), oklch(0.11 0.03 310 / 0.8))",
+              border: "1px solid oklch(0.45 0.14 310 / 0.5)",
+            }}
+          >
+            <span className="text-xl shrink-0">🎬</span>
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "oklch(0.88 0.14 310)" }}
+              >
+                Only model accounts can post here
+              </p>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "oklch(0.6 0.08 310)" }}
+              >
+                Switch to a Model Account in Settings to post your reels here.
+              </p>
+            </div>
+            <Link to="/settings" className="shrink-0">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:brightness-110"
+                style={{
+                  background: "oklch(0.5 0.18 310 / 0.3)",
+                  color: "oklch(0.82 0.2 310)",
+                  border: "1px solid oklch(0.55 0.18 310 / 0.4)",
+                }}
+              >
+                <Settings size={12} />
+                Settings
+              </button>
+            </Link>
+          </div>
+        )}
+
+        {/* Model account active banner */}
+        {isMyAccountModel && (
           <div
             className="rounded-xl p-4 mb-5 flex items-center gap-3"
             style={{
@@ -394,7 +512,7 @@ export function ModelReelsPage() {
           </div>
         )}
 
-        {/* Empty state */}
+        {/* Empty state — only show when posts have loaded AND we've checked authors */}
         {!isLoading && displayPosts.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div
@@ -410,32 +528,35 @@ export function ModelReelsPage() {
             </h3>
             <p className="text-steel text-sm mb-6 max-w-xs">
               {selectedSpecialty === "All"
-                ? "Upload a video reel from the Create Post page to see it here."
-                : "Be the first to upload a reel with this specialty tag."}
+                ? "Model accounts can upload reels from the Create Post page."
+                : "Be the first model to upload a reel with this tag."}
             </p>
-            <Link to="/create">
-              <Button
-                style={{
-                  background: "oklch(0.6 0.22 310)",
-                  color: "white",
-                }}
-              >
-                Upload Reel
-              </Button>
-            </Link>
+            {isMyAccountModel && (
+              <Link to="/create">
+                <Button
+                  style={{
+                    background: "oklch(0.6 0.22 310)",
+                    color: "white",
+                  }}
+                >
+                  Upload Reel
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
         {/* Reel grid */}
-        {!isLoading && displayPosts.length > 0 && (
+        {!isLoading && topicFilteredPosts.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {displayPosts.map((post) => (
-              <ModelVideoCard
+            {topicFilteredPosts.map((post) => (
+              <ModelReelCardGated
                 key={post.id}
                 post={post}
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted((m) => !m)}
                 myPrincipal={myPrincipal}
+                onConfirmModel={handleConfirmModel}
               />
             ))}
           </div>

@@ -2,8 +2,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Principal } from "@icp-sdk/core/principal";
 import { Link } from "@tanstack/react-router";
-import { Heart, Image, LayoutGrid, X } from "lucide-react";
-import { useState } from "react";
+import { Heart, Image, LayoutGrid, Settings, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
@@ -12,9 +12,19 @@ import {
   useLikePost,
   useUnlikePost,
 } from "../hooks/useQueries";
+import { useUserMeta } from "../hooks/useUserMeta";
+import { decodeMetaFromLocation } from "../lib/userMeta";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
 const MODEL_SPECIALTIES = ["All", "JDM", "Euro", "Stance", "Muscle", "Other"];
+
+// ─── Hook: check if a profile's location encodes isModel: true ────────────────
+function useIsModelAuthor(author: Principal | undefined) {
+  const { data: profile } = useGetProfile(author);
+  if (!profile) return null; // null = still loading
+  const meta = decodeMetaFromLocation(profile.location ?? "");
+  return meta.isModel;
+}
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 interface LightboxPost {
@@ -253,6 +263,30 @@ function GalleryThumb({ post, onClick }: GalleryThumbProps) {
   );
 }
 
+// ─── Model-gated thumbnail: only renders if author is a model account ──────────
+function ModelGalleryThumbGated({
+  post,
+  onClick,
+  onConfirmModel,
+}: {
+  post: LightboxPost;
+  onClick: () => void;
+  onConfirmModel: (authorId: string, isModel: boolean) => void;
+}) {
+  const isModelAuthor = useIsModelAuthor(post.author);
+
+  useEffect(() => {
+    if (isModelAuthor !== null) {
+      onConfirmModel(post.author.toString(), isModelAuthor);
+    }
+  }, [isModelAuthor, post.author, onConfirmModel]);
+
+  // Show while loading (optimistic), hide once confirmed non-model
+  if (isModelAuthor === false) return null;
+
+  return <GalleryThumb post={post} onClick={onClick} />;
+}
+
 // ─── ModelGalleryPage ─────────────────────────────────────────────────────────
 export function ModelGalleryPage() {
   const { data: posts, isLoading } = useGetAllPosts();
@@ -260,18 +294,49 @@ export function ModelGalleryPage() {
   const myPrincipal = identity?.getPrincipal().toString();
   const [selectedSpecialty, setSelectedSpecialty] = useState("All");
   const [lightboxPost, setLightboxPost] = useState<LightboxPost | null>(null);
+  const { meta } = useUserMeta();
+  const isMyAccountModel = meta.isModel;
+
+  // Track which authors we've confirmed as model or non-model
+  const [authorModelStatus, setAuthorModelStatus] = useState<
+    Record<string, boolean>
+  >({});
+
+  const handleConfirmModel = (authorId: string, isModel: boolean) => {
+    setAuthorModelStatus((prev) => {
+      if (prev[authorId] === isModel) return prev;
+      return { ...prev, [authorId]: isModel };
+    });
+  };
 
   // Filter to photo posts only
-  const photoPosts = (posts ?? []).filter(
-    (p) => p.postType === "Photo" && p.mediaUrls.length > 0,
+  const photoPosts = useMemo(
+    () =>
+      (posts ?? []).filter(
+        (p) => p.postType === "Photo" && p.mediaUrls.length > 0,
+      ),
+    [posts],
   );
 
-  const displayPosts =
-    selectedSpecialty === "All"
-      ? photoPosts
-      : photoPosts.filter(
-          (p) => p.topic.toLowerCase() === selectedSpecialty.toLowerCase(),
-        );
+  const topicFilteredPosts = useMemo(
+    () =>
+      selectedSpecialty === "All"
+        ? photoPosts
+        : photoPosts.filter(
+            (p) => p.topic.toLowerCase() === selectedSpecialty.toLowerCase(),
+          ),
+    [photoPosts, selectedSpecialty],
+  );
+
+  // Posts confirmed as from model accounts (exclude confirmed non-models)
+  const displayPosts = useMemo(
+    () =>
+      topicFilteredPosts.filter((p) => {
+        const status = authorModelStatus[p.author.toString()];
+        return status !== false; // show if model or unconfirmed
+      }),
+    [topicFilteredPosts, authorModelStatus],
+  );
 
   return (
     <div className="min-h-screen">
@@ -284,6 +349,48 @@ export function ModelGalleryPage() {
       </header>
 
       <div className="px-4 pb-6">
+        {/* Model-only notice for non-model viewers */}
+        {!isMyAccountModel && (
+          <div
+            className="rounded-xl p-4 mb-5 flex items-start gap-3"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.14 0.06 310 / 0.5), oklch(0.11 0.03 310 / 0.8))",
+              border: "1px solid oklch(0.45 0.14 310 / 0.5)",
+            }}
+          >
+            <span className="text-xl shrink-0">📸</span>
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "oklch(0.88 0.14 310)" }}
+              >
+                Only model accounts can post here
+              </p>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "oklch(0.6 0.08 310)" }}
+              >
+                Switch to a Model Account in Settings to post your photos here.
+              </p>
+            </div>
+            <Link to="/settings" className="shrink-0">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:brightness-110"
+                style={{
+                  background: "oklch(0.5 0.18 310 / 0.3)",
+                  color: "oklch(0.82 0.2 310)",
+                  border: "1px solid oklch(0.55 0.18 310 / 0.4)",
+                }}
+              >
+                <Settings size={12} />
+                Settings
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* Specialty filter bar */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
           {MODEL_SPECIALTIES.map((s) => (
@@ -335,34 +442,38 @@ export function ModelGalleryPage() {
             </div>
             <h3 className="font-display text-lg font-bold text-foreground mb-2">
               {selectedSpecialty === "All"
-                ? "No Photos Yet"
+                ? "No Model Photos Yet"
                 : `No "${selectedSpecialty}" Photos`}
             </h3>
             <p className="text-steel text-sm mb-6 max-w-xs">
-              Upload a photo post from the Create Post page and select "Photo"
-              as the type.
+              {selectedSpecialty === "All"
+                ? "Model accounts can upload photos from the Create Post page."
+                : "Be the first model to upload a photo with this tag."}
             </p>
-            <Link to="/create">
-              <Button
-                style={{
-                  background: "oklch(0.6 0.22 310)",
-                  color: "white",
-                }}
-              >
-                Upload Photo
-              </Button>
-            </Link>
+            {isMyAccountModel && (
+              <Link to="/create">
+                <Button
+                  style={{
+                    background: "oklch(0.6 0.22 310)",
+                    color: "white",
+                  }}
+                >
+                  Upload Photo
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
-        {/* Photo grid */}
-        {!isLoading && displayPosts.length > 0 && (
+        {/* Photo grid — render gated thumbnails for all topic-filtered posts */}
+        {!isLoading && topicFilteredPosts.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
-            {displayPosts.map((post) => (
-              <GalleryThumb
+            {topicFilteredPosts.map((post) => (
+              <ModelGalleryThumbGated
                 key={post.id}
                 post={post}
                 onClick={() => setLightboxPost(post)}
+                onConfirmModel={handleConfirmModel}
               />
             ))}
           </div>
