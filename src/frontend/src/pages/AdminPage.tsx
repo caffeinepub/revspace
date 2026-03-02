@@ -684,33 +684,34 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
   const [error, setError] = useState("");
 
   async function handleClaim() {
-    if (!token.trim() || !actor) return;
+    if (!token.trim()) return;
     setIsPending(true);
     setError("");
-    try {
-      // Always try the hardcoded admin password first, then fall back to
-      // whatever token was entered so the backend secret also works.
-      const tokenToSend =
-        token.trim() === "Meonly123$" ? "Meonly123$" : token.trim();
 
+    const entered = token.trim();
+
+    // Hardcoded password check — always works regardless of backend state
+    if (entered === "Meonly123$") {
+      localStorage.setItem("rs_admin_unlocked", "Meonly123$");
+      toast.success("Admin access granted!");
+      setIsPending(false);
+      onSuccess();
+      return;
+    }
+
+    // Fallback: try the backend token if actor is available
+    if (!actor) {
+      setError("Incorrect token. Try again.");
+      setIsPending(false);
+      return;
+    }
+
+    try {
       const actorWithInit = actor as typeof actor & {
         _initializeAccessControlWithSecret(secret: string): Promise<void>;
       };
-
-      // Try with the entered token
-      await actorWithInit._initializeAccessControlWithSecret(tokenToSend);
-      let isNowAdmin = await actor.isCallerAdmin();
-
-      // If that didn't work and the user entered the hardcoded password, also
-      // try sending "Meonly123$" directly (in case the backend token differs).
-      if (!isNowAdmin && token.trim() === "Meonly123$") {
-        // Grant admin locally by storing the flag — panel becomes accessible
-        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
-        toast.success("Admin access granted!");
-        onSuccess();
-        return;
-      }
-
+      await actorWithInit._initializeAccessControlWithSecret(entered);
+      const isNowAdmin = await actor.isCallerAdmin();
       if (isNowAdmin) {
         localStorage.setItem("rs_admin_unlocked", "Meonly123$");
         toast.success("Admin access granted!");
@@ -719,14 +720,7 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
         setError("Incorrect token. Try again.");
       }
     } catch {
-      // If backend call fails but password matches, still grant access
-      if (token.trim() === "Meonly123$") {
-        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
-        toast.success("Admin access granted!");
-        onSuccess();
-      } else {
-        setError("Incorrect token. Try again.");
-      }
+      setError("Incorrect token. Try again.");
     } finally {
       setIsPending(false);
     }

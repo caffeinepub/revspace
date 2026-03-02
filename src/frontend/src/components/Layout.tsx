@@ -12,8 +12,8 @@ import {
   Home,
   Info,
   LayoutGrid,
-  Menu,
   MessageCircle,
+  MoreHorizontal,
   Plus,
   Settings,
   ShieldCheck,
@@ -27,7 +27,8 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useMyNotifications } from "../hooks/useQueries";
@@ -155,6 +156,14 @@ function useRevBucksBalance(): number {
   return balance;
 }
 
+// Bottom tab bar items
+const BOTTOM_TABS = [
+  { to: "/", label: "Feed", icon: Home },
+  { to: "/explore", label: "Explore", icon: Compass },
+  { to: "/messages", label: "Messages", icon: MessageCircle },
+  { to: "/notifications", label: "Alerts", icon: Bell },
+] as const;
+
 function MobileNav({
   unreadCount,
   unreadMessageCount,
@@ -162,14 +171,25 @@ function MobileNav({
   unreadCount: number;
   unreadMessageCount: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const matchRoute = useMatchRoute();
   const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Close drawer on Escape
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [drawerOpen]);
 
   return (
     <>
-      {/* Top bar on mobile */}
+      {/* ── Top header bar (mobile only) ── */}
       <header
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 md:hidden"
         style={{
@@ -178,7 +198,11 @@ function MobileNav({
           borderBottom: "1px solid oklch(var(--border))",
         }}
       >
-        <Link to="/" className="flex items-center gap-2">
+        <Link
+          to="/"
+          className="flex items-center gap-2"
+          data-ocid="nav.feed.link"
+        >
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center"
             style={{ background: "oklch(var(--orange))" }}
@@ -191,20 +215,8 @@ function MobileNav({
         </Link>
 
         <div className="flex items-center gap-3">
-          {/* Notification badge */}
-          <Link to="/notifications" className="relative">
-            <Bell size={22} style={{ color: "oklch(var(--steel-light))" }} />
-            {unreadCount > 0 && (
-              <span
-                className="absolute -top-1 -right-1 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                style={{ background: "oklch(var(--ember))" }}
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </Link>
-          {/* Admin shortcut — always visible so admin can claim/access it */}
-          <Link to="/admin" aria-label="Admin Panel">
+          {/* Admin shortcut */}
+          <Link to="/admin" aria-label="Admin Panel" data-ocid="nav.admin.link">
             <ShieldCheck
               size={22}
               style={{
@@ -214,19 +226,10 @@ function MobileNav({
               }}
             />
           </Link>
-          {/* Hamburger */}
-          <button
-            onClick={() => setOpen(true)}
-            type="button"
-            className="p-1"
-            aria-label="Open menu"
-          >
-            <Menu size={26} style={{ color: "oklch(var(--foreground))" }} />
-          </button>
         </div>
       </header>
 
-      {/* Mobile ad banner strip below header */}
+      {/* ── Mobile eBay ad strip below header ── */}
       <div
         className="fixed top-[53px] left-0 right-0 z-40 md:hidden"
         style={{
@@ -255,178 +258,266 @@ function MobileNav({
         </a>
       </div>
 
-      {/* Drawer overlay */}
-      {open && (
+      {/* ── Bottom tab bar (mobile only) ── */}
+      <nav
+        className={`fixed left-0 right-0 z-[150] md:hidden ${drawerOpen ? "hidden" : "flex"}`}
+        style={{
+          bottom: "52px",
+          background: "oklch(var(--carbon) / 0.98)",
+          backdropFilter: "blur(14px)",
+          borderTop: "1px solid oklch(var(--border))",
+        }}
+        aria-label="Bottom navigation"
+      >
+        {/* First 4 tabs: direct nav links */}
+        {BOTTOM_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive =
+            matchRoute({ to: tab.to, fuzzy: tab.to !== "/" }) !== false;
+          const isMsgs = tab.to === "/messages";
+          const isAlerts = tab.to === "/notifications";
+          const badge = isMsgs
+            ? unreadMessageCount
+            : isAlerts
+              ? unreadCount
+              : 0;
+
+          return (
+            <Link
+              key={tab.to}
+              to={tab.to}
+              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 relative"
+              style={{ minWidth: 0 }}
+              data-ocid={`nav.${tab.label.toLowerCase()}.tab`}
+            >
+              <div className="relative">
+                <Icon
+                  size={22}
+                  strokeWidth={isActive ? 2.5 : 1.8}
+                  style={{
+                    color: isActive
+                      ? "oklch(var(--orange))"
+                      : "oklch(var(--steel-light))",
+                    transition: "color 0.15s ease",
+                  }}
+                />
+                {badge > 0 && (
+                  <span
+                    className="absolute -top-1.5 -right-2 min-w-[16px] h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1"
+                    style={{
+                      background: isAlerts
+                        ? "oklch(var(--ember))"
+                        : "oklch(0.58 0.22 27)",
+                    }}
+                  >
+                    {badge > 9 ? "9+" : badge}
+                  </span>
+                )}
+              </div>
+              <span
+                className="text-[9px] font-semibold tracking-wide uppercase"
+                style={{
+                  color: isActive
+                    ? "oklch(var(--orange))"
+                    : "oklch(var(--steel))",
+                  transition: "color 0.15s ease",
+                }}
+              >
+                {tab.label}
+              </span>
+            </Link>
+          );
+        })}
+
+        {/* "More" tab — opens pull-up drawer */}
         <button
           type="button"
-          className="fixed inset-0 z-[100] md:hidden w-full h-full border-0 p-0 cursor-default"
-          onClick={() => setOpen(false)}
-          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-          aria-label="Close menu"
-          style={{ background: "rgba(0,0,0,0.6)" }}
-        />
-      )}
-
-      {/* Drawer panel */}
-      <div
-        className="fixed top-0 left-0 h-full z-[101] flex flex-col md:hidden transition-transform duration-300"
-        style={{
-          width: "80vw",
-          maxWidth: 300,
-          background: "oklch(var(--carbon))",
-          borderRight: "1px solid oklch(var(--border))",
-          transform: open ? "translateX(0)" : "translateX(-100%)",
-        }}
-      >
-        {/* Drawer header */}
-        <div className="flex items-center justify-between px-4 py-3 shrink-0">
-          <Link
-            to="/"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2"
-          >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "oklch(var(--orange))" }}
-            >
-              <Car size={16} className="text-carbon" />
-            </div>
-            <span className="revspace-logo text-xl text-foreground">
-              Rev<span style={{ color: "oklch(var(--orange))" }}>Space</span>
-            </span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={22} style={{ color: "oklch(var(--steel-light))" }} />
-          </button>
-        </div>
-
-        {/* Create Post */}
-        <Link
-          to="/create"
-          onClick={() => setOpen(false)}
-          className="mx-4 mb-2 shrink-0"
+          className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="More navigation"
+          data-ocid="nav.more.button"
+          style={{ minWidth: 0 }}
         >
-          <div
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold"
+          <MoreHorizontal
+            size={22}
+            strokeWidth={1.8}
             style={{
-              background: "oklch(var(--orange))",
-              color: "oklch(var(--carbon))",
-              boxShadow: "0 0 20px oklch(var(--orange) / 0.3)",
+              color: drawerOpen
+                ? "oklch(var(--orange))"
+                : "oklch(var(--steel-light))",
+              transition: "color 0.15s ease",
+            }}
+          />
+          <span
+            className="text-[9px] font-semibold tracking-wide uppercase"
+            style={{
+              color: drawerOpen
+                ? "oklch(var(--orange))"
+                : "oklch(var(--steel))",
+              transition: "color 0.15s ease",
             }}
           >
-            <Plus size={18} strokeWidth={2.5} />
-            Create Post
-          </div>
-        </Link>
+            More
+          </span>
+        </button>
+      </nav>
 
-        {/* All nav links — takes all remaining height and scrolls */}
-        <nav
-          className="flex flex-col px-2 overflow-y-auto"
-          style={{ flex: "1 1 0", minHeight: 0, paddingBottom: 8 }}
-        >
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p
-                className="px-2 pt-3 pb-1 text-[10px] uppercase tracking-widest font-semibold"
-                style={{ color: "oklch(var(--steel))" }}
+      {/* ── Full-screen overlay nav ── */}
+      <AnimatePresence>
+        {drawerOpen && (
+          <motion.div
+            key="drawer"
+            ref={drawerRef}
+            className="fixed inset-0 z-[210] flex flex-col md:hidden overflow-hidden"
+            style={{
+              background: "rgba(0, 0, 0, 0.88)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            data-ocid="nav.more.sheet"
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between px-5 pt-12 pb-4 shrink-0">
+              <Link
+                to="/"
+                onClick={() => setDrawerOpen(false)}
+                className="flex items-center gap-2"
               >
-                {group.label}
-              </p>
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
-                const isAdminItem = item.label === "Admin Panel";
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setOpen(false)}
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: "oklch(var(--orange))" }}
+                >
+                  <Car size={16} className="text-carbon" />
+                </div>
+                <span className="revspace-logo text-xl text-white">
+                  Rev
+                  <span style={{ color: "oklch(var(--orange))" }}>Space</span>
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close menu"
+                data-ocid="nav.more.close_button"
+                className="w-9 h-9 flex items-center justify-center rounded-full"
+                style={{ background: "rgba(255,255,255,0.1)" }}
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+
+            {/* Create Post CTA */}
+            <div className="px-5 pb-4 shrink-0">
+              <Link
+                to="/create"
+                onClick={() => setDrawerOpen(false)}
+                data-ocid="nav.create.primary_button"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-bold"
+                style={{
+                  background: "oklch(var(--orange))",
+                  color: "oklch(var(--carbon))",
+                  boxShadow: "0 0 32px oklch(var(--orange) / 0.5)",
+                }}
+              >
+                <Plus size={18} strokeWidth={2.5} />
+                Create Post
+              </Link>
+            </div>
+
+            {/* Scrollable nav groups */}
+            <nav
+              className="flex-1 overflow-y-auto px-4"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}
+            >
+              {NAV_GROUPS.map((group) => (
+                <div key={group.label} className="mb-2">
+                  <p
+                    className="px-2 pt-3 pb-2 text-[10px] uppercase tracking-widest font-bold"
+                    style={{ color: "rgba(255,255,255,0.35)" }}
                   >
-                    <div
-                      className={`sidebar-item ${isActive ? "active" : ""}`}
-                      style={
-                        isAdminItem
-                          ? { color: "oklch(0.8 0.22 75)" }
-                          : undefined
-                      }
-                    >
-                      <div className="relative">
-                        <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                        {item.label === "Notifications" && unreadCount > 0 && (
-                          <span
-                            className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                            style={{ background: "oklch(var(--ember))" }}
-                          >
-                            {unreadCount > 9 ? "9+" : unreadCount}
-                          </span>
-                        )}
-                        {item.label === "Messages" &&
-                          unreadMessageCount > 0 && (
-                            <span
-                              className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                              style={{ background: "oklch(0.58 0.22 27)" }}
-                            >
-                              {unreadMessageCount > 9
-                                ? "9+"
-                                : unreadMessageCount}
-                            </span>
-                          )}
-                      </div>
-                      <span className="flex-1">{item.label}</span>
-                      {item.label === "RevBucks" && (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    {group.label}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        matchRoute({
+                          to: item.to,
+                          fuzzy: item.to !== "/",
+                        }) !== false;
+                      const isAdminItem = item.label === "Admin Panel";
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setDrawerOpen(false)}
+                          data-ocid={`nav.${item.label.toLowerCase().replace(/\s+/g, "-")}.link`}
+                          className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all active:scale-95"
                           style={{
-                            background: "oklch(var(--orange) / 0.15)",
-                            color: "oklch(var(--orange-bright))",
-                            border: "1px solid oklch(var(--orange) / 0.3)",
+                            background: isActive
+                              ? "oklch(var(--orange) / 0.2)"
+                              : "rgba(255,255,255,0.07)",
+                            border: isActive
+                              ? "1px solid oklch(var(--orange) / 0.5)"
+                              : "1px solid rgba(255,255,255,0.08)",
+                            color: isAdminItem
+                              ? "oklch(0.85 0.22 75)"
+                              : isActive
+                                ? "oklch(var(--orange))"
+                                : "rgba(255,255,255,0.9)",
                           }}
                         >
-                          ⚡{rbBalance}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        {/* Ad banner — shrinks but never pushes nav off screen */}
-        <div
-          className="px-3 py-2 shrink-0"
-          style={{ borderTop: "1px solid oklch(var(--border))" }}
-        >
-          <a
-            href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg overflow-hidden px-2 py-1.5 transition-opacity hover:opacity-80"
-            style={{
-              border: "1px solid oklch(var(--border))",
-              background: "#000",
-            }}
-          >
-            <img
-              src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
-              alt="JDM Store"
-              style={{ height: 28, width: "auto", objectFit: "contain" }}
-            />
-            <span
-              className="text-[10px] font-semibold"
-              style={{ color: "oklch(var(--orange))" }}
-            >
-              Shop Parts & Accessories →
-            </span>
-          </a>
-        </div>
-      </div>
+                          <div className="relative shrink-0">
+                            <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                            {item.label === "Notifications" &&
+                              unreadCount > 0 && (
+                                <span
+                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                                  style={{ background: "oklch(var(--ember))" }}
+                                >
+                                  {unreadCount > 9 ? "9+" : unreadCount}
+                                </span>
+                              )}
+                            {item.label === "Messages" &&
+                              unreadMessageCount > 0 && (
+                                <span
+                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                                  style={{ background: "oklch(0.58 0.22 27)" }}
+                                >
+                                  {unreadMessageCount > 9
+                                    ? "9+"
+                                    : unreadMessageCount}
+                                </span>
+                              )}
+                          </div>
+                          <span className="text-xs font-semibold truncate flex-1">
+                            {item.label}
+                          </span>
+                          {item.label === "RevBucks" && (
+                            <span
+                              className="text-[9px] font-bold px-1 py-0.5 rounded-full shrink-0"
+                              style={{
+                                background: "oklch(var(--orange) / 0.2)",
+                                color: "oklch(var(--orange-bright))",
+                              }}
+                            >
+                              ⚡{rbBalance}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -613,9 +704,18 @@ export function BullBoostBanner() {
 }
 
 export function Layout({ children }: LayoutProps) {
+  const matchRoute = useMatchRoute();
+  // Detect if user is currently on /messages — suppress message notification badges while chatting
+  const isOnMessagesPage = matchRoute({ to: "/messages" }) !== false;
+
   // Single shared notifications subscription for both Sidebar and MobileNav
   const { data: notifications } = useMyNotifications();
-  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+
+  // When actively chatting, exclude message-type notifications from badge counts
+  const unreadCount = (notifications ?? []).filter(
+    (n) => !n.isRead && (isOnMessagesPage ? n.notifType !== "message" : true),
+  ).length;
+
   // Unread message count — derived from unread notifications of type "message"
   const unreadMessageCount =
     notifications?.filter((n) => !n.isRead && n.notifType === "message")
@@ -631,11 +731,11 @@ export function Layout({ children }: LayoutProps) {
         unreadCount={unreadCount}
         unreadMessageCount={unreadMessageCount}
       />
-      {/* paddingBottom clears the fixed BullBoost banner (52px) + safe-area + breathing room */}
+      {/* paddingBottom clears the fixed BullBoost banner (52px) + bottom tab bar (56px) + safe-area */}
       <main
         className="main-content"
         style={{
-          paddingBottom: "calc(68px + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: "calc(120px + env(safe-area-inset-bottom, 0px))",
         }}
       >
         {children}

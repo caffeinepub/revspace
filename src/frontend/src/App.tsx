@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
+import { useDeployGuard } from "./hooks/useDeployGuard";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { setFriendOfCreator } from "./lib/friendBadge";
 import { setUserPro } from "./lib/pro";
@@ -347,9 +348,15 @@ function FriendBadgeActivator() {
   return null;
 }
 
+function DeployGuard() {
+  useDeployGuard();
+  return null;
+}
+
 export default function App() {
   return (
     <>
+      <DeployGuard />
       <ProSuccessHandler />
       <FriendBadgeActivator />
       <RouterProvider router={router} />

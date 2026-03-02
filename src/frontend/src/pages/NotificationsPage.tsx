@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Principal } from "@icp-sdk/core/principal";
-import { useRouter } from "@tanstack/react-router";
+import { useMatchRoute, useRouter } from "@tanstack/react-router";
 import {
   Bell,
   Calendar,
@@ -287,8 +287,14 @@ export function NotificationsPage() {
   const { data: notifications, isLoading } = useMyNotifications();
   const markRead = useMarkNotificationRead();
   const router = useRouter();
+  const matchRoute = useMatchRoute();
 
-  const displayNotifs = notifications ?? [];
+  // If somehow viewing notifications while on /messages, suppress message-type notifs
+  const isOnMessagesPage = matchRoute({ to: "/messages" }) !== false;
+
+  const displayNotifs = (notifications ?? []).filter((n) =>
+    isOnMessagesPage ? n.notifType !== "message" : true,
+  );
   const unreadCount = displayNotifs.filter((n) => !n.isRead).length;
 
   const handleMarkAllRead = () => {
