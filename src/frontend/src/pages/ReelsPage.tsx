@@ -342,7 +342,13 @@ function ReelMedia({
     );
   }
 
-  return <img src={mediaUrl} alt="" className="w-full h-full object-cover" />;
+  return (
+    <img
+      src={mediaUrl}
+      alt=""
+      className="absolute inset-0 w-full h-full object-cover"
+    />
+  );
 }
 
 const REEL_TOPICS = [

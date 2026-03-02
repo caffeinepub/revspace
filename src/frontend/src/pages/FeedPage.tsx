@@ -209,17 +209,30 @@ export function FeedPage() {
             <p className="text-white/70 text-sm font-medium mt-1">
               The streets are watching
             </p>
-            {memberCount !== null && memberCount > 0 && (
+            {isLoading ? (
               <span
-                className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold animate-pulse"
                 style={{
-                  background: "oklch(var(--orange) / 0.15)",
-                  color: "oklch(var(--orange))",
-                  border: "1px solid oklch(var(--orange) / 0.4)",
+                  background: "oklch(var(--orange) / 0.1)",
+                  color: "oklch(var(--orange) / 0.5)",
+                  border: "1px solid oklch(var(--orange) / 0.2)",
                 }}
               >
-                {memberCount.toLocaleString()} members
+                Loading members...
               </span>
+            ) : (
+              memberCount !== null && (
+                <span
+                  className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                  style={{
+                    background: "oklch(var(--orange) / 0.15)",
+                    color: "oklch(var(--orange))",
+                    border: "1px solid oklch(var(--orange) / 0.4)",
+                  }}
+                >
+                  {memberCount.toLocaleString()} members
+                </span>
+              )
             )}
           </div>
         </div>

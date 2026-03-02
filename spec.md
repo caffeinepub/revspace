@@ -1,30 +1,28 @@
 # RevSpace
 
 ## Current State
-- Model Reels and Model Gallery pages already filter display to model-account posts only
-- CreatePostPage has no model-account gate — any user can currently post any type from that page
-- Build Battle allows one user to fill out both Car A and Car B in a single modal, uploading both cars themselves
+Full-featured car enthusiast social platform. v110 is live. Three bugs reported post-v110 deploy:
+1. Reels page — image posts (postType "Photo") posted to reels don't display correctly because `<img>` lacks `absolute inset-0` positioning inside the full-height reel card container.
+2. Feed member count — only shows when `memberCount > 0`, so if posts load as empty array (cold-start) or there are genuinely 0 posts, count never shows. Also no loading state shown while posts are fetching.
+3. General: Both `ReelsPage` and `ModelReelsPage` filter for `Reel`/`Video` post types only, which is correct — but the images in `ExplorePage` trending grid fall back to `picsum.photos` placeholder URLs when `mediaUrls[0]` is undefined/empty, which causes broken image appearance.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Model-only posting gate in CreatePostPage: if the URL query param `?section=model` is present (or postType is Reel/Video and user navigated from a model section), check `isModel` from `useUserMeta`. If not a model account, show an inline block with a prompt to go to Settings — disable the Publish button.
-- Simpler approach: add a `?modelOnly=1` query param that CreatePostPage reads; if present and user is not a model, show a full-screen gate instead of the form.
-- Build Battle "challenger" flow: when creating a battle, the creator fills out only Car A (their own car) and optionally sets a title. The battle starts in a `pending` state with Car B empty. A "Join Battle" button appears on the battle card — any other signed-in user can click it, fill out their Car B info + photo, and complete the battle. Once both cars are submitted the battle goes live for voting.
+- Loading skeleton for member count in FeedPage while `isLoading` is true
+- `absolute inset-0` class to the image element inside `ReelMedia` in `ReelsPage` so photo posts fill the full viewport like videos do
 
 ### Modify
-- `BuildBattlePage` / `SubmitModal`: creator only submits Car A. Battle saved with `status: "open"` (waiting for challenger).
-- `BattleCard`: show a "Join This Battle" button when `status === "open"` and the viewer is not the Car A owner. Clicking opens a `JoinBattleModal` where the challenger submits Car B.
-- `buildBattle.ts`: add `status: "open" | "active" | "ended"` field to `Battle`. `createBattle` only takes `carA`, sets `carB` to null/placeholder. New `joinBattle(battleId, carB)` function sets Car B and changes status to `"active"`.
-- `ModelReelsPage` and `ModelGalleryPage`: already gate display; optionally reinforce with a clearer "Post here" CTA that passes `?modelOnly=1` to the create page.
-- `CreatePostPage`: read `?modelOnly=1` query param; if set and `isMyAccountModel === false`, render a gate UI (purple banner + Settings button) instead of the post form.
+- `ReelMedia` image: add `absolute inset-0` and correct `object-cover` positioning classes to match the video element layout
+- `FeedPage` member count: show a loading pill when `isLoading` is true; show the count when data is ready and posts exist; show "0 members" only if explicitly 0 (not hidden)
+- `ExplorePage` trending grid: add `onError` fallback on `<img>` to hide broken images gracefully instead of showing a broken icon
+- Member count logic: use `?? 0` pattern so it shows "0 members" during cold-start recovery rather than disappearing entirely
 
 ### Remove
-- The dual-car form in `SubmitModal` (remove Car B section from the create flow — creator only fills Car A now)
+- The `memberCount > 0` gate — replace with `memberCount !== null` so it shows even when count is 0
 
 ## Implementation Plan
-1. Update `buildBattle.ts`: add `status` field, update `createBattle` to accept only `carA` and set status `"open"`, add `joinBattle(battleId, carB)` function, update `getActiveBattles` to show both `"open"` and `"active"` battles.
-2. Update `BuildBattlePage` / `SubmitModal`: remove Car B form, creator submits only their own car. 
-3. Update `BattleCard`: show "Join This Battle" CTA when `status === "open"` and viewer is not carA owner. Add `JoinBattleModal` component for challenger to upload their Car B.
-4. Update `CreatePostPage`: read `modelOnly` search param from router; if truthy and user is not a model account, show a purple gate UI instead of the post form with a link to Settings.
-5. Update `ModelReelsPage` and `ModelGalleryPage` "Upload" CTAs to link with `?modelOnly=1`.
+1. Fix `ReelMedia` component: add `absolute inset-0` to the `<img>` element so photo posts fill the viewport in the full-screen reel view
+2. Fix `FeedPage` member count: show loading skeleton pill while `isLoading`; show count when `memberCount !== null` (including 0)
+3. Fix `ExplorePage` trending image grid: add `onError` handler to hide broken images gracefully
+4. Audit any other places where `mediaUrls[0]` is used without null guard and fix accordingly

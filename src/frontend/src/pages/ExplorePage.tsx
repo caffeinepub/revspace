@@ -150,16 +150,22 @@ export function ExplorePage() {
                   <div
                     key={post.id}
                     className="relative aspect-square overflow-hidden cursor-pointer group"
-                    style={{ borderRadius: "4px" }}
+                    style={{
+                      borderRadius: "4px",
+                      background: "oklch(0.18 0.01 240)",
+                    }}
                   >
-                    <img
-                      src={
-                        post.mediaUrls[0] ??
-                        `https://picsum.photos/seed/${post.id}/300/300`
-                      }
-                      alt=""
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+                    {post.mediaUrls[0] ? (
+                      <img
+                        src={post.mediaUrls[0]}
+                        alt=""
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display =
+                            "none";
+                        }}
+                      />
+                    ) : null}
                     <div
                       className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                       style={{ background: "oklch(0 0 0 / 0.4)" }}
