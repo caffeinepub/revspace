@@ -309,11 +309,11 @@ export function ModelGalleryPage() {
     });
   };
 
-  // Filter to photo posts only
+  // Filter to photo posts only — case-insensitive since backend may return lowercase
   const photoPosts = useMemo(
     () =>
       (posts ?? []).filter(
-        (p) => p.postType === "Photo" && p.mediaUrls.length > 0,
+        (p) => p.postType?.toLowerCase() === "photo" && p.mediaUrls.length > 0,
       ),
     [posts],
   );

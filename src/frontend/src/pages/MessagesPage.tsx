@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Principal } from "@icp-sdk/core/principal";
 import { Principal as PrincipalCls } from "@icp-sdk/core/principal";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -20,13 +21,15 @@ import {
   Send,
   UserSearch,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetConversations,
   useGetMessages,
   useGetProfile,
+  useMarkNotificationRead,
+  useMyNotifications,
   useMyProfile,
   useSendMessage,
   useSendNotificationToUser,
@@ -378,6 +381,26 @@ export function MessagesPage() {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString() ?? "";
   const { recipient } = useSearch({ from: "/messages" });
+  const { data: notifications } = useMyNotifications();
+  const markRead = useMarkNotificationRead();
+  const queryClient = useQueryClient();
+  const hasAutoMarked = useRef(false);
+
+  // Auto-mark all unread message-type notifications as read when the page loads
+  useEffect(() => {
+    if (hasAutoMarked.current) return;
+    if (!notifications || notifications.length === 0) return;
+    const unreadMessages = notifications.filter(
+      (n) => !n.isRead && n.notifType === "message",
+    );
+    if (unreadMessages.length === 0) return;
+    hasAutoMarked.current = true;
+    const markAll = async () => {
+      await Promise.all(unreadMessages.map((n) => markRead.mutateAsync(n.id)));
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    };
+    markAll().catch(() => {});
+  }, [notifications, markRead, queryClient]);
 
   // Auto-open a conversation if recipient is provided in search params
   const [selectedConvo, setSelectedConvo] = useState<Principal | null>(() => {

@@ -25,14 +25,15 @@ interface PostCardProps {
 }
 
 function PostTypeBadge({ type }: { type: string }) {
-  if (type === "Photo") return null;
+  const lower = type?.toLowerCase() ?? "";
+  if (lower === "photo") return null;
   const colors: Record<string, string> = {
-    Video: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    Reel: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    video: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    reel: "bg-purple-500/20 text-purple-400 border-purple-500/30",
   };
   return (
     <span
-      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colors[type] ?? "badge-orange"}`}
+      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colors[lower] ?? "badge-orange"}`}
     >
       {type}
     </span>
@@ -137,7 +138,9 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     }
   };
 
-  const isVideoPost = post.postType === "Video" || post.postType === "Reel";
+  const isVideoPost =
+    post.postType?.toLowerCase() === "video" ||
+    post.postType?.toLowerCase() === "reel";
 
   return (
     <article className="post-card animate-fade-in">

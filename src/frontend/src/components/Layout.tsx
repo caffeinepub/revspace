@@ -9,6 +9,7 @@ import {
   Compass,
   Film,
   Gamepad2,
+  GaugeCircle,
   Home,
   Info,
   LayoutGrid,
@@ -180,7 +181,10 @@ const NAV_GROUPS = [
   },
   {
     label: "Pro Perks",
-    items: [{ to: "/game", label: "Rev Racing", icon: Gamepad2 }],
+    items: [
+      { to: "/game", label: "Rev Racing", icon: Gamepad2 },
+      { to: "/track-ready", label: "Track Ready", icon: GaugeCircle },
+    ],
   },
   {
     label: "Account",

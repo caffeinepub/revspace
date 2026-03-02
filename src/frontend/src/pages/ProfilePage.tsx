@@ -344,7 +344,8 @@ export function ProfilePage() {
                       setSelectedMedia({
                         url: post.mediaUrls[0],
                         type:
-                          post.postType === "Video" || post.postType === "Reel"
+                          post.postType?.toLowerCase() === "video" ||
+                          post.postType?.toLowerCase() === "reel"
                             ? "video"
                             : "image",
                       });
@@ -352,7 +353,8 @@ export function ProfilePage() {
                   }}
                 >
                   {post.mediaUrls[0] ? (
-                    post.postType === "Video" || post.postType === "Reel" ? (
+                    post.postType?.toLowerCase() === "video" ||
+                    post.postType?.toLowerCase() === "reel" ? (
                       <video
                         src={post.mediaUrls[0]}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

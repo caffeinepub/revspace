@@ -132,7 +132,9 @@ function ModelVideoCard({
     }
   };
 
-  const isVideo = post.postType === "Reel" || post.postType === "Video";
+  const isVideo =
+    post.postType?.toLowerCase() === "reel" ||
+    post.postType?.toLowerCase() === "video";
   const mediaUrl = post.mediaUrls[0];
 
   return (
@@ -344,11 +346,13 @@ export function ModelReelsPage() {
     });
   };
 
-  // Filter to video/reel posts only
+  // Filter to video/reel posts only — case-insensitive since backend may return lowercase
   const videoPosts = useMemo(
     () =>
       (posts ?? []).filter(
-        (p) => p.postType === "Reel" || p.postType === "Video",
+        (p) =>
+          p.postType?.toLowerCase() === "reel" ||
+          p.postType?.toLowerCase() === "video",
       ),
     [posts],
   );

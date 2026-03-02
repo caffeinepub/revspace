@@ -34,6 +34,7 @@ import { RevBucksPage } from "./pages/RevBucksPage";
 import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ShopPage } from "./pages/ShopPage";
+import { TrackReadyPage } from "./pages/TrackReadyPage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 
 const LoadingSpinner = () => (
@@ -269,6 +270,12 @@ const gameRoute = createRoute({
   component: GamePage,
 });
 
+const trackReadyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/track-ready",
+  component: TrackReadyPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -296,6 +303,7 @@ const routeTree = rootRoute.addChildren([
   modelReelsRoute,
   modelGalleryRoute,
   gameRoute,
+  trackReadyRoute,
 ]);
 
 const router = createRouter({ routeTree });

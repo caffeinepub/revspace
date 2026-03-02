@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Principal } from "@icp-sdk/core/principal";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMatchRoute, useRouter } from "@tanstack/react-router";
 import {
   Bell,
@@ -12,6 +13,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import type { ReactElement } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   useGetAllPosts,
@@ -286,8 +288,24 @@ function NotificationItem({ notif, onClick }: NotifItemProps) {
 export function NotificationsPage() {
   const { data: notifications, isLoading } = useMyNotifications();
   const markRead = useMarkNotificationRead();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const matchRoute = useMatchRoute();
+  const hasAutoMarked = useRef(false);
+
+  // Auto-mark all unread notifications as read when the page loads
+  useEffect(() => {
+    if (hasAutoMarked.current) return;
+    if (!notifications || notifications.length === 0) return;
+    const unread = notifications.filter((n) => !n.isRead);
+    if (unread.length === 0) return;
+    hasAutoMarked.current = true;
+    const markAll = async () => {
+      await Promise.all(unread.map((n) => markRead.mutateAsync(n.id)));
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    };
+    markAll().catch(() => {});
+  }, [notifications, markRead, queryClient]);
 
   // If somehow viewing notifications while on /messages, suppress message-type notifs
   const isOnMessagesPage = matchRoute({ to: "/messages" }) !== false;
