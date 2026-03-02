@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "@tanstack/react-router";
 import {
   Bell,
   Calendar,
   CheckCheck,
+  ChevronRight,
   Heart,
   MessageCircle,
   UserPlus,
@@ -40,9 +42,31 @@ const NOTIF_BG: Record<string, string> = {
   message: "oklch(0.5 0.18 220 / 0.15)",
 };
 
+// Types that navigate somewhere on click
+const NAVIGABLE_TYPES = new Set(["comment", "follow", "message"]);
+
+function getNotifDestination(
+  notifType: string,
+  relatedId: string,
+): string | null {
+  switch (notifType) {
+    case "comment":
+      // Navigate to feed — the relatedId is the postId
+      return relatedId ? `/?postId=${relatedId}` : "/";
+    case "follow":
+      // Navigate to the follower's profile — relatedId is the principal
+      return relatedId ? `/profile/${relatedId}` : null;
+    case "message":
+      return "/messages";
+    default:
+      return null;
+  }
+}
+
 export function NotificationsPage() {
   const { data: notifications, isLoading } = useMyNotifications();
   const markRead = useMarkNotificationRead();
+  const router = useRouter();
 
   const displayNotifs = notifications ?? [];
   const unreadCount = displayNotifs.filter((n) => !n.isRead).length;
@@ -54,6 +78,24 @@ export function NotificationsPage() {
         toast.success("All notifications marked as read");
       })
       .catch(() => toast.error("Failed to mark read"));
+  };
+
+  const handleNotifClick = (notif: {
+    id: string;
+    isRead: boolean;
+    notifType: string;
+    relatedId: string;
+  }) => {
+    // Mark as read first
+    if (!notif.isRead) {
+      markRead.mutate(notif.id);
+    }
+
+    // Navigate based on type — use router.history for programmatic navigation
+    const dest = getNotifDestination(notif.notifType, notif.relatedId);
+    if (dest) {
+      router.history.push(dest);
+    }
   };
 
   return (
@@ -101,56 +143,67 @@ export function NotificationsPage() {
             <p className="text-steel text-sm">No notifications yet</p>
           </div>
         ) : (
-          displayNotifs.map((notif) => (
-            <button
-              key={notif.id}
-              type="button"
-              className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface transition-colors w-full text-left"
-              style={
-                !notif.isRead
-                  ? { background: "oklch(var(--orange) / 0.04)" }
-                  : undefined
-              }
-              onClick={() => {
-                if (!notif.isRead) {
-                  markRead.mutate(notif.id);
+          displayNotifs.map((notif) => {
+            const isNavigable = NAVIGABLE_TYPES.has(notif.notifType);
+            return (
+              <button
+                key={notif.id}
+                type="button"
+                className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface transition-colors w-full text-left"
+                style={
+                  !notif.isRead
+                    ? { background: "oklch(var(--orange) / 0.04)" }
+                    : undefined
                 }
-              }}
-            >
-              {/* Icon */}
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                style={{
-                  background:
-                    NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))",
-                }}
+                onClick={() => handleNotifClick(notif)}
               >
-                {NOTIF_ICONS[notif.notifType] ?? (
-                  <Bell size={16} className="text-steel" />
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <p
-                  className={`text-sm leading-snug ${!notif.isRead ? "text-foreground font-medium" : "text-steel"}`}
-                >
-                  {notif.message}
-                </p>
-                <p className="text-[11px] text-steel mt-0.5">
-                  {timeAgo(notif.timestamp)}
-                </p>
-              </div>
-
-              {/* Unread dot */}
-              {!notif.isRead && (
+                {/* Icon */}
                 <div
-                  className="w-2 h-2 rounded-full shrink-0 mt-2"
-                  style={{ background: "oklch(var(--orange))" }}
-                />
-              )}
-            </button>
-          ))
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                  style={{
+                    background:
+                      NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))",
+                  }}
+                >
+                  {NOTIF_ICONS[notif.notifType] ?? (
+                    <Bell size={16} className="text-steel" />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`text-sm leading-snug ${
+                      !notif.isRead
+                        ? "text-foreground font-semibold"
+                        : "text-steel"
+                    }`}
+                  >
+                    {notif.message}
+                  </p>
+                  <p className="text-[11px] text-steel mt-0.5">
+                    {timeAgo(notif.timestamp)}
+                  </p>
+                </div>
+
+                {/* Right side: unread dot OR chevron for navigable */}
+                <div className="flex items-center gap-1.5 shrink-0 mt-1.5">
+                  {!notif.isRead && (
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: "oklch(var(--orange))" }}
+                    />
+                  )}
+                  {isNavigable && (
+                    <ChevronRight
+                      size={14}
+                      style={{ color: "oklch(var(--steel))" }}
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
 

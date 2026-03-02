@@ -154,7 +154,13 @@ function useRevBucksBalance(): number {
   return balance;
 }
 
-function MobileNav({ unreadCount }: { unreadCount: number }) {
+function MobileNav({
+  unreadCount,
+  unreadMessageCount,
+}: {
+  unreadCount: number;
+  unreadMessageCount: number;
+}) {
   const [open, setOpen] = useState(false);
   const matchRoute = useMatchRoute();
   const isAdmin = useIsAdmin();
@@ -196,6 +202,12 @@ function MobileNav({ unreadCount }: { unreadCount: number }) {
               </span>
             )}
           </Link>
+          {/* Admin shortcut — only shown to admins */}
+          {isAdmin && (
+            <Link to="/admin" aria-label="Admin Panel">
+              <ShieldCheck size={22} style={{ color: "oklch(0.8 0.22 75)" }} />
+            </Link>
+          )}
           {/* Hamburger */}
           <button
             onClick={() => setOpen(true)}
@@ -339,6 +351,17 @@ function MobileNav({ unreadCount }: { unreadCount: number }) {
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
                         )}
+                        {item.label === "Messages" &&
+                          unreadMessageCount > 0 && (
+                            <span
+                              className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                              style={{ background: "oklch(0.58 0.22 27)" }}
+                            >
+                              {unreadMessageCount > 9
+                                ? "9+"
+                                : unreadMessageCount}
+                            </span>
+                          )}
                       </div>
                       <span className="flex-1">{item.label}</span>
                       {item.label === "RevBucks" && (
@@ -406,7 +429,13 @@ function MobileNav({ unreadCount }: { unreadCount: number }) {
   );
 }
 
-function Sidebar({ unreadCount }: { unreadCount: number }) {
+function Sidebar({
+  unreadCount,
+  unreadMessageCount,
+}: {
+  unreadCount: number;
+  unreadMessageCount: number;
+}) {
   const matchRoute = useMatchRoute();
   const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
@@ -466,6 +495,14 @@ function Sidebar({ unreadCount }: { unreadCount: number }) {
                           style={{ background: "oklch(var(--ember))" }}
                         >
                           {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                      {item.label === "Messages" && unreadMessageCount > 0 && (
+                        <span
+                          className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                          style={{ background: "oklch(0.58 0.22 27)" }}
+                        >
+                          {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
                         </span>
                       )}
                     </div>
@@ -584,11 +621,21 @@ export function Layout({ children }: LayoutProps) {
   // Single shared notifications subscription for both Sidebar and MobileNav
   const { data: notifications } = useMyNotifications();
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+  // Unread message count — derived from unread notifications of type "message"
+  const unreadMessageCount =
+    notifications?.filter((n) => !n.isRead && n.notifType === "message")
+      .length ?? 0;
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar unreadCount={unreadCount} />
-      <MobileNav unreadCount={unreadCount} />
+      <Sidebar
+        unreadCount={unreadCount}
+        unreadMessageCount={unreadMessageCount}
+      />
+      <MobileNav
+        unreadCount={unreadCount}
+        unreadMessageCount={unreadMessageCount}
+      />
       {/* paddingBottom clears the fixed BullBoost banner (52px) + safe-area + breathing room */}
       <main
         className="main-content"
