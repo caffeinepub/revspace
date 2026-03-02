@@ -13,6 +13,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { BuildBattlePage } from "./pages/BuildBattlePage";
 import { ClubsPage } from "./pages/ClubsPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
+import { CreatorPage } from "./pages/CreatorPage";
 import { EventsPage } from "./pages/EventsPage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { FeaturedCarPage } from "./pages/FeaturedCarPage";
@@ -276,6 +277,12 @@ const trackReadyRoute = createRoute({
   component: TrackReadyPage,
 });
 
+const creatorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/creator",
+  component: CreatorPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -304,6 +311,7 @@ const routeTree = rootRoute.addChildren([
   modelGalleryRoute,
   gameRoute,
   trackReadyRoute,
+  creatorRoute,
 ]);
 
 const router = createRouter({ routeTree });

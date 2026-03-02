@@ -134,6 +134,9 @@ function NotificationPromptBanner() {
   );
 }
 
+const OWNER_PRINCIPAL =
+  "lxabr-wc334-2wlj6-karlm-6ez4a-sahnr-7s7ge-2onmm-u4ht3-pue6x-jae";
+
 const NAV_GROUPS = [
   {
     label: "Discover",
@@ -274,6 +277,8 @@ function MobileNav({
   const matchRoute = useMatchRoute();
   const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
+  const { identity: mobileIdentity } = useInternetIdentity();
+  const isOwner = mobileIdentity?.getPrincipal().toText() === OWNER_PRINCIPAL;
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // Close drawer on Escape
@@ -610,6 +615,37 @@ function MobileNav({
                         </Link>
                       );
                     })}
+                    {/* Owner-only: Creator Profile link injected into My Space */}
+                    {group.label === "My Space" && isOwner && (
+                      <Link
+                        to="/creator"
+                        onClick={() => setDrawerOpen(false)}
+                        data-ocid="nav.creator-profile.link"
+                        className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all active:scale-95"
+                        style={{
+                          background:
+                            matchRoute({ to: "/creator", fuzzy: false }) !==
+                            false
+                              ? "oklch(var(--orange) / 0.2)"
+                              : "rgba(255,255,255,0.07)",
+                          border:
+                            matchRoute({ to: "/creator", fuzzy: false }) !==
+                            false
+                              ? "1px solid oklch(var(--orange) / 0.5)"
+                              : "1px solid rgba(255,255,255,0.08)",
+                          color:
+                            matchRoute({ to: "/creator", fuzzy: false }) !==
+                            false
+                              ? "oklch(var(--orange))"
+                              : "rgba(255,255,255,0.9)",
+                        }}
+                      >
+                        <Star size={18} strokeWidth={2} />
+                        <span className="text-xs font-semibold truncate flex-1">
+                          Creator Profile
+                        </span>
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
@@ -630,6 +666,8 @@ function Sidebar({
 }) {
   const matchRoute = useMatchRoute();
   const rbBalance = useRevBucksBalance();
+  const { identity: sidebarIdentity } = useInternetIdentity();
+  const isOwner = sidebarIdentity?.getPrincipal().toText() === OWNER_PRINCIPAL;
 
   return (
     <aside className="sidebar-nav">
@@ -720,6 +758,17 @@ function Sidebar({
                 </Link>
               );
             })}
+            {/* Owner-only: Creator Profile link in My Space */}
+            {group.label === "My Space" && isOwner && (
+              <Link to="/creator">
+                <div
+                  className={`sidebar-item ${matchRoute({ to: "/creator", fuzzy: false }) !== false ? "active" : ""}`}
+                >
+                  <Star size={18} strokeWidth={2} />
+                  <span className="flex-1">Creator Profile</span>
+                </div>
+              </Link>
+            )}
           </div>
         ))}
       </div>
