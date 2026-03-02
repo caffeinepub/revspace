@@ -145,6 +145,7 @@ export interface _SERVICE {
   'adminGetAllProfiles' : ActorMethod<[], Array<ProfileWithPrincipal>>,
   'adminGetAllUsers' : ActorMethod<[], Array<UserWithRole>>,
   'adminUnbanUser' : ActorMethod<[Principal], undefined>,
+  'adminUpdateUserLocation' : ActorMethod<[Principal, string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createClub' : ActorMethod<[string, string, string, string], string>,
   'createEvent' : ActorMethod<

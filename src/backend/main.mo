@@ -13,8 +13,6 @@ import MixinStorage "blob-storage/Mixin";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
-
-
 actor {
   //-----------------------------
   // Types
@@ -345,6 +343,25 @@ actor {
       case (#user) { Runtime.trap("Not currently banned") };
       case (#guest) {
         AccessControl.assignRole(accessControlState, caller, user, #user);
+      };
+    };
+  };
+
+  // Admin-only function to update user's location field
+  public shared ({ caller }) func adminUpdateUserLocation(user : Principal, newLocation : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+
+    switch (profiles.get(user)) {
+      case (null) {
+        Runtime.trap("Profile not found");
+      };
+      case (?existingProfile) {
+        let updatedProfile = {
+          existingProfile with location = newLocation
+        };
+        profiles.add(user, updatedProfile);
       };
     };
   };

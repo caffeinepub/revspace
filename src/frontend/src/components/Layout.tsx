@@ -31,11 +31,106 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useMyNotifications } from "../hooks/useQueries";
+import { useNotificationPoller } from "../hooks/useNotificationPoller";
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+} from "../hooks/usePushNotifications";
 import { getBalance } from "../lib/revbucks";
 
 interface LayoutProps {
   children: ReactNode;
+}
+
+// ─── Notification Permission Banner ──────────────────────────────────────────
+function NotificationPromptBanner() {
+  const [show, setShow] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    // Only prompt if permission hasn't been asked yet
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    const wasDismissed = localStorage.getItem("rs_notif_prompt_dismissed");
+    if (wasDismissed) return;
+    // Small delay so we don't jump the user on page load
+    const t = setTimeout(() => setShow(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!show || dismissed) return null;
+
+  const handleEnable = async () => {
+    setShow(false);
+    setDismissed(true);
+    const result = await requestNotificationPermission();
+    if (result === "granted") {
+      await registerServiceWorker();
+    }
+    localStorage.setItem("rs_notif_prompt_dismissed", "1");
+  };
+
+  const handleDismiss = () => {
+    setShow(false);
+    setDismissed(true);
+    localStorage.setItem("rs_notif_prompt_dismissed", "1");
+  };
+
+  return (
+    <motion.div
+      initial={{ y: -60, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: -60, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      className="fixed top-0 left-0 right-0 z-[300] md:left-auto md:right-4 md:top-4 md:max-w-sm"
+      style={{
+        background: "oklch(0.16 0.03 220)",
+        borderBottom: "1px solid oklch(var(--orange) / 0.4)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+      }}
+    >
+      <div className="flex items-center gap-3 px-4 py-3 md:rounded-xl md:border md:border-orange/40">
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: "oklch(var(--orange) / 0.15)" }}
+        >
+          <Bell size={16} style={{ color: "oklch(var(--orange))" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-foreground">
+            Enable notifications
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-tight">
+            Get alerts for chats, likes &amp; comments
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleEnable}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
+            data-ocid="notifications.enable.primary_button"
+          >
+            Enable
+          </button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            aria-label="Dismiss"
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+            style={{ color: "oklch(var(--steel))" }}
+            data-ocid="notifications.enable.close_button"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 const NAV_GROUPS = [
@@ -705,11 +800,28 @@ export function BullBoostBanner() {
 
 export function Layout({ children }: LayoutProps) {
   const matchRoute = useMatchRoute();
+  const { identity } = useInternetIdentity();
+
   // Detect if user is currently on /messages — suppress message notification badges while chatting
   const isOnMessagesPage = matchRoute({ to: "/messages" }) !== false;
 
-  // Single shared notifications subscription for both Sidebar and MobileNav
-  const { data: notifications } = useMyNotifications();
+  // Single shared notifications subscription for both Sidebar and MobileNav.
+  // useNotificationPoller wraps useMyNotifications and fires native phone
+  // notifications for each newly arrived unread notification.
+  const { data: notifications } = useNotificationPoller();
+
+  // Register service worker + request notification permission once after login
+  const swRegistered = useRef(false);
+  useEffect(() => {
+    if (!identity || swRegistered.current) return;
+    swRegistered.current = true;
+
+    // Register SW first (non-blocking)
+    void registerServiceWorker();
+
+    // If permission was already granted, no prompt needed — SW is enough
+    // The banner handles the "default" case with a user-friendly prompt
+  }, [identity]);
 
   // When actively chatting, exclude message-type notifications from badge counts
   const unreadCount = (notifications ?? []).filter(
@@ -723,6 +835,11 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Native notification permission prompt banner */}
+      <AnimatePresence>
+        {identity && <NotificationPromptBanner key="notif-banner" />}
+      </AnimatePresence>
+
       <Sidebar
         unreadCount={unreadCount}
         unreadMessageCount={unreadMessageCount}

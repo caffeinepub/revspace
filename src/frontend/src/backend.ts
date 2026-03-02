@@ -217,6 +217,7 @@ export interface backendInterface {
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
     adminUnbanUser(user: Principal): Promise<void>;
+    adminUpdateUserLocation(user: Principal, newLocation: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClub(name: string, description: string, category: string, coverImageUrl: string): Promise<string>;
     createEvent(title: string, description: string, location: string, eventDate: bigint, coverImageUrl: string, category: string, maxAttendees: bigint): Promise<string>;
@@ -503,6 +504,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.adminUnbanUser(arg0);
+            return result;
+        }
+    }
+    async adminUpdateUserLocation(arg0: Principal, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminUpdateUserLocation(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminUpdateUserLocation(arg0, arg1);
             return result;
         }
     }

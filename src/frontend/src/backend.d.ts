@@ -117,6 +117,7 @@ export interface backendInterface {
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
     adminUnbanUser(user: Principal): Promise<void>;
+    adminUpdateUserLocation(user: Principal, newLocation: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClub(name: string, description: string, category: string, coverImageUrl: string): Promise<string>;
     createEvent(title: string, description: string, location: string, eventDate: bigint, coverImageUrl: string, category: string, maxAttendees: bigint): Promise<string>;

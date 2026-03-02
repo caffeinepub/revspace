@@ -173,6 +173,7 @@ export const idlService = IDL.Service({
     ),
   'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
   'adminUnbanUser' : IDL.Func([IDL.Principal], [], []),
+  'adminUpdateUserLocation' : IDL.Func([IDL.Principal, IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createClub' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -442,6 +443,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserWithRole)], ['query']),
     'adminUnbanUser' : IDL.Func([IDL.Principal], [], []),
+    'adminUpdateUserLocation' : IDL.Func([IDL.Principal, IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createClub' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],

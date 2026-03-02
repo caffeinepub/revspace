@@ -11,17 +11,20 @@ import {
   Ban,
   CheckCircle2,
   Copy,
+  Crown,
   Eye,
   EyeOff,
   KeyRound,
   Link2,
   Loader2,
   Package,
+  Plus,
   ShieldCheck,
   Tag,
   Trash2,
   UserX,
   Users,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -34,6 +37,7 @@ import type {
 } from "../backend.d";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +60,10 @@ type MergedUser = {
   role: UserRole;
   displayName: string;
   avatarUrl: string;
+  revBucks: number;
+  isPro: boolean;
+  isModel: boolean;
+  locationRaw: string; // the full encoded location string
 };
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -136,26 +144,46 @@ function UsersTab({
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  // Per-user RB input values
+  const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!actor) return;
     setLoading(true);
-    Promise.all([actor.adminGetAllUsers(), actor.adminGetAllProfiles()])
+    // Use adminGetAllProfiles() as primary source — it has EVERY user who saved a profile.
+    // adminGetAllUsers() is secondary — just provides role data.
+    Promise.all([actor.adminGetAllProfiles(), actor.adminGetAllUsers()])
       .then(
-        ([usersArr, profilesArr]: [UserWithRole[], ProfileWithPrincipal[]]) => {
-          const profileMap = new Map<string, ProfileWithPrincipal["profile"]>();
-          for (const pp of profilesArr) {
-            profileMap.set(pp.principal.toString(), pp.profile);
+        ([profilesArr, usersArr]: [ProfileWithPrincipal[], UserWithRole[]]) => {
+          // Build a role lookup from the users list
+          const roleMap = new Map<string, UserRole>();
+          for (const u of usersArr) {
+            roleMap.set(u.principal.toString(), u.role);
           }
-          const merged: MergedUser[] = usersArr.map((u) => {
-            const p = profileMap.get(u.principal.toString());
+
+          const merged: MergedUser[] = profilesArr.map((pp) => {
+            const meta = decodeMetaFromLocation(pp.profile.location ?? "");
             return {
-              principal: u.principal,
-              role: u.role,
-              displayName: p?.displayName || truncPrincipal(u.principal),
-              avatarUrl: p?.avatarUrl || "",
+              principal: pp.principal,
+              role:
+                roleMap.get(pp.principal.toString()) ?? ("user" as UserRole),
+              displayName:
+                pp.profile.displayName || truncPrincipal(pp.principal),
+              avatarUrl: pp.profile.avatarUrl || "",
+              revBucks: meta.rb,
+              isPro: meta.isPro,
+              isModel: meta.isModel,
+              locationRaw: pp.profile.location ?? "",
             };
           });
+
+          // Sort: admins first, then alphabetically by display name
+          merged.sort((a, b) => {
+            if (a.role === "admin" && b.role !== "admin") return -1;
+            if (b.role === "admin" && a.role !== "admin") return 1;
+            return a.displayName.localeCompare(b.displayName);
+          });
+
           setUsers(merged);
         },
       )
@@ -193,14 +221,14 @@ function UsersTab({
         await actor.adminBanUser(user.principal);
         toast.success(`${user.displayName} banned`);
       }
-      // refresh the role
+      // Refresh roles
       const refreshed = await actor.adminGetAllUsers();
-      const roleMap = new Map<string, UserRole>();
-      for (const u of refreshed) roleMap.set(u.principal.toString(), u.role);
+      const roleMapNew = new Map<string, UserRole>();
+      for (const u of refreshed) roleMapNew.set(u.principal.toString(), u.role);
       setUsers((prev) =>
         prev.map((u) => ({
           ...u,
-          role: roleMap.get(u.principal.toString()) ?? u.role,
+          role: roleMapNew.get(u.principal.toString()) ?? u.role,
         })),
       );
     } catch {
@@ -210,9 +238,74 @@ function UsersTab({
     }
   }
 
+  // Give RevBucks — calls adminUpdateUserLocation to persist changes on-chain immediately.
+  async function handleAddRb(user: MergedUser) {
+    if (!actor) return;
+    const amtStr = rbInputs[user.principal.toString()] ?? "";
+    const amt = Number.parseInt(amtStr, 10);
+    if (Number.isNaN(amt) || amt <= 0) {
+      toast.error("Enter a valid positive number");
+      return;
+    }
+
+    const currentMeta = decodeMetaFromLocation(user.locationRaw);
+    const newMeta = { ...currentMeta, rb: currentMeta.rb + amt };
+    const newEncoded = encodeMetaToLocation(newMeta);
+
+    // Clear input
+    setRbInputs((prev) => ({ ...prev, [user.principal.toString()]: "" }));
+
+    const rbKey = `rb-${user.principal.toString()}`;
+    setPendingAction(rbKey);
+    try {
+      await actor.adminUpdateUserLocation(user.principal, newEncoded);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.principal.toString() === user.principal.toString()
+            ? { ...u, revBucks: newMeta.rb, locationRaw: newEncoded }
+            : u,
+        ),
+      );
+      toast.success(
+        `+${amt} RB added to ${user.displayName}! New balance: ${newMeta.rb} RB`,
+      );
+    } catch {
+      toast.error("Failed to update RevBucks");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleProToggle(user: MergedUser) {
+    if (!actor) return;
+    const currentMeta = decodeMetaFromLocation(user.locationRaw);
+    const newMeta = { ...currentMeta, isPro: !currentMeta.isPro };
+    const newEncoded = encodeMetaToLocation(newMeta);
+
+    const proKey = `pro-${user.principal.toString()}`;
+    setPendingAction(proKey);
+    try {
+      await actor.adminUpdateUserLocation(user.principal, newEncoded);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.principal.toString() === user.principal.toString()
+            ? { ...u, isPro: newMeta.isPro, locationRaw: newEncoded }
+            : u,
+        ),
+      );
+      toast.success(
+        `${user.displayName} Pro ${newMeta.isPro ? "enabled" : "removed"}`,
+      );
+    } catch {
+      toast.error("Failed to update Pro status");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   if (loading) {
     return (
-      <div className="space-y-2 mt-4">
+      <div className="space-y-2 mt-4" data-ocid="admin.users.loading_state">
         {["u1", "u2", "u3", "u4"].map((k) => (
           <RowSkeleton key={k} />
         ))}
@@ -222,7 +315,10 @@ function UsersTab({
 
   if (users.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div
+        className="flex flex-col items-center justify-center py-16 text-center"
+        data-ocid="admin.users.empty_state"
+      >
         <Users
           size={40}
           className="mb-3"
@@ -235,111 +331,312 @@ function UsersTab({
 
   return (
     <div className="space-y-2 mt-4">
-      {users.map((user) => {
+      <p className="text-xs text-muted-foreground mb-3">
+        {users.length} user{users.length !== 1 ? "s" : ""} with profiles
+      </p>
+      {users.map((user, index) => {
         const isMe = user.principal.toString() === myPrincipal;
         const isBanned = user.role === "guest";
         const delKey = `del-${user.principal.toString()}`;
         const banKey = `ban-${user.principal.toString()}`;
+        const principalStr = user.principal.toString();
+        const rbInput = rbInputs[principalStr] ?? "";
 
         return (
           <div
-            key={user.principal.toString()}
-            className="flex items-center gap-3 p-3 rounded-lg transition-colors"
+            key={principalStr}
+            className="rounded-xl transition-colors"
+            data-ocid={`admin.users.item.${index + 1}`}
             style={{
               background: isBanned
-                ? "oklch(var(--ember) / 0.08)"
+                ? "oklch(var(--ember) / 0.06)"
                 : "oklch(var(--surface))",
               border: isBanned
                 ? "1px solid oklch(var(--ember) / 0.3)"
                 : "1px solid oklch(var(--border))",
             }}
           >
-            <Avatar className="h-9 w-9 flex-shrink-0">
-              <AvatarImage src={user.avatarUrl} />
-              <AvatarFallback
-                className="text-xs font-bold"
-                style={{
-                  background: "oklch(var(--surface-elevated))",
-                  color: "oklch(var(--orange-bright))",
-                }}
-              >
-                {user.displayName.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            {/* Top row: avatar + name + badges */}
+            <div className="flex items-center gap-3 p-3">
+              <Avatar className="h-10 w-10 flex-shrink-0">
+                <AvatarImage src={user.avatarUrl} />
+                <AvatarFallback
+                  className="text-xs font-bold"
+                  style={{
+                    background: "oklch(var(--surface-elevated))",
+                    color: "oklch(var(--orange-bright))",
+                  }}
+                >
+                  {user.displayName.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-foreground truncate">
-                  {user.displayName}
-                </span>
-                <RoleBadge role={user.role} />
-                {isMe && (
-                  <span className="text-[10px] text-muted-foreground">
-                    (you)
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-foreground">
+                    {user.displayName}
                   </span>
-                )}
+                  <RoleBadge role={user.role} />
+                  {user.isPro && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                      style={{
+                        background: "oklch(0.8 0.18 85 / 0.15)",
+                        color: "oklch(0.82 0.18 85)",
+                        border: "1px solid oklch(0.8 0.18 85 / 0.35)",
+                      }}
+                    >
+                      <Crown size={9} />
+                      Pro
+                    </span>
+                  )}
+                  {user.isModel && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                      style={{
+                        background: "oklch(0.55 0.18 300 / 0.15)",
+                        color: "oklch(0.78 0.18 300)",
+                        border: "1px solid oklch(0.55 0.18 300 / 0.35)",
+                      }}
+                    >
+                      Model
+                    </span>
+                  )}
+                  {isMe && (
+                    <span className="text-[10px] text-muted-foreground">
+                      (you)
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  {/* Principal */}
+                  <button
+                    type="button"
+                    className="text-[11px] font-mono flex items-center gap-1 hover:opacity-80 transition-opacity"
+                    style={{ color: "oklch(var(--steel))" }}
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(principalStr)
+                        .then(() => toast.success("Principal copied!"));
+                    }}
+                    title="Click to copy full principal"
+                    data-ocid={`admin.users.button.${index + 1}`}
+                  >
+                    {truncPrincipal(user.principal)}
+                    <Copy size={9} />
+                  </button>
+
+                  {/* RevBucks balance */}
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-bold"
+                    style={{ color: "oklch(var(--orange-bright))" }}
+                  >
+                    <Zap size={10} />
+                    {user.revBucks} RB
+                  </span>
+                </div>
               </div>
-              <p
-                className="text-xs mt-0.5 font-mono"
-                style={{ color: "oklch(var(--steel))" }}
-              >
-                {truncPrincipal(user.principal)}
-              </p>
+
+              {/* Desktop: ban/delete on the right */}
+              {!isMe && (
+                <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={pendingAction === banKey}
+                    onClick={() => handleBanToggle(user)}
+                    data-ocid={
+                      isBanned
+                        ? `admin.users.secondary_button.${index + 1}`
+                        : `admin.users.delete_button.${index + 1}`
+                    }
+                    style={
+                      isBanned
+                        ? {
+                            borderColor: "oklch(0.7 0.18 150 / 0.5)",
+                            color: "oklch(0.75 0.18 150)",
+                          }
+                        : {
+                            borderColor: "oklch(var(--ember) / 0.5)",
+                            color: "oklch(0.75 0.18 27)",
+                          }
+                    }
+                  >
+                    {pendingAction === banKey ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : isBanned ? (
+                      <>
+                        <CheckCircle2 size={12} className="mr-1" />
+                        Unban
+                      </>
+                    ) : (
+                      <>
+                        <UserX size={12} className="mr-1" />
+                        Ban
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={pendingAction === delKey}
+                    onClick={() => handleDeleteProfile(user.principal)}
+                    data-ocid={`admin.users.delete_button.${index + 1}`}
+                  >
+                    {pendingAction === delKey ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 size={12} className="mr-1" />
+                        Delete
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {!isMe && (
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2.5 text-xs"
-                  disabled={pendingAction === banKey}
-                  onClick={() => handleBanToggle(user)}
-                  style={
-                    isBanned
-                      ? {
-                          borderColor: "oklch(0.7 0.18 150 / 0.5)",
-                          color: "oklch(0.75 0.18 150)",
-                        }
-                      : {
-                          borderColor: "oklch(var(--ember) / 0.5)",
-                          color: "oklch(0.75 0.18 27)",
-                        }
+            {/* Bottom row: RevBucks + Pro controls */}
+            <div
+              className="px-3 pb-3 flex flex-wrap items-center gap-2"
+              style={{ borderTop: "1px solid oklch(var(--border) / 0.5)" }}
+            >
+              {/* Add RevBucks */}
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="RB amount"
+                  value={rbInput}
+                  onChange={(e) =>
+                    setRbInputs((prev) => ({
+                      ...prev,
+                      [principalStr]: e.target.value,
+                    }))
                   }
-                >
-                  {pendingAction === banKey ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : isBanned ? (
-                    <>
-                      <CheckCircle2 size={12} className="mr-1" />
-                      Unban
-                    </>
-                  ) : (
-                    <>
-                      <UserX size={12} className="mr-1" />
-                      Ban
-                    </>
-                  )}
-                </Button>
-
+                  className="h-7 w-24 text-xs px-2 font-mono"
+                  style={{
+                    background: "oklch(var(--carbon))",
+                    border: "1px solid oklch(var(--border))",
+                  }}
+                  data-ocid={`admin.users.input.${index + 1}`}
+                />
                 <Button
                   size="sm"
-                  variant="destructive"
-                  className="h-7 px-2.5 text-xs"
-                  disabled={pendingAction === delKey}
-                  onClick={() => handleDeleteProfile(user.principal)}
+                  className="h-7 px-2.5 text-xs gap-1 font-bold"
+                  onClick={() => {
+                    void handleAddRb(user);
+                  }}
+                  disabled={pendingAction === `rb-${principalStr}`}
+                  data-ocid={`admin.users.save_button.${index + 1}`}
+                  style={{
+                    background: "oklch(var(--orange) / 0.2)",
+                    border: "1px solid oklch(var(--orange) / 0.4)",
+                    color: "oklch(var(--orange-bright))",
+                  }}
                 >
-                  {pendingAction === delKey ? (
-                    <Loader2 size={12} className="animate-spin" />
+                  {pendingAction === `rb-${principalStr}` ? (
+                    <Loader2 size={11} className="animate-spin" />
                   ) : (
                     <>
-                      <Trash2 size={12} className="mr-1" />
-                      Delete
+                      <Plus size={11} />
+                      <Zap size={11} />
                     </>
                   )}
+                  Add RB
                 </Button>
               </div>
-            )}
+
+              {/* Pro toggle */}
+              <Button
+                size="sm"
+                className="h-7 px-2.5 text-xs gap-1 font-bold"
+                onClick={() => {
+                  void handleProToggle(user);
+                }}
+                disabled={pendingAction === `pro-${principalStr}`}
+                data-ocid={`admin.users.toggle.${index + 1}`}
+                style={
+                  user.isPro
+                    ? {
+                        background: "oklch(0.8 0.18 85 / 0.2)",
+                        border: "1px solid oklch(0.8 0.18 85 / 0.4)",
+                        color: "oklch(0.82 0.18 85)",
+                      }
+                    : {
+                        background: "oklch(var(--surface-elevated))",
+                        border: "1px solid oklch(var(--border))",
+                        color: "oklch(var(--steel-light))",
+                      }
+                }
+              >
+                {pendingAction === `pro-${principalStr}` ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : (
+                  <Crown size={11} />
+                )}
+                {user.isPro ? "Remove Pro" : "Give Pro"}
+              </Button>
+
+              {/* Mobile: ban/delete */}
+              {!isMe && (
+                <div className="flex sm:hidden items-center gap-1.5 ml-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={pendingAction === banKey}
+                    onClick={() => handleBanToggle(user)}
+                    style={
+                      isBanned
+                        ? {
+                            borderColor: "oklch(0.7 0.18 150 / 0.5)",
+                            color: "oklch(0.75 0.18 150)",
+                          }
+                        : {
+                            borderColor: "oklch(var(--ember) / 0.5)",
+                            color: "oklch(0.75 0.18 27)",
+                          }
+                    }
+                  >
+                    {pendingAction === banKey ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : isBanned ? (
+                      <>
+                        <CheckCircle2 size={12} className="mr-1" />
+                        Unban
+                      </>
+                    ) : (
+                      <>
+                        <UserX size={12} className="mr-1" />
+                        Ban
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={pendingAction === delKey}
+                    onClick={() => handleDeleteProfile(user.principal)}
+                  >
+                    {pendingAction === delKey ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 size={12} className="mr-1" />
+                        Delete
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
@@ -839,6 +1136,17 @@ export function AdminPage() {
 
   const myPrincipal = identity?.getPrincipal().toString();
 
+  // Safety timeout — if isAdmin is still null after 5s, fall through to token gate
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setIsAdmin((prev) => {
+        if (prev === null) return false;
+        return prev;
+      });
+    }, 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Auth check — also honour the local password unlock
   useEffect(() => {
     if (isFetching) return;
@@ -847,7 +1155,10 @@ export function AdminPage() {
       setIsAdmin(true);
       return;
     }
-    if (!actor) return;
+    if (!actor) {
+      setIsAdmin(false);
+      return;
+    }
     actor
       .isCallerAdmin()
       .then((result: boolean) => {
@@ -858,13 +1169,13 @@ export function AdminPage() {
       });
   }, [actor, isFetching]);
 
-  // Count badges (best-effort)
+  // Count badges (best-effort) — use adminGetAllProfiles for accurate user count
   useEffect(() => {
     if (!actor || !isAdmin) return;
     Promise.all([
       actor
-        .adminGetAllUsers()
-        .then((u: UserWithRole[]) => setUserCount(u.length)),
+        .adminGetAllProfiles()
+        .then((p: ProfileWithPrincipal[]) => setUserCount(p.length)),
       actor.getAllPosts().then((p: PostView[]) => setPostCount(p.length)),
       actor.listAllListings().then((l: Listing[]) => setListingCount(l.length)),
     ]).catch(() => {});
