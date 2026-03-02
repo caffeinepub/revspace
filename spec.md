@@ -1,32 +1,38 @@
 # RevSpace
 
 ## Current State
-Full-featured social media platform for car enthusiasts. React + TypeScript + Tailwind frontend on ICP. 28 pages, all imported eagerly in App.tsx. Vite build has `minify: false`. Google Fonts loaded synchronously via CSS `@import`. Videos autoplay in feed. All pages load regardless of whether the user visits them. staleTime on some queries is very short (e.g. 10s for posts).
+Full-featured car enthusiast social platform. After v138, users report everything still throwing error messages — feed not loading, reels not loading, profiles not showing username/pic/reels.
+
+The actor initialization chain is:
+1. `useActor` builds the actor and immediately calls `_initializeAccessControlWithSecret(adminToken)` inside its React Query `queryFn`.
+2. `useRegisteredActor` wraps `useActor` and calls `_initializeAccessControlWithSecret("")` again in a `useEffect`, then waits 200ms before setting `isRegistered = true`.
+3. All queries are gated on `!!actor && !isFetching`.
+
+The `useDeployGuard` hook invalidates the actor query on every new 5-minute window AND removes all cached query data.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Route-based code splitting (lazy load all 28 page components via `React.lazy` + `Suspense`)
-- Vite build minification enabled (`minify: "esbuild"`)
-- `font-display: swap` for Google Fonts to prevent render blocking
-- Image lazy loading on all non-critical images (already on PostCard images; extend to Explore, Events, Clubs, Marketplace, etc.)
-- `will-change: transform` on animated/transitioning elements to promote GPU layers
-- Increase `staleTime` on stable queries (clubs, events, leaderboard, garage) to reduce redundant backend roundtrips
-- `preload="none"` on videos that autoplay off-screen (PostCard feed videos)
+- Force an explicit `syncTime()` call on the HttpAgent inside `useActor`'s `queryFn`, BEFORE calling `_initializeAccessControlWithSecret`. This ensures the agent clock is synced with the replica after every deploy.
+- Add a `shouldSyncTime: true` option to the HttpAgent creation in `useActor`.
 
 ### Modify
-- App.tsx: Replace all static page imports with `React.lazy()` imports; wrap route components in `Suspense` with a lightweight `PageLoader` fallback
-- vite.config.js: Set `minify: "esbuild"` and add `rollupOptions.output.manualChunks` to split vendor/ICP SDK into separate chunks
-- index.css: Add `font-display: swap` to the Google Fonts import URL via `&display=swap` (already present — verify it's applied correctly) and add `content-visibility: auto` on heavy sections
-- PostCard.tsx: Change video `preload` from `"metadata"` to `"none"` for off-screen autoplay videos to reduce bandwidth
-- useQueries.ts: Increase `staleTime` on `useAllClubs`, `useAllEvents`, `useAllListings`, `useGarageByUser` from default/0 to 60_000ms
+- In `useActor`, wrap the `_initializeAccessControlWithSecret` call in a try/catch with retry logic (up to 3 attempts with 1s delay) so transient post-deploy errors don't leave the actor in a broken state forever.
+- In `useActor`, after building the actor, call `syncTime()` on the agent if available, before calling `_initializeAccessControlWithSecret`. Use `(actor as any)._agent?.syncTime?.()` or similar pattern to reach the agent.
+- In `useRegisteredActor`, increase the post-registration delay from 200ms to 500ms to give the canister more time to process the role after a cold-start.
+- In `useDeployGuard`, instead of `removeQueries` (which wipes ALL cached data including valid query results), use `invalidateQueries` only, so queries refetch in the background rather than showing loading states immediately.
+- In `useActor`, set `retry: 3` and `retryDelay` on the query config so the actor rebuild retries on failure.
 
 ### Remove
-- Nothing removed
+- Nothing removed.
 
 ## Implementation Plan
-1. Update `vite.config.js` — enable `minify: "esbuild"`, add manual chunk splitting for `@dfinity`, `@icp-sdk`, `react`, `react-dom`, `@tanstack`
-2. Update `App.tsx` — convert all 28 page imports to `React.lazy()`, add `PageLoader` Suspense fallback
-3. Update `useQueries.ts` — raise `staleTime` on stable data queries
-4. Update `PostCard.tsx` — change video `preload="metadata"` to `preload="none"`
-5. Add CSS micro-optimizations: `content-visibility: auto` on feed items, smooth transitions
+1. Edit `useActor.ts`:
+   - Add `retry: 3`, `retryDelay` to the useQuery config.
+   - Inside `queryFn`, after creating the actor with `createActorWithConfig`, attempt to sync the agent's clock via `(actor as any)._agent?.syncTime?.()` — wrap in try/catch.
+   - Wrap the `_initializeAccessControlWithSecret(adminToken)` call in a retry loop (3 attempts, 1s apart).
+2. Edit `useRegisteredActor.ts`:
+   - Increase the post-registration delay from 200ms to 500ms.
+3. Edit `useDeployGuard.ts`:
+   - Replace `queryClient.removeQueries(...)` with `queryClient.invalidateQueries(...)` so data is refetched in background rather than showing blank/loading immediately.
+4. Verify TypeScript compiles cleanly.

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { backendInterface } from "../backend";
 import { useActor } from "./useActor";
@@ -22,6 +23,7 @@ import { useActor } from "./useActor";
  */
 export function useRegisteredActor() {
   const { actor, isFetching } = useActor();
+  const queryClient = useQueryClient();
 
   const [isRegistered, setIsRegistered] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -29,6 +31,19 @@ export function useRegisteredActor() {
   // Track the last actor instance we ran registration for so we don't repeat
   // the init call on every render.
   const lastActorRef = useRef<backendInterface | null>(null);
+
+  // If the actor query failed (actor is null, not currently fetching), force a
+  // retry after a short delay. The actor query has staleTime: Infinity so React
+  // Query won't automatically retry it — we need to manually invalidate it.
+  // This covers the case where _initializeAccessControlWithSecret throws on the
+  // first load after a new deploy.
+  useEffect(() => {
+    if (actor || isFetching) return;
+    const timer = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["actor"] });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [actor, isFetching, queryClient]);
 
   useEffect(() => {
     // No actor yet, or same actor instance we already registered — nothing to do.

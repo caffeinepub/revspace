@@ -209,7 +209,8 @@ export function useGetAllPosts() {
       return actor.getAllPosts();
     },
     enabled: !!actor && !isFetching,
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchOnMount: true,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
@@ -224,7 +225,8 @@ export function useGetPostsByUser(user: Principal | undefined) {
       return actor.getPostsByUser(user);
     },
     enabled: !!actor && !isFetching && !!user,
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchOnMount: true,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
@@ -900,7 +902,9 @@ export function useUnfollowUser() {
 }
 
 export function useGetFollowers(user: Principal | undefined) {
-  const { actor, isFetching } = useRegisteredActor();
+  // getFollowers is a public read — use useActor directly so it fires
+  // immediately without waiting for the registration gate.
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["followers", user?.toString()],
     queryFn: async () => {
@@ -913,7 +917,8 @@ export function useGetFollowers(user: Principal | undefined) {
 }
 
 export function useGetFollowing(user: Principal | undefined) {
-  const { actor, isFetching } = useRegisteredActor();
+  // getFollowing is a public read — use useActor directly.
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["following", user?.toString()],
     queryFn: async () => {
@@ -926,7 +931,8 @@ export function useGetFollowing(user: Principal | undefined) {
 }
 
 export function useIsFollowing(user: Principal | undefined) {
-  const { actor, isFetching } = useRegisteredActor();
+  // isFollowing is a public read — use useActor directly.
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["isFollowing", user?.toString()],
     queryFn: async () => {

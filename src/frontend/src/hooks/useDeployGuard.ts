@@ -36,7 +36,7 @@ export function useDeployGuard() {
       queryClient.invalidateQueries({ queryKey: [ACTOR_QUERY_KEY] });
       // Also remove ALL cached query data so stale post/profile/etc results
       // are not shown after a deploy that may have reset on-chain state.
-      queryClient.removeQueries({
+      queryClient.invalidateQueries({
         predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
       });
     }

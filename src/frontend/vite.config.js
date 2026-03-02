@@ -17,24 +17,7 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: false,
-    minify: "esbuild",
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          router: ["@tanstack/react-router"],
-          query: ["@tanstack/react-query"],
-          motion: ["motion/react"],
-          "icp-sdk": [
-            "@icp-sdk/core",
-            "@dfinity/agent",
-            "@dfinity/candid",
-            "@dfinity/principal",
-          ],
-          lucide: ["lucide-react"],
-        },
-      },
-    },
+    minify: false,
   },
   css: {
     postcss: "./postcss.config.js",
