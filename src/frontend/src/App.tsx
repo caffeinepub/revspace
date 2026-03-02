@@ -16,6 +16,7 @@ import { EventsPage } from "./pages/EventsPage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { FeaturedCarPage } from "./pages/FeaturedCarPage";
 import { FeedPage } from "./pages/FeedPage";
+import { GamePage } from "./pages/GamePage";
 import { GaragePage } from "./pages/GaragePage";
 import { GuidePage } from "./pages/GuidePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
@@ -261,6 +262,12 @@ const modelGalleryRoute = createRoute({
   component: ModelGalleryPage,
 });
 
+const gameRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/game",
+  component: GamePage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -287,6 +294,7 @@ const routeTree = rootRoute.addChildren([
   buildBattleRoute,
   modelReelsRoute,
   modelGalleryRoute,
+  gameRoute,
 ]);
 
 const router = createRouter({ routeTree });

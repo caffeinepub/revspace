@@ -435,6 +435,70 @@ function ShopTab({
 
   return (
     <>
+      {/* Buy More RevBucks banner */}
+      <motion.a
+        href={`https://buy.stripe.com/5kQ6oI3tl9Vielf48T9EI01?client_reference_id=${encodeURIComponent(myPrincipal)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        whileHover={{ scale: 1.01, y: -1 }}
+        whileTap={{ scale: 0.99 }}
+        className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-6 no-underline cursor-pointer relative overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.2 0.06 50 / 0.9), oklch(0.16 0.04 50))",
+          border: "1.5px solid oklch(var(--orange) / 0.5)",
+          boxShadow: "0 0 20px oklch(var(--orange) / 0.12)",
+        }}
+        onClick={() => {
+          toast.success(
+            "Taking you to checkout\u2026 RevBucks will be credited when you return.",
+            { duration: 4000 },
+          );
+        }}
+      >
+        {/* Glow effect */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at 0% 50%, oklch(var(--orange) / 0.1) 0%, transparent 60%)",
+          }}
+        />
+        <div className="flex items-center gap-3 relative z-10">
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+            style={{
+              background: "oklch(var(--orange) / 0.18)",
+              border: "1px solid oklch(var(--orange) / 0.35)",
+            }}
+          >
+            <Zap size={18} style={{ color: "oklch(var(--orange))" }} />
+          </div>
+          <div>
+            <p
+              className="text-sm font-bold leading-tight"
+              style={{ color: "oklch(var(--foreground))" }}
+            >
+              Buy More RevBucks
+            </p>
+            <p className="text-[11px]" style={{ color: "oklch(var(--steel))" }}>
+              ⚡ {balance.toLocaleString()} RB in your wallet
+            </p>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 relative z-10"
+          style={{
+            background: "oklch(var(--orange))",
+            color: "oklch(var(--carbon))",
+            boxShadow: "0 0 12px oklch(var(--orange) / 0.4)",
+          }}
+        >
+          <Zap size={12} />
+          550 RB — $5.99
+        </div>
+      </motion.a>
+
       <div className="space-y-8 pb-6">
         {SHOP_CATEGORIES.map((cat) => {
           const items = SHOP_ITEMS.filter((i) => i.category === cat);

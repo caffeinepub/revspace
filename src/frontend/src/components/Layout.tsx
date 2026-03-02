@@ -8,6 +8,7 @@ import {
   Coins,
   Compass,
   Film,
+  Gamepad2,
   Home,
   Info,
   LayoutGrid,
@@ -36,29 +37,71 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-const ALL_NAV_ITEMS = [
-  { to: "/", label: "Feed", icon: Home },
-  { to: "/explore", label: "Explore", icon: Compass },
-  { to: "/reels", label: "Reels", icon: Film },
-  { to: "/model-reels", label: "Model Reels", icon: Clapperboard },
-  { to: "/model-gallery", label: "Model Gallery", icon: LayoutGrid },
-  { to: "/garage", label: "My Garage", icon: Car },
-  { to: "/events", label: "Events", icon: Calendar },
-  { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
-  { to: "/clubs", label: "Car Clubs", icon: Users },
-  { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { to: "/revbucks", label: "RevBucks", icon: Coins },
-  { to: "/featured", label: "Featured Car", icon: Star },
-  { to: "/buildbattle", label: "Build Battle", icon: Swords },
-  { to: "/mechanics", label: "Mechanics", icon: Wrench },
-  { to: "/shop", label: "Performance Shop", icon: Store },
-  { to: "/about", label: "About RevSpace", icon: Info },
-  { to: "/guide", label: "Guide", icon: BookOpen },
-  { to: "/messages", label: "Messages", icon: MessageCircle },
-  { to: "/notifications", label: "Notifications", icon: Bell },
-  { to: "/profile", label: "Profile", icon: User },
-  { to: "/settings", label: "Settings", icon: Settings },
-];
+const NAV_GROUPS = [
+  {
+    label: "Discover",
+    items: [
+      { to: "/", label: "Feed", icon: Home },
+      { to: "/explore", label: "Explore", icon: Compass },
+      { to: "/reels", label: "Reels", icon: Film },
+    ],
+  },
+  {
+    label: "Models",
+    items: [
+      { to: "/model-reels", label: "Model Reels", icon: Clapperboard },
+      { to: "/model-gallery", label: "Model Gallery", icon: LayoutGrid },
+    ],
+  },
+  {
+    label: "Community",
+    items: [
+      { to: "/events", label: "Events", icon: Calendar },
+      { to: "/clubs", label: "Car Clubs", icon: Users },
+      { to: "/buildbattle", label: "Build Battle", icon: Swords },
+      { to: "/mechanics", label: "Mechanics", icon: Wrench },
+      { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
+    ],
+  },
+  {
+    label: "Marketplace",
+    items: [
+      { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+      { to: "/shop", label: "Performance Shop", icon: Store },
+      { to: "/featured", label: "Featured Car", icon: Star },
+    ],
+  },
+  {
+    label: "RevBucks",
+    items: [{ to: "/revbucks", label: "RevBucks", icon: Coins }],
+  },
+  {
+    label: "My Space",
+    items: [
+      { to: "/garage", label: "My Garage", icon: Car },
+      { to: "/profile", label: "Profile", icon: User },
+    ],
+  },
+  {
+    label: "Pro Perks",
+    items: [{ to: "/game", label: "Rev Racing", icon: Gamepad2 }],
+  },
+  {
+    label: "Account",
+    items: [
+      { to: "/messages", label: "Messages", icon: MessageCircle },
+      { to: "/notifications", label: "Notifications", icon: Bell },
+      { to: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Info",
+    items: [
+      { to: "/guide", label: "Guide", icon: BookOpen },
+      { to: "/about", label: "About RevSpace", icon: Info },
+    ],
+  },
+] as const;
 
 function useIsAdmin(): boolean {
   const { actor, isFetching } = useActor();
@@ -240,44 +283,58 @@ function MobileNav({ unreadCount }: { unreadCount: number }) {
 
         {/* All nav links — takes all remaining height and scrolls */}
         <nav
-          className="flex flex-col gap-0.5 px-2 overflow-y-auto"
+          className="flex flex-col px-2 overflow-y-auto"
           style={{ flex: "1 1 0", minHeight: 0, paddingBottom: 8 }}
         >
-          {ALL_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
-            return (
-              <Link key={item.to} to={item.to} onClick={() => setOpen(false)}>
-                <div className={`sidebar-item ${isActive ? "active" : ""}`}>
-                  <div className="relative">
-                    <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                    {item.label === "Notifications" && unreadCount > 0 && (
-                      <span
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                        style={{ background: "oklch(var(--ember))" }}
-                      >
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                  </div>
-                  <span className="flex-1">{item.label}</span>
-                  {item.label === "RevBucks" && (
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{
-                        background: "oklch(var(--orange) / 0.15)",
-                        color: "oklch(var(--orange-bright))",
-                        border: "1px solid oklch(var(--orange) / 0.3)",
-                      }}
-                    >
-                      ⚡{rbBalance}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p
+                className="px-2 pt-3 pb-1 text-[10px] uppercase tracking-widest font-semibold"
+                style={{ color: "oklch(var(--steel))" }}
+              >
+                {group.label}
+              </p>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive =
+                  matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                  >
+                    <div className={`sidebar-item ${isActive ? "active" : ""}`}>
+                      <div className="relative">
+                        <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                        {item.label === "Notifications" && unreadCount > 0 && (
+                          <span
+                            className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                            style={{ background: "oklch(var(--ember))" }}
+                          >
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <span className="flex-1">{item.label}</span>
+                      {item.label === "RevBucks" && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{
+                            background: "oklch(var(--orange) / 0.15)",
+                            color: "oklch(var(--orange-bright))",
+                            border: "1px solid oklch(var(--orange) / 0.3)",
+                          }}
+                        >
+                          ⚡{rbBalance}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
 
           {/* Admin Panel — only shown to admins */}
           {isAdmin && (
@@ -366,43 +423,53 @@ function Sidebar({ unreadCount }: { unreadCount: number }) {
         </div>
       </Link>
 
-      <div className="flex flex-col gap-0.5">
-        {ALL_NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+      <div className="flex flex-col">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p
+              className="px-2 pt-3 pb-1 text-[10px] uppercase tracking-widest font-semibold"
+              style={{ color: "oklch(var(--steel))" }}
+            >
+              {group.label}
+            </p>
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
 
-          return (
-            <Link key={item.to} to={item.to}>
-              <div className={`sidebar-item ${isActive ? "active" : ""}`}>
-                <div className="relative">
-                  <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                  {item.label === "Notifications" && unreadCount > 0 && (
-                    <span
-                      className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                      style={{ background: "oklch(var(--ember))" }}
-                    >
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </div>
-                <span className="flex-1">{item.label}</span>
-                {item.label === "RevBucks" && (
-                  <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{
-                      background: "oklch(var(--orange) / 0.15)",
-                      color: "oklch(var(--orange-bright))",
-                      border: "1px solid oklch(var(--orange) / 0.3)",
-                    }}
-                  >
-                    ⚡{rbBalance}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+              return (
+                <Link key={item.to} to={item.to}>
+                  <div className={`sidebar-item ${isActive ? "active" : ""}`}>
+                    <div className="relative">
+                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                      {item.label === "Notifications" && unreadCount > 0 && (
+                        <span
+                          className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                          style={{ background: "oklch(var(--ember))" }}
+                        >
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1">{item.label}</span>
+                    {item.label === "RevBucks" && (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: "oklch(var(--orange) / 0.15)",
+                          color: "oklch(var(--orange-bright))",
+                          border: "1px solid oklch(var(--orange) / 0.3)",
+                        }}
+                      >
+                        ⚡{rbBalance}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
 
         {/* Admin Panel link — only for admins */}
         {isAdmin && (

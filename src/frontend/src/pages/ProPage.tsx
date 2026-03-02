@@ -5,6 +5,7 @@ import {
   CheckCircle,
   Crown,
   Film,
+  Gamepad2,
   Loader2,
   MessageCircle,
   Shield,
@@ -63,6 +64,11 @@ const PRO_PERKS = [
     icon: MessageCircle,
     title: "Pro Support",
     desc: "Direct access to priority support via Instagram @boddysum for any issues or requests.",
+  },
+  {
+    icon: Gamepad2,
+    title: "Exclusive Game Access",
+    desc: "Pro members get access to Rev Racing — an exclusive game embedded right inside RevSpace.",
   },
 ];
 
