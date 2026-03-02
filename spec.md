@@ -1,62 +1,30 @@
 # RevSpace
 
 ## Current State
-Full-featured car enthusiast social platform on ICP. Backend has on-chain storage for posts, profiles, cars, events, listings, clubs, notifications, messages, and follows. RevBucks balance/transactions/gifts, Pro status, and Model account status are all stored only in localStorage — they vanish when a user clears browser data or updates the app. Model Reels and Model Gallery pages show all reels from any user (no model-account restriction on who can post there). The registered-users counter in the feed is a post-count workaround — it counts distinct authors rather than actual registered users.
+- Model Reels and Model Gallery pages already filter display to model-account posts only
+- CreatePostPage has no model-account gate — any user can currently post any type from that page
+- Build Battle allows one user to fill out both Car A and Car B in a single modal, uploading both cars themselves
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `UserMeta` record per principal storing `revbucksBalance: Nat`, `isPro: Bool`, `isModel: Bool`, `modelSpecialty: Text`, `modelSocialHandle: Text`, `modelBookingContact: Text`, `modelYearsActive: Text`
-- Backend: `revbucksTransactions` map (principal → list of transaction records: id, type, description, amount, timestamp)
-- Backend: `receivedGifts` map (principal → list of gift records: id, giftId, giftName, giftEmoji, fromPrincipal, timestamp)
-- Backend: `getMyUserMeta()` — returns the caller's UserMeta (or defaults)
-- Backend: `getUserMeta(user: Principal)` — public read of any user's isPro/isModel (for display on profiles/posts)
-- Backend: `saveUserMeta(isPro, isModel, modelSpecialty, modelSocialHandle, modelBookingContact, modelYearsActive)` — saves caller's meta
-- Backend: `addRevBucks(amount: Nat)` — admin-only, credit RB to any principal
-- Backend: `awardRevBucks(reason: Text)` — internal helper called by createPost, likePost, etc.
-- Backend: `deductRevBucks(amount: Nat)` — deducts from caller balance, returns Bool success
-- Backend: `recordRevBucksPurchase(amount: Nat, packName: Text)` — called on Stripe redirect
-- Backend: `sendGift(recipientPrincipal: Principal, giftId: Text, giftName: Text, giftEmoji: Text, cost: Nat)` — deducts from caller, records gift for recipient
-- Backend: `getMyRevBucksTransactions()` — returns caller's transaction history
-- Backend: `getMyReceivedGifts()` — returns caller's received gifts
-- Backend: `getTotalRegisteredUsers()` — returns count of all principals who have ever called saveCallerUserProfile or saveUserMeta (true headcount)
-- Backend: Post type extended with `isModelPost: Bool` flag — set true when posting author has isModel=true at time of post
-- Backend: `adminAwardRevBucks(user: Principal, amount: Nat)` — admin panel manual credit
-- Backend: `adminGetUserMeta(user: Principal)` — admin read
+- Model-only posting gate in CreatePostPage: if the URL query param `?section=model` is present (or postType is Reel/Video and user navigated from a model section), check `isModel` from `useUserMeta`. If not a model account, show an inline block with a prompt to go to Settings — disable the Publish button.
+- Simpler approach: add a `?modelOnly=1` query param that CreatePostPage reads; if present and user is not a model, show a full-screen gate instead of the form.
+- Build Battle "challenger" flow: when creating a battle, the creator fills out only Car A (their own car) and optionally sets a title. The battle starts in a `pending` state with Car B empty. A "Join Battle" button appears on the battle card — any other signed-in user can click it, fill out their Car B info + photo, and complete the battle. Once both cars are submitted the battle goes live for voting.
 
 ### Modify
-- Backend: `createPost` — awards +10 RB on-chain after successful post; sets `isModelPost` flag based on caller's current isModel status
-- Backend: `likePost` — when a post reaches a multiple of 10 likes, awards +5 RB to post author on-chain
-- Model Reels / Model Gallery pages — filter to only show posts where `isModelPost === true`
-- Settings page — ModelAccountCard and ProCard save/load from backend via `saveUserMeta` / `getMyUserMeta` instead of localStorage
-- RevBucks page — balance, transactions, gifts all loaded from backend; Stripe redirect calls `recordRevBucksPurchase` on-chain; gift sends call `sendGift` on-chain
-- Pro page — Pro status loaded from backend `getMyUserMeta().isPro`; Stripe redirect calls `saveUserMeta` with `isPro=true`
-- Feed page header — registered user count uses `getTotalRegisteredUsers()` instead of distinct post authors
-- CreatePost page — remove `awardPostCreation` localStorage call (backend now handles it)
+- `BuildBattlePage` / `SubmitModal`: creator only submits Car A. Battle saved with `status: "open"` (waiting for challenger).
+- `BattleCard`: show a "Join This Battle" button when `status === "open"` and the viewer is not the Car A owner. Clicking opens a `JoinBattleModal` where the challenger submits Car B.
+- `buildBattle.ts`: add `status: "open" | "active" | "ended"` field to `Battle`. `createBattle` only takes `carA`, sets `carB` to null/placeholder. New `joinBattle(battleId, carB)` function sets Car B and changes status to `"active"`.
+- `ModelReelsPage` and `ModelGalleryPage`: already gate display; optionally reinforce with a clearer "Post here" CTA that passes `?modelOnly=1` to the create page.
+- `CreatePostPage`: read `?modelOnly=1` query param; if set and `isMyAccountModel === false`, render a gate UI (purple banner + Settings button) instead of the post form.
 
 ### Remove
-- localStorage-only RevBucks balance/transactions/gifts logic as primary source (keep as display fallback during loading only)
-- localStorage-only Pro status as primary source
-- localStorage-only Model account status as primary source
+- The dual-car form in `SubmitModal` (remove Car B section from the create flow — creator only fills Car A now)
 
 ## Implementation Plan
-1. Add `UserMeta` type + `userMeta` map to backend Motoko
-2. Add `revbucksTransactions` and `receivedGifts` maps with transaction/gift types
-3. Add `registeredUsers` set to track true headcount
-4. Implement all new query/update backend functions
-5. Modify `createPost` to award RB on-chain and set `isModelPost`
-6. Modify `likePost` to award RB on 10-like milestones
-7. Extend `PostView` with `isModelPost: Bool`
-8. Update `saveCallerUserProfile` and `saveUserMeta` to register into `registeredUsers` set
-9. Frontend: update `useQueries` hooks with new backend calls
-10. Frontend: RevBucks lib — wrap backend calls, keep localStorage as in-memory cache only
-11. Frontend: Pro lib — read/write from backend
-12. Frontend: Model account lib — read/write from backend
-13. Frontend: ModelReelsPage — filter `p.isModelPost === true`
-14. Frontend: ModelGalleryPage — filter `p.isModelPost === true`
-15. Frontend: Feed registered user count — use `getTotalRegisteredUsers()`
-16. Frontend: Settings ModelAccountCard — save/load via backend
-17. Frontend: Settings ProCard — save/load via backend
-18. Frontend: RevBucksPage — all balance/transaction/gift ops via backend
-19. Frontend: ProPage — Pro status and Stripe credit via backend
-20. Frontend: CreatePost — remove localStorage RB award call
+1. Update `buildBattle.ts`: add `status` field, update `createBattle` to accept only `carA` and set status `"open"`, add `joinBattle(battleId, carB)` function, update `getActiveBattles` to show both `"open"` and `"active"` battles.
+2. Update `BuildBattlePage` / `SubmitModal`: remove Car B form, creator submits only their own car. 
+3. Update `BattleCard`: show "Join This Battle" CTA when `status === "open"` and viewer is not carA owner. Add `JoinBattleModal` component for challenger to upload their Car B.
+4. Update `CreatePostPage`: read `modelOnly` search param from router; if truthy and user is not a model account, show a purple gate UI instead of the post form with a link to Settings.
+5. Update `ModelReelsPage` and `ModelGalleryPage` "Upload" CTAs to link with `?modelOnly=1`.

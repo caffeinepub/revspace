@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Film,
@@ -16,6 +16,7 @@ import {
   ImagePlus,
   Loader2,
   RotateCcw,
+  Settings,
   Tag,
   Upload,
   Video,
@@ -26,6 +27,7 @@ import { toast } from "sonner";
 import { UploadHealthBanner } from "../components/UploadHealthBanner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreatePost, useUploadFile } from "../hooks/useQueries";
+import { useUserMeta } from "../hooks/useUserMeta";
 import { convertToJpegIfNeeded } from "../lib/convertHeic";
 import { clearDraft, getDraft, hasDraft, saveDraft } from "../lib/draftPost";
 import { awardPostCreation } from "../lib/revbucks";
@@ -128,6 +130,11 @@ export function CreatePostPage() {
   const navigate = useNavigate();
   const { identity } = useInternetIdentity();
   const principalId = identity?.getPrincipal().toText() ?? "";
+  const { meta, isLoading: metaLoading } = useUserMeta();
+
+  // Check if this page was opened from a model-only section
+  const isModelOnlySection =
+    new URLSearchParams(window.location.search).get("modelOnly") === "1";
 
   const [postType, setPostType] = useState("Photo");
   const [topic, setTopic] = useState("Other");
@@ -346,6 +353,9 @@ export function CreatePostPage() {
   const isBusy = stage !== "idle" || createPost.isPending;
   const stageInfo = getStageInfo(stage, uploadProgress);
 
+  // Model-only gate: if opened from model section and user is not a model account
+  const showModelGate = isModelOnlySection && !metaLoading && !meta.isModel;
+
   return (
     <div className="min-h-screen">
       <header className="page-header">
@@ -364,354 +374,418 @@ export function CreatePostPage() {
         </Button>
       </header>
 
-      <form onSubmit={handleSubmit} className="p-4 space-y-5 max-w-xl mx-auto">
-        {/* Draft restore banner */}
-        {draftBannerVisible && (
+      {/* Model-only section gate */}
+      {showModelGate && (
+        <div className="p-4 max-w-xl mx-auto">
           <div
-            className="flex items-center gap-3 rounded-xl px-3.5 py-3"
+            className="rounded-2xl p-6 flex flex-col items-center text-center gap-4"
             style={{
-              background: "oklch(0.2 0.06 260 / 0.3)",
-              border: "1px solid oklch(0.55 0.18 260 / 0.4)",
+              background:
+                "linear-gradient(135deg, oklch(0.14 0.06 310 / 0.6), oklch(0.11 0.03 310 / 0.9))",
+              border: "1px solid oklch(0.45 0.14 310 / 0.6)",
             }}
           >
-            <RotateCcw
-              size={15}
-              className="shrink-0"
-              style={{ color: "oklch(0.7 0.18 260)" }}
-            />
-            <p
-              className="text-xs flex-1"
-              style={{ color: "oklch(0.82 0.08 260)" }}
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: "oklch(0.3 0.15 310 / 0.4)" }}
             >
-              You have a saved draft
-            </p>
-            <button
-              type="button"
-              onClick={handleRestoreDraft}
-              className="text-xs font-semibold px-2 py-1 rounded-lg transition-opacity hover:opacity-80"
-              style={{
-                background: "oklch(0.55 0.2 260 / 0.3)",
-                color: "oklch(0.78 0.2 260)",
-                border: "1px solid oklch(0.55 0.2 260 / 0.4)",
-              }}
-            >
-              Restore
-            </button>
-            <button
-              type="button"
-              onClick={handleDismissDraft}
-              className="text-steel hover:text-foreground transition-colors ml-1"
-              aria-label="Dismiss draft"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        )}
-
-        {/* Post Type Selector */}
-        <div>
-          <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
-            Post Type
-          </Label>
-          <div className="grid grid-cols-3 gap-3">
-            {POST_TYPES.map(({ value, icon: Icon, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setPostType(value);
-                  clearFile();
+              <span className="text-3xl">🎬</span>
+            </div>
+            <div>
+              <p
+                className="text-lg font-black mb-1"
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  letterSpacing: "0.04em",
+                  color: "oklch(0.92 0.14 310)",
                 }}
-                className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
-                style={
-                  postType === value
-                    ? {
-                        background: "oklch(var(--orange) / 0.15)",
-                        border: "2px solid oklch(var(--orange))",
-                        color: "oklch(var(--orange-bright))",
-                      }
-                    : {
-                        background: "oklch(var(--surface))",
-                        border: "2px solid oklch(var(--border))",
-                        color: "oklch(var(--steel-light))",
-                      }
-                }
               >
-                <Icon size={22} />
-                <span className="text-xs font-semibold">{label}</span>
-              </button>
-            ))}
+                Model Accounts Only
+              </p>
+              <p className="text-sm" style={{ color: "oklch(0.65 0.1 310)" }}>
+                This section is exclusively for model accounts. Switch to a
+                Model Account in Settings to post here.
+              </p>
+            </div>
+            <Link to="/settings">
+              <Button
+                className="flex items-center gap-2 font-semibold"
+                style={{
+                  background: "oklch(0.55 0.22 310)",
+                  color: "white",
+                  border: "none",
+                  boxShadow: "0 0 20px oklch(0.55 0.22 310 / 0.4)",
+                }}
+              >
+                <Settings size={15} />
+                Go to Settings
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void navigate({ to: "/" })}
+              className="text-steel"
+            >
+              Back to Feed
+            </Button>
           </div>
         </div>
+      )}
 
-        {/* Topic Selector — only for Reel/Video */}
-        {(postType === "Reel" || postType === "Video") && (
+      {!showModelGate && (
+        <form
+          onSubmit={handleSubmit}
+          className="p-4 space-y-5 max-w-xl mx-auto"
+        >
+          {/* Draft restore banner */}
+          {draftBannerVisible && (
+            <div
+              className="flex items-center gap-3 rounded-xl px-3.5 py-3"
+              style={{
+                background: "oklch(0.2 0.06 260 / 0.3)",
+                border: "1px solid oklch(0.55 0.18 260 / 0.4)",
+              }}
+            >
+              <RotateCcw
+                size={15}
+                className="shrink-0"
+                style={{ color: "oklch(0.7 0.18 260)" }}
+              />
+              <p
+                className="text-xs flex-1"
+                style={{ color: "oklch(0.82 0.08 260)" }}
+              >
+                You have a saved draft
+              </p>
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="text-xs font-semibold px-2 py-1 rounded-lg transition-opacity hover:opacity-80"
+                style={{
+                  background: "oklch(0.55 0.2 260 / 0.3)",
+                  color: "oklch(0.78 0.2 260)",
+                  border: "1px solid oklch(0.55 0.2 260 / 0.4)",
+                }}
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={handleDismissDraft}
+                className="text-steel hover:text-foreground transition-colors ml-1"
+                aria-label="Dismiss draft"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* Post Type Selector */}
           <div>
             <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
-              <span className="flex items-center gap-1.5">
-                <Tag size={12} />
-                Topic / Category
-              </span>
+              Post Type
             </Label>
-            <Select value={topic} onValueChange={setTopic}>
-              <SelectTrigger
-                className="h-11 text-sm font-medium"
-                style={{
-                  background: "oklch(var(--surface))",
-                  borderColor: "oklch(var(--border))",
-                  color: "oklch(var(--foreground))",
-                }}
-              >
-                <SelectValue placeholder="Select a topic..." />
-              </SelectTrigger>
-              <SelectContent
-                style={{
-                  background: "oklch(var(--surface))",
-                  borderColor: "oklch(var(--border))",
-                }}
-              >
-                {REEL_TOPICS.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-steel mt-1">
-              Help others find your reel by tagging it with a topic
-            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {POST_TYPES.map(({ value, icon: Icon, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setPostType(value);
+                    clearFile();
+                  }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
+                  style={
+                    postType === value
+                      ? {
+                          background: "oklch(var(--orange) / 0.15)",
+                          border: "2px solid oklch(var(--orange))",
+                          color: "oklch(var(--orange-bright))",
+                        }
+                      : {
+                          background: "oklch(var(--surface))",
+                          border: "2px solid oklch(var(--border))",
+                          color: "oklch(var(--steel-light))",
+                        }
+                  }
+                >
+                  <Icon size={22} />
+                  <span className="text-xs font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Media Upload */}
-        <div>
-          <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
-            Media {postType === "Photo" ? "(Image)" : "(Video)"}
-          </Label>
+          {/* Topic Selector — only for Reel/Video */}
+          {(postType === "Reel" || postType === "Video") && (
+            <div>
+              <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <Tag size={12} />
+                  Topic / Category
+                </span>
+              </Label>
+              <Select value={topic} onValueChange={setTopic}>
+                <SelectTrigger
+                  className="h-11 text-sm font-medium"
+                  style={{
+                    background: "oklch(var(--surface))",
+                    borderColor: "oklch(var(--border))",
+                    color: "oklch(var(--foreground))",
+                  }}
+                >
+                  <SelectValue placeholder="Select a topic..." />
+                </SelectTrigger>
+                <SelectContent
+                  style={{
+                    background: "oklch(var(--surface))",
+                    borderColor: "oklch(var(--border))",
+                  }}
+                >
+                  {REEL_TOPICS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-steel mt-1">
+                Help others find your reel by tagging it with a topic
+              </p>
+            </div>
+          )}
 
-          {/* Upload health warning banner */}
-          <UploadHealthBanner />
+          {/* Media Upload */}
+          <div>
+            <Label className="text-xs text-steel mb-2 block uppercase tracking-wider font-semibold">
+              Media {postType === "Photo" ? "(Image)" : "(Video)"}
+            </Label>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={currentType.accept}
-            className="hidden"
-            onChange={handleFileChange}
-          />
+            {/* Upload health warning banner */}
+            <UploadHealthBanner />
 
-          <div
-            className="relative rounded-xl overflow-hidden"
-            style={{
-              border: "2px dashed oklch(var(--border))",
-              minHeight: "160px",
-              background: "oklch(var(--surface))",
-            }}
-          >
-            {previewUrl ? (
-              <div className="relative">
-                {isVideo ? (
-                  <video
-                    src={previewUrl}
-                    className="w-full h-52 object-cover"
-                    controls
-                    playsInline
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={currentType.accept}
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            <div
+              className="relative rounded-xl overflow-hidden"
+              style={{
+                border: "2px dashed oklch(var(--border))",
+                minHeight: "160px",
+                background: "oklch(var(--surface))",
+              }}
+            >
+              {previewUrl ? (
+                <div className="relative">
+                  {isVideo ? (
+                    <video
+                      src={previewUrl}
+                      className="w-full h-52 object-cover"
+                      controls
+                      playsInline
+                    >
+                      <track kind="captions" />
+                    </video>
+                  ) : (
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-52 object-cover"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearFile}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: "oklch(0 0 0 / 0.6)" }}
                   >
-                    <track kind="captions" />
-                  </video>
-                ) : (
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="w-full h-52 object-cover"
-                  />
-                )}
+                    <X size={14} className="text-white" />
+                  </button>
+                  {file && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0 px-3 py-2"
+                      style={{ background: "oklch(0 0 0 / 0.5)" }}
+                    >
+                      <p className="text-white text-xs truncate">{file.name}</p>
+                      <p className="text-white/60 text-[10px]">
+                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={clearFile}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "oklch(0 0 0 / 0.6)" }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center py-10 gap-3 hover:opacity-80 transition-opacity"
                 >
-                  <X size={14} className="text-white" />
-                </button>
-                {file && (
                   <div
-                    className="absolute bottom-0 left-0 right-0 px-3 py-2"
-                    style={{ background: "oklch(0 0 0 / 0.5)" }}
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background: "oklch(var(--orange) / 0.1)",
+                      border: "1px solid oklch(var(--orange) / 0.3)",
+                    }}
                   >
-                    <p className="text-white text-xs truncate">{file.name}</p>
-                    <p className="text-white/60 text-[10px]">
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                    <ImagePlus
+                      size={26}
+                      style={{ color: "oklch(var(--orange))" }}
+                    />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-foreground">
+                      {isVideo ? "Upload Video" : "Upload Photo"}
                     </p>
+                    <p className="text-xs text-steel mt-0.5">
+                      {postType === "Reel"
+                        ? "Up to 10 minutes · MP4/MOV recommended"
+                        : `Tap to browse ${isVideo ? "videos" : "images"} from your device`}
+                    </p>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Multi-stage upload progress indicator */}
+            {stageInfo && (
+              <div className="mt-2 space-y-1.5">
+                {/* Stage pill */}
+                <div className="flex items-center justify-between">
+                  <span
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
+                    style={{
+                      background: "oklch(var(--orange))",
+                      color: "oklch(var(--carbon))",
+                    }}
+                  >
+                    {stage === "publishing" && (
+                      <CheckCircle2 size={11} className="opacity-80" />
+                    )}
+                    {(stage === "uploading" || stage === "validating") && (
+                      <Loader2 size={11} className="animate-spin opacity-80" />
+                    )}
+                    {stageInfo.label}
+                  </span>
+                  {stage === "uploading" && uploadProgress !== null && (
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: "oklch(var(--orange))" }}
+                    >
+                      {Math.round(uploadProgress)}%
+                    </span>
+                  )}
+                </div>
+
+                {/* Progress bar — only during upload */}
+                {stage === "uploading" && uploadProgress !== null && (
+                  <div
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "oklch(var(--surface-elevated))" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${uploadProgress}%`,
+                        background: "oklch(var(--orange))",
+                      }}
+                    />
                   </div>
                 )}
               </div>
-            ) : (
+            )}
+
+            {/* Browse button when file already selected */}
+            {previewUrl && !isBusy && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center py-10 gap-3 hover:opacity-80 transition-opacity"
+                className="mt-2 flex items-center gap-1.5 text-xs text-steel hover:text-foreground transition-colors"
               >
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: "oklch(var(--orange) / 0.1)",
-                    border: "1px solid oklch(var(--orange) / 0.3)",
-                  }}
-                >
-                  <ImagePlus
-                    size={26}
-                    style={{ color: "oklch(var(--orange))" }}
-                  />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-foreground">
-                    {isVideo ? "Upload Video" : "Upload Photo"}
-                  </p>
-                  <p className="text-xs text-steel mt-0.5">
-                    {postType === "Reel"
-                      ? "Up to 10 minutes · MP4/MOV recommended"
-                      : `Tap to browse ${isVideo ? "videos" : "images"} from your device`}
-                  </p>
-                </div>
+                <Upload size={12} />
+                Change file
               </button>
             )}
           </div>
 
-          {/* Multi-stage upload progress indicator */}
-          {stageInfo && (
-            <div className="mt-2 space-y-1.5">
-              {/* Stage pill */}
-              <div className="flex items-center justify-between">
+          {/* Caption */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs text-steel uppercase tracking-wider font-semibold">
+                Caption *
+              </Label>
+              {/* Draft saved indicator */}
+              {draftSavedAt && (
                 <span
-                  className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
-                  style={{
-                    background: "oklch(var(--orange))",
-                    color: "oklch(var(--carbon))",
-                  }}
+                  className="text-[10px] flex items-center gap-1 transition-opacity"
+                  style={{ color: "oklch(0.65 0.14 150)" }}
                 >
-                  {stage === "publishing" && (
-                    <CheckCircle2 size={11} className="opacity-80" />
-                  )}
-                  {(stage === "uploading" || stage === "validating") && (
-                    <Loader2 size={11} className="animate-spin opacity-80" />
-                  )}
-                  {stageInfo.label}
+                  <CheckCircle2 size={10} />
+                  Draft saved
                 </span>
-                {stage === "uploading" && uploadProgress !== null && (
-                  <span
-                    className="text-xs font-semibold"
-                    style={{ color: "oklch(var(--orange))" }}
-                  >
-                    {Math.round(uploadProgress)}%
-                  </span>
-                )}
-              </div>
-
-              {/* Progress bar — only during upload */}
-              {stage === "uploading" && uploadProgress !== null && (
-                <div
-                  className="h-1.5 rounded-full overflow-hidden"
-                  style={{ background: "oklch(var(--surface-elevated))" }}
-                >
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{
-                      width: `${uploadProgress}%`,
-                      background: "oklch(var(--orange))",
-                    }}
-                  />
-                </div>
               )}
             </div>
-          )}
-
-          {/* Browse button when file already selected */}
-          {previewUrl && !isBusy && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-2 flex items-center gap-1.5 text-xs text-steel hover:text-foreground transition-colors"
-            >
-              <Upload size={12} />
-              Change file
-            </button>
-          )}
-        </div>
-
-        {/* Caption */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-steel uppercase tracking-wider font-semibold">
-              Caption *
-            </Label>
-            {/* Draft saved indicator */}
-            {draftSavedAt && (
-              <span
-                className="text-[10px] flex items-center gap-1 transition-opacity"
-                style={{ color: "oklch(0.65 0.14 150)" }}
-              >
-                <CheckCircle2 size={10} />
-                Draft saved
-              </span>
-            )}
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Share your build story, mod list, or weekend drive..."
+              className="min-h-[120px] resize-none text-sm"
+              style={{
+                background: "oklch(var(--surface))",
+                borderColor: "oklch(var(--border))",
+              }}
+              maxLength={2000}
+            />
+            <p className="text-[11px] text-steel text-right mt-1">
+              {content.length}/2000
+            </p>
           </div>
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Share your build story, mod list, or weekend drive..."
-            className="min-h-[120px] resize-none text-sm"
-            style={{
-              background: "oklch(var(--surface))",
-              borderColor: "oklch(var(--border))",
-            }}
-            maxLength={2000}
-          />
-          <p className="text-[11px] text-steel text-right mt-1">
-            {content.length}/2000
-          </p>
-        </div>
 
-        {/* Submit */}
-        <Button
-          type="submit"
-          disabled={isBusy || !content.trim()}
-          className="w-full h-12 text-base font-bold rounded-xl"
-          style={{
-            background:
-              isBusy || !content.trim()
-                ? "oklch(var(--surface-elevated))"
-                : "oklch(var(--orange))",
-            color:
-              isBusy || !content.trim()
-                ? "oklch(var(--steel-light))"
-                : "oklch(var(--carbon))",
-            boxShadow:
-              !isBusy && content.trim()
-                ? "0 0 30px oklch(var(--orange) / 0.3)"
-                : "none",
-          }}
-        >
-          {stage === "validating" ? (
-            <div className="flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin" />
-              Validating...
-            </div>
-          ) : stage === "uploading" ? (
-            <div className="flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin" />
-              Uploading media...
-            </div>
-          ) : stage === "publishing" || createPost.isPending ? (
-            <div className="flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin" />
-              Publishing...
-            </div>
-          ) : (
-            "Publish Post 🔥"
-          )}
-        </Button>
-      </form>
+          {/* Submit */}
+          <Button
+            type="submit"
+            disabled={isBusy || !content.trim()}
+            className="w-full h-12 text-base font-bold rounded-xl"
+            style={{
+              background:
+                isBusy || !content.trim()
+                  ? "oklch(var(--surface-elevated))"
+                  : "oklch(var(--orange))",
+              color:
+                isBusy || !content.trim()
+                  ? "oklch(var(--steel-light))"
+                  : "oklch(var(--carbon))",
+              boxShadow:
+                !isBusy && content.trim()
+                  ? "0 0 30px oklch(var(--orange) / 0.3)"
+                  : "none",
+            }}
+          >
+            {stage === "validating" ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Validating...
+              </div>
+            ) : stage === "uploading" ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Uploading media...
+              </div>
+            ) : stage === "publishing" || createPost.isPending ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Publishing...
+              </div>
+            ) : (
+              "Publish Post 🔥"
+            )}
+          </Button>
+        </form>
+      )}
 
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">

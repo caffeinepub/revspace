@@ -443,17 +443,32 @@ export function ModelReelsPage() {
         {/* Model account active banner */}
         {isMyAccountModel && (
           <div
-            className="rounded-xl p-4 mb-5 flex items-center gap-3"
+            className="rounded-xl p-4 mb-5 flex items-center justify-between gap-3"
             style={{
               background:
                 "linear-gradient(135deg, oklch(0.2 0.1 310 / 0.4), oklch(0.15 0.06 310 / 0.6))",
               border: "1px solid oklch(0.5 0.18 310 / 0.4)",
             }}
           >
-            <span className="text-2xl">🎬</span>
-            <p className="text-sm" style={{ color: "oklch(0.85 0.14 310)" }}>
-              You're posting as a Model Account — your reels appear here
-            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎬</span>
+              <p className="text-sm" style={{ color: "oklch(0.85 0.14 310)" }}>
+                You're a Model Account — post your reels here
+              </p>
+            </div>
+            <a href="/create?modelOnly=1" className="shrink-0">
+              <button
+                type="button"
+                className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:brightness-110"
+                style={{
+                  background: "oklch(0.55 0.22 310)",
+                  color: "white",
+                  border: "none",
+                }}
+              >
+                Post
+              </button>
+            </a>
           </div>
         )}
 
@@ -532,7 +547,7 @@ export function ModelReelsPage() {
                 : "Be the first model to upload a reel with this tag."}
             </p>
             {isMyAccountModel && (
-              <Link to="/create">
+              <a href="/create?modelOnly=1">
                 <Button
                   style={{
                     background: "oklch(0.6 0.22 310)",
@@ -541,7 +556,7 @@ export function ModelReelsPage() {
                 >
                   Upload Reel
                 </Button>
-              </Link>
+              </a>
             )}
           </div>
         )}

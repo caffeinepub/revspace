@@ -451,7 +451,7 @@ export function ModelGalleryPage() {
                 : "Be the first model to upload a photo with this tag."}
             </p>
             {isMyAccountModel && (
-              <Link to="/create">
+              <a href="/create?modelOnly=1">
                 <Button
                   style={{
                     background: "oklch(0.6 0.22 310)",
@@ -460,7 +460,7 @@ export function ModelGalleryPage() {
                 >
                   Upload Photo
                 </Button>
-              </Link>
+              </a>
             )}
           </div>
         )}
