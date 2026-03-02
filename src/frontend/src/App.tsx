@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { Outlet, createRootRoute, createRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
@@ -9,34 +9,118 @@ import { useDeployGuard } from "./hooks/useDeployGuard";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { setFriendOfCreator } from "./lib/friendBadge";
 import { setUserPro } from "./lib/pro";
-import { AdminPage } from "./pages/AdminPage";
-import { BuildBattlePage } from "./pages/BuildBattlePage";
-import { ClubsPage } from "./pages/ClubsPage";
-import { CreatePostPage } from "./pages/CreatePostPage";
-import { CreatorPage } from "./pages/CreatorPage";
-import { EventsPage } from "./pages/EventsPage";
-import { ExplorePage } from "./pages/ExplorePage";
-import { FeaturedCarPage } from "./pages/FeaturedCarPage";
-import { FeedPage } from "./pages/FeedPage";
-import { GamePage } from "./pages/GamePage";
-import { GaragePage } from "./pages/GaragePage";
-import { GuidePage } from "./pages/GuidePage";
-import { LeaderboardPage } from "./pages/LeaderboardPage";
-import { MarketplacePage } from "./pages/MarketplacePage";
-import { MechanicsPage } from "./pages/MechanicsPage";
-import { MessagesPage } from "./pages/MessagesPage";
-import { ModelGalleryPage } from "./pages/ModelGalleryPage";
-import { ModelReelsPage } from "./pages/ModelReelsPage";
-import { NotificationsPage } from "./pages/NotificationsPage";
-import { ProPage } from "./pages/ProPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { ReelsPage } from "./pages/ReelsPage";
-import { RevBucksPage } from "./pages/RevBucksPage";
-import { RevSpaceInfoPage } from "./pages/RevSpaceInfoPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { ShopPage } from "./pages/ShopPage";
-import { TrackReadyPage } from "./pages/TrackReadyPage";
-import { UserProfilePage } from "./pages/UserProfilePage";
+
+const AdminPage = lazy(() =>
+  import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+const BuildBattlePage = lazy(() =>
+  import("./pages/BuildBattlePage").then((m) => ({
+    default: m.BuildBattlePage,
+  })),
+);
+const ClubsPage = lazy(() =>
+  import("./pages/ClubsPage").then((m) => ({ default: m.ClubsPage })),
+);
+const CreatePostPage = lazy(() =>
+  import("./pages/CreatePostPage").then((m) => ({ default: m.CreatePostPage })),
+);
+const CreatorPage = lazy(() =>
+  import("./pages/CreatorPage").then((m) => ({ default: m.CreatorPage })),
+);
+const EventsPage = lazy(() =>
+  import("./pages/EventsPage").then((m) => ({ default: m.EventsPage })),
+);
+const ExplorePage = lazy(() =>
+  import("./pages/ExplorePage").then((m) => ({ default: m.ExplorePage })),
+);
+const FeaturedCarPage = lazy(() =>
+  import("./pages/FeaturedCarPage").then((m) => ({
+    default: m.FeaturedCarPage,
+  })),
+);
+const FeedPage = lazy(() =>
+  import("./pages/FeedPage").then((m) => ({ default: m.FeedPage })),
+);
+const GamePage = lazy(() =>
+  import("./pages/GamePage").then((m) => ({ default: m.GamePage })),
+);
+const GaragePage = lazy(() =>
+  import("./pages/GaragePage").then((m) => ({ default: m.GaragePage })),
+);
+const GuidePage = lazy(() =>
+  import("./pages/GuidePage").then((m) => ({ default: m.GuidePage })),
+);
+const LeaderboardPage = lazy(() =>
+  import("./pages/LeaderboardPage").then((m) => ({
+    default: m.LeaderboardPage,
+  })),
+);
+const MarketplacePage = lazy(() =>
+  import("./pages/MarketplacePage").then((m) => ({
+    default: m.MarketplacePage,
+  })),
+);
+const MechanicsPage = lazy(() =>
+  import("./pages/MechanicsPage").then((m) => ({ default: m.MechanicsPage })),
+);
+const MessagesPage = lazy(() =>
+  import("./pages/MessagesPage").then((m) => ({ default: m.MessagesPage })),
+);
+const ModelGalleryPage = lazy(() =>
+  import("./pages/ModelGalleryPage").then((m) => ({
+    default: m.ModelGalleryPage,
+  })),
+);
+const ModelReelsPage = lazy(() =>
+  import("./pages/ModelReelsPage").then((m) => ({
+    default: m.ModelReelsPage,
+  })),
+);
+const NotificationsPage = lazy(() =>
+  import("./pages/NotificationsPage").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
+const ProPage = lazy(() =>
+  import("./pages/ProPage").then((m) => ({ default: m.ProPage })),
+);
+const ProfilePage = lazy(() =>
+  import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
+);
+const ReelsPage = lazy(() =>
+  import("./pages/ReelsPage").then((m) => ({ default: m.ReelsPage })),
+);
+const RevBucksPage = lazy(() =>
+  import("./pages/RevBucksPage").then((m) => ({ default: m.RevBucksPage })),
+);
+const RevSpaceInfoPage = lazy(() =>
+  import("./pages/RevSpaceInfoPage").then((m) => ({
+    default: m.RevSpaceInfoPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
+const ShopPage = lazy(() =>
+  import("./pages/ShopPage").then((m) => ({ default: m.ShopPage })),
+);
+const TrackReadyPage = lazy(() =>
+  import("./pages/TrackReadyPage").then((m) => ({ default: m.TrackReadyPage })),
+);
+const UserProfilePage = lazy(() =>
+  import("./pages/UserProfilePage").then((m) => ({
+    default: m.UserProfilePage,
+  })),
+);
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <div
+      className="w-8 h-8 border-2 border-white/20 rounded-full animate-spin"
+      style={{ borderTopColor: "oklch(var(--orange))" }}
+    />
+  </div>
+);
 
 const LoadingSpinner = () => (
   <div
@@ -88,7 +172,9 @@ function RootLayout() {
   return (
     <AuthGate>
       <Layout>
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </Layout>
     </AuthGate>
   );
@@ -98,7 +184,9 @@ function RootLayout() {
 function ReelsLayout() {
   return (
     <AuthGate>
-      <ReelsPage />
+      <Suspense fallback={<PageLoader />}>
+        <ReelsPage />
+      </Suspense>
     </AuthGate>
   );
 }
@@ -117,49 +205,81 @@ const reelsRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: FeedPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <FeedPage />
+    </Suspense>
+  ),
 });
 
 const exploreRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/explore",
-  component: ExplorePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ExplorePage />
+    </Suspense>
+  ),
 });
 
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profile",
-  component: ProfilePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ProfilePage />
+    </Suspense>
+  ),
 });
 
 const garageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/garage",
-  component: GaragePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <GaragePage />
+    </Suspense>
+  ),
 });
 
 const eventsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/events",
-  component: EventsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <EventsPage />
+    </Suspense>
+  ),
 });
 
 const marketplaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/marketplace",
-  component: MarketplacePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <MarketplacePage />
+    </Suspense>
+  ),
 });
 
 const clubsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/clubs",
-  component: ClubsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ClubsPage />
+    </Suspense>
+  ),
 });
 
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notifications",
-  component: NotificationsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <NotificationsPage />
+    </Suspense>
+  ),
 });
 
 const messagesRoute = createRoute({
@@ -169,19 +289,31 @@ const messagesRoute = createRoute({
     recipient:
       typeof search.recipient === "string" ? search.recipient : undefined,
   }),
-  component: MessagesPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <MessagesPage />
+    </Suspense>
+  ),
 });
 
 const createRoute_ = createRoute({
   getParentRoute: () => rootRoute,
   path: "/create",
-  component: CreatePostPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <CreatePostPage />
+    </Suspense>
+  ),
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
-  component: SettingsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <SettingsPage />
+    </Suspense>
+  ),
 });
 
 const userProfileRoute = createRoute({
@@ -189,98 +321,162 @@ const userProfileRoute = createRoute({
   path: "/profile/$userId",
   component: function UserProfileRouteComponent() {
     const { userId } = userProfileRoute.useParams();
-    return <UserProfilePage userId={userId} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <UserProfilePage userId={userId} />
+      </Suspense>
+    );
   },
 });
 
 const leaderboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/leaderboard",
-  component: LeaderboardPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <LeaderboardPage />
+    </Suspense>
+  ),
 });
 
 const shopRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/shop",
-  component: ShopPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ShopPage />
+    </Suspense>
+  ),
 });
 
 const mechanicsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/mechanics",
-  component: MechanicsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <MechanicsPage />
+    </Suspense>
+  ),
 });
 
 const aboutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/about",
-  component: RevSpaceInfoPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <RevSpaceInfoPage />
+    </Suspense>
+  ),
 });
 
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
-  component: AdminPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <AdminPage />
+    </Suspense>
+  ),
 });
 
 const guideRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/guide",
-  component: GuidePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <GuidePage />
+    </Suspense>
+  ),
 });
 
 const proRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pro",
-  component: ProPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ProPage />
+    </Suspense>
+  ),
 });
 
 const revbucksRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/revbucks",
-  component: RevBucksPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <RevBucksPage />
+    </Suspense>
+  ),
 });
 
 const featuredCarRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/featured",
-  component: FeaturedCarPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <FeaturedCarPage />
+    </Suspense>
+  ),
 });
 
 const buildBattleRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/buildbattle",
-  component: BuildBattlePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <BuildBattlePage />
+    </Suspense>
+  ),
 });
 
 const modelReelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/model-reels",
-  component: ModelReelsPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ModelReelsPage />
+    </Suspense>
+  ),
 });
 
 const modelGalleryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/model-gallery",
-  component: ModelGalleryPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <ModelGalleryPage />
+    </Suspense>
+  ),
 });
 
 const gameRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/game",
-  component: GamePage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <GamePage />
+    </Suspense>
+  ),
 });
 
 const trackReadyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/track-ready",
-  component: TrackReadyPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <TrackReadyPage />
+    </Suspense>
+  ),
 });
 
 const creatorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/creator",
-  component: CreatorPage,
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <CreatorPage />
+    </Suspense>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([

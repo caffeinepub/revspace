@@ -239,6 +239,7 @@ export function useGetComments(postId: string) {
       return actor.getCommentsForPost(postId);
     },
     enabled: !!actor && !isFetching && !!postId,
+    staleTime: 15_000,
   });
 }
 
@@ -579,6 +580,7 @@ export function useGarageByUser(user: Principal | undefined) {
       return actor.getGarageByUser(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 30_000,
   });
 }
 
@@ -634,6 +636,7 @@ export function useAllEvents() {
       return actor.listAllEvents();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 60_000,
   });
 }
 
@@ -743,6 +746,7 @@ export function useAllListings() {
       return actor.listAllListings();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 60_000,
   });
 }
 
@@ -810,6 +814,7 @@ export function useAllClubs() {
       return actor.listAllClubs();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 60_000,
   });
 }
 
@@ -903,6 +908,7 @@ export function useGetFollowers(user: Principal | undefined) {
       return actor.getFollowers(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 30_000,
   });
 }
 
@@ -915,6 +921,7 @@ export function useGetFollowing(user: Principal | undefined) {
       return actor.getFollowing(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 30_000,
   });
 }
 
@@ -927,6 +934,7 @@ export function useIsFollowing(user: Principal | undefined) {
       return actor.isFollowing(user);
     },
     enabled: !!actor && !isFetching && !!user,
+    staleTime: 30_000,
   });
 }
 
