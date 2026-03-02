@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Principal } from "@icp-sdk/core/principal";
 import { useRouter } from "@tanstack/react-router";
 import {
   Bell,
@@ -13,6 +14,9 @@ import {
 import type { ReactElement } from "react";
 import { toast } from "sonner";
 import {
+  useGetAllPosts,
+  useGetComments,
+  useGetProfile,
   useMarkNotificationRead,
   useMyNotifications,
 } from "../hooks/useQueries";
@@ -62,6 +66,222 @@ function getNotifDestination(
       return null;
   }
 }
+
+// ─── Per-notification enrichment components ───────────────────────────────────
+// Each component calls the hooks it needs unconditionally. The parent renders
+// one of these components for each notification type, avoiding conditional hook
+// calls in the parent.
+
+interface NotifItemProps {
+  notif: {
+    id: string;
+    notifType: string;
+    message: string;
+    relatedId: string;
+    isRead: boolean;
+    timestamp: bigint;
+  };
+  onClick: () => void;
+}
+
+// Follow notification: resolve follower by relatedId principal string
+function FollowNotifItem({ notif, onClick }: NotifItemProps) {
+  let followerPrincipal: Principal | undefined;
+  try {
+    followerPrincipal = notif.relatedId
+      ? Principal.fromText(notif.relatedId)
+      : undefined;
+  } catch {
+    followerPrincipal = undefined;
+  }
+
+  const { data: followerProfile } = useGetProfile(followerPrincipal);
+  const displayName = (followerProfile as any)?.displayName || "Someone";
+  const enrichedMessage = `${displayName} started following you`;
+
+  return (
+    <NotifRow
+      notif={notif}
+      displayMessage={enrichedMessage}
+      onClick={onClick}
+    />
+  );
+}
+
+// Like notification: resolve most recent liker from posts cache
+function LikeNotifItem({ notif, onClick }: NotifItemProps) {
+  const { data: allPosts } = useGetAllPosts();
+  const post = (allPosts ?? []).find((p) => p.id === notif.relatedId);
+  const likes = post?.likes ?? [];
+  const lastLiker: Principal | undefined =
+    likes.length > 0 ? likes[likes.length - 1] : undefined;
+
+  const { data: likerProfile } = useGetProfile(lastLiker);
+  const displayName = (likerProfile as any)?.displayName || "Someone";
+  const enrichedMessage = `${displayName} liked your post`;
+
+  return (
+    <NotifRow
+      notif={notif}
+      displayMessage={enrichedMessage}
+      onClick={onClick}
+    />
+  );
+}
+
+// Comment notification: resolve most recent commenter and show preview
+function CommentNotifItem({ notif, onClick }: NotifItemProps) {
+  const { data: comments } = useGetComments(notif.relatedId);
+
+  // Sort comments by timestamp descending to get the most recent one
+  const sortedComments = [...(comments ?? [])].sort(
+    (a, b) => Number(b.timestamp) - Number(a.timestamp),
+  );
+  const latestComment = sortedComments[0];
+  const authorPrincipal: Principal | undefined = latestComment?.author;
+  const commentPreview = latestComment?.content
+    ? latestComment.content.length > 60
+      ? `${latestComment.content.slice(0, 60)}…`
+      : latestComment.content
+    : undefined;
+
+  const { data: authorProfile } = useGetProfile(authorPrincipal);
+  const displayName = (authorProfile as any)?.displayName || "Someone";
+  const enrichedMessage = `${displayName} commented on your post`;
+
+  return (
+    <NotifRow
+      notif={notif}
+      displayMessage={enrichedMessage}
+      commentPreview={commentPreview}
+      onClick={onClick}
+    />
+  );
+}
+
+// Message notification: keep as-is if already has a name, else show generic
+function MessageNotifItem({ notif, onClick }: NotifItemProps) {
+  // If message doesn't start with "Someone" or "You have", it's already enriched
+  const isGeneric =
+    notif.message.startsWith("Someone") || notif.message.startsWith("You have");
+
+  let displayMessage = notif.message;
+  if (isGeneric) {
+    displayMessage = "You have a new message";
+  }
+
+  return (
+    <NotifRow notif={notif} displayMessage={displayMessage} onClick={onClick} />
+  );
+}
+
+// Generic notification: use original message
+function GenericNotifItem({ notif, onClick }: NotifItemProps) {
+  return (
+    <NotifRow notif={notif} displayMessage={notif.message} onClick={onClick} />
+  );
+}
+
+// ─── The actual row UI ────────────────────────────────────────────────────────
+
+interface NotifRowProps {
+  notif: {
+    id: string;
+    notifType: string;
+    message: string;
+    relatedId: string;
+    isRead: boolean;
+    timestamp: bigint;
+  };
+  displayMessage: string;
+  commentPreview?: string;
+  onClick: () => void;
+}
+
+function NotifRow({
+  notif,
+  displayMessage,
+  commentPreview,
+  onClick,
+}: NotifRowProps) {
+  const isNavigable = NAVIGABLE_TYPES.has(notif.notifType);
+
+  return (
+    <button
+      type="button"
+      className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface transition-colors w-full text-left"
+      style={
+        !notif.isRead
+          ? { background: "oklch(var(--orange) / 0.04)" }
+          : undefined
+      }
+      onClick={onClick}
+    >
+      {/* Icon */}
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+        style={{
+          background: NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))",
+        }}
+      >
+        {NOTIF_ICONS[notif.notifType] ?? (
+          <Bell size={16} className="text-steel" />
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-sm leading-snug ${
+            !notif.isRead ? "text-foreground font-semibold" : "text-steel"
+          }`}
+        >
+          {displayMessage}
+        </p>
+        {commentPreview && (
+          <p className="text-[11px] text-steel/70 mt-0.5 italic truncate">
+            "{commentPreview}"
+          </p>
+        )}
+        <p className="text-[11px] text-steel mt-0.5">
+          {timeAgo(notif.timestamp)}
+        </p>
+      </div>
+
+      {/* Right side: unread dot OR chevron for navigable */}
+      <div className="flex items-center gap-1.5 shrink-0 mt-1.5">
+        {!notif.isRead && (
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ background: "oklch(var(--orange))" }}
+          />
+        )}
+        {isNavigable && (
+          <ChevronRight size={14} style={{ color: "oklch(var(--steel))" }} />
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ─── Dispatcher: picks the right enrichment component per type ────────────────
+
+function NotificationItem({ notif, onClick }: NotifItemProps) {
+  switch (notif.notifType) {
+    case "follow":
+      return <FollowNotifItem notif={notif} onClick={onClick} />;
+    case "like":
+      return <LikeNotifItem notif={notif} onClick={onClick} />;
+    case "comment":
+      return <CommentNotifItem notif={notif} onClick={onClick} />;
+    case "message":
+      return <MessageNotifItem notif={notif} onClick={onClick} />;
+    default:
+      return <GenericNotifItem notif={notif} onClick={onClick} />;
+  }
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function NotificationsPage() {
   const { data: notifications, isLoading } = useMyNotifications();
@@ -143,75 +363,21 @@ export function NotificationsPage() {
             <p className="text-steel text-sm">No notifications yet</p>
           </div>
         ) : (
-          displayNotifs.map((notif) => {
-            const isNavigable = NAVIGABLE_TYPES.has(notif.notifType);
-            return (
-              <button
-                key={notif.id}
-                type="button"
-                className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface transition-colors w-full text-left"
-                style={
-                  !notif.isRead
-                    ? { background: "oklch(var(--orange) / 0.04)" }
-                    : undefined
-                }
-                onClick={() => handleNotifClick(notif)}
-              >
-                {/* Icon */}
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                  style={{
-                    background:
-                      NOTIF_BG[notif.notifType] ?? "oklch(var(--surface))",
-                  }}
-                >
-                  {NOTIF_ICONS[notif.notifType] ?? (
-                    <Bell size={16} className="text-steel" />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm leading-snug ${
-                      !notif.isRead
-                        ? "text-foreground font-semibold"
-                        : "text-steel"
-                    }`}
-                  >
-                    {notif.message}
-                  </p>
-                  <p className="text-[11px] text-steel mt-0.5">
-                    {timeAgo(notif.timestamp)}
-                  </p>
-                </div>
-
-                {/* Right side: unread dot OR chevron for navigable */}
-                <div className="flex items-center gap-1.5 shrink-0 mt-1.5">
-                  {!notif.isRead && (
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: "oklch(var(--orange))" }}
-                    />
-                  )}
-                  {isNavigable && (
-                    <ChevronRight
-                      size={14}
-                      style={{ color: "oklch(var(--steel))" }}
-                    />
-                  )}
-                </div>
-              </button>
-            );
-          })
+          displayNotifs.map((notif) => (
+            <NotificationItem
+              key={notif.id}
+              notif={notif}
+              onClick={() => handleNotifClick(notif)}
+            />
+          ))
         )}
       </div>
 
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
-        © 2026. Built with ❤️ using{" "}
+        © {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
-          href="https://caffeine.ai"
+          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-orange hover:underline"
