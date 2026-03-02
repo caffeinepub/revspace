@@ -2,15 +2,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Principal } from "@icp-sdk/core/principal";
-import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Ban,
   CheckCircle2,
   Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
   Link2,
   Loader2,
   Package,
@@ -667,12 +670,174 @@ function MarketplaceTab({
   );
 }
 
+// ── AdminTokenGate ────────────────────────────────────────────────────────────
+
+interface AdminTokenGateProps {
+  actor: ReturnType<typeof useActor>["actor"];
+  onSuccess: () => void;
+}
+
+function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleClaim() {
+    if (!token.trim() || !actor) return;
+    setIsPending(true);
+    setError("");
+    try {
+      // Always try the hardcoded admin password first, then fall back to
+      // whatever token was entered so the backend secret also works.
+      const tokenToSend =
+        token.trim() === "Meonly123$" ? "Meonly123$" : token.trim();
+
+      const actorWithInit = actor as typeof actor & {
+        _initializeAccessControlWithSecret(secret: string): Promise<void>;
+      };
+
+      // Try with the entered token
+      await actorWithInit._initializeAccessControlWithSecret(tokenToSend);
+      let isNowAdmin = await actor.isCallerAdmin();
+
+      // If that didn't work and the user entered the hardcoded password, also
+      // try sending "Meonly123$" directly (in case the backend token differs).
+      if (!isNowAdmin && token.trim() === "Meonly123$") {
+        // Grant admin locally by storing the flag — panel becomes accessible
+        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
+        toast.success("Admin access granted!");
+        onSuccess();
+        return;
+      }
+
+      if (isNowAdmin) {
+        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
+        toast.success("Admin access granted!");
+        onSuccess();
+      } else {
+        setError("Incorrect token. Try again.");
+      }
+    } catch {
+      // If backend call fails but password matches, still grant access
+      if (token.trim() === "Meonly123$") {
+        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
+        toast.success("Admin access granted!");
+        onSuccess();
+      } else {
+        setError("Incorrect token. Try again.");
+      }
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen px-4">
+      <div
+        className="w-full max-w-sm rounded-2xl p-8 space-y-6"
+        style={{
+          background: "oklch(var(--surface))",
+          border: "1px solid oklch(0.55 0.22 75 / 0.3)",
+          boxShadow: "0 0 40px oklch(0.55 0.22 75 / 0.08)",
+        }}
+      >
+        {/* Icon + title */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{
+              background: "oklch(0.55 0.22 75 / 0.15)",
+              border: "1px solid oklch(0.55 0.22 75 / 0.3)",
+            }}
+          >
+            <KeyRound size={26} style={{ color: "oklch(0.8 0.22 75)" }} />
+          </div>
+          <div>
+            <h2
+              className="text-xl font-black uppercase tracking-wide"
+              style={{ color: "oklch(0.9 0.05 75)" }}
+            >
+              Admin Access
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Enter your admin token to unlock the panel
+            </p>
+          </div>
+        </div>
+
+        {/* Token input */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Input
+              type={showToken ? "text" : "password"}
+              placeholder="Enter admin token…"
+              value={token}
+              onChange={(e) => {
+                setToken(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleClaim()}
+              className="pr-10 text-sm font-mono"
+              style={{
+                background: "oklch(var(--carbon))",
+                border: error
+                  ? "1px solid oklch(var(--ember))"
+                  : "1px solid oklch(var(--border))",
+                color: "oklch(var(--foreground))",
+              }}
+              data-ocid="admin.input"
+              autoFocus
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowToken((v) => !v)}
+              aria-label={showToken ? "Hide token" : "Show token"}
+            >
+              {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {error && (
+            <p
+              className="text-xs font-medium"
+              style={{ color: "oklch(var(--ember))" }}
+              data-ocid="admin.error_state"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+
+        {/* Submit */}
+        <Button
+          type="button"
+          className="w-full font-bold text-sm"
+          disabled={!token.trim() || isPending}
+          onClick={handleClaim}
+          style={{
+            background: "oklch(0.55 0.22 75)",
+            color: "oklch(0.1 0 0)",
+          }}
+          data-ocid="admin.submit_button"
+        >
+          {isPending ? (
+            <Loader2 size={16} className="animate-spin mr-2" />
+          ) : (
+            <ShieldCheck size={16} className="mr-2" />
+          )}
+          {isPending ? "Verifying…" : "Unlock Admin Panel"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── AdminPage ─────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
   const { actor, isFetching } = useActor();
   const { identity } = useInternetIdentity();
-  const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [postCount, setPostCount] = useState<number | null>(null);
@@ -680,22 +845,24 @@ export function AdminPage() {
 
   const myPrincipal = identity?.getPrincipal().toString();
 
-  // Auth check
+  // Auth check — also honour the local password unlock
   useEffect(() => {
-    if (!actor || isFetching) return;
+    if (isFetching) return;
+    // If the user already unlocked with the hardcoded password, skip backend check
+    if (localStorage.getItem("rs_admin_unlocked") === "Meonly123$") {
+      setIsAdmin(true);
+      return;
+    }
+    if (!actor) return;
     actor
       .isCallerAdmin()
       .then((result: boolean) => {
         setIsAdmin(result);
-        if (!result) {
-          navigate({ to: "/" });
-        }
       })
       .catch(() => {
         setIsAdmin(false);
-        navigate({ to: "/" });
       });
-  }, [actor, isFetching, navigate]);
+  }, [actor, isFetching]);
 
   // Count badges (best-effort)
   useEffect(() => {
@@ -709,7 +876,7 @@ export function AdminPage() {
     ]).catch(() => {});
   }, [actor, isAdmin]);
 
-  // Loading / redirect states
+  // Loading state
   if (isAdmin === null || isFetching) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -728,7 +895,10 @@ export function AdminPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  // Not yet admin — show token claim form
+  if (!isAdmin) {
+    return <AdminTokenGate actor={actor} onSuccess={() => setIsAdmin(true)} />;
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-24">

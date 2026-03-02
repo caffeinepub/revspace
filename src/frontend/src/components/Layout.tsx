@@ -99,6 +99,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/guide", label: "Guide", icon: BookOpen },
       { to: "/about", label: "About RevSpace", icon: Info },
+      { to: "/admin", label: "Admin Panel", icon: ShieldCheck },
     ],
   },
 ] as const;
@@ -202,12 +203,17 @@ function MobileNav({
               </span>
             )}
           </Link>
-          {/* Admin shortcut — only shown to admins */}
-          {isAdmin && (
-            <Link to="/admin" aria-label="Admin Panel">
-              <ShieldCheck size={22} style={{ color: "oklch(0.8 0.22 75)" }} />
-            </Link>
-          )}
+          {/* Admin shortcut — always visible so admin can claim/access it */}
+          <Link to="/admin" aria-label="Admin Panel">
+            <ShieldCheck
+              size={22}
+              style={{
+                color: isAdmin
+                  ? "oklch(0.8 0.22 75)"
+                  : "oklch(var(--steel-light))",
+              }}
+            />
+          </Link>
           {/* Hamburger */}
           <button
             onClick={() => setOpen(true)}
@@ -334,13 +340,21 @@ function MobileNav({
                 const Icon = item.icon;
                 const isActive =
                   matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+                const isAdminItem = item.label === "Admin Panel";
                 return (
                   <Link
                     key={item.to}
                     to={item.to}
                     onClick={() => setOpen(false)}
                   >
-                    <div className={`sidebar-item ${isActive ? "active" : ""}`}>
+                    <div
+                      className={`sidebar-item ${isActive ? "active" : ""}`}
+                      style={
+                        isAdminItem
+                          ? { color: "oklch(0.8 0.22 75)" }
+                          : undefined
+                      }
+                    >
                       <div className="relative">
                         <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
                         {item.label === "Notifications" && unreadCount > 0 && (
@@ -380,18 +394,6 @@ function MobileNav({
                   </Link>
                 );
               })}
-              {/* Admin Panel — appended inside the Info group for admins */}
-              {group.label === "Info" && isAdmin && (
-                <Link to="/admin" onClick={() => setOpen(false)}>
-                  <div
-                    className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
-                    style={{ color: "oklch(0.8 0.22 75)" }}
-                  >
-                    <ShieldCheck size={18} />
-                    <span>Admin Panel</span>
-                  </div>
-                </Link>
-              )}
             </div>
           ))}
         </nav>
@@ -437,7 +439,6 @@ function Sidebar({
   unreadMessageCount: number;
 }) {
   const matchRoute = useMatchRoute();
-  const isAdmin = useIsAdmin();
   const rbBalance = useRevBucksBalance();
 
   return (
@@ -483,10 +484,16 @@ function Sidebar({
               const Icon = item.icon;
               const isActive =
                 matchRoute({ to: item.to, fuzzy: item.to !== "/" }) !== false;
+              const isAdminItem = item.label === "Admin Panel";
 
               return (
                 <Link key={item.to} to={item.to}>
-                  <div className={`sidebar-item ${isActive ? "active" : ""}`}>
+                  <div
+                    className={`sidebar-item ${isActive ? "active" : ""}`}
+                    style={
+                      isAdminItem ? { color: "oklch(0.8 0.22 75)" } : undefined
+                    }
+                  >
                     <div className="relative">
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
                       {item.label === "Notifications" && unreadCount > 0 && (
@@ -523,18 +530,6 @@ function Sidebar({
                 </Link>
               );
             })}
-            {/* Admin Panel — appended inside the Info group for admins */}
-            {group.label === "Info" && isAdmin && (
-              <Link to="/admin">
-                <div
-                  className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
-                  style={{ color: "oklch(0.8 0.22 75)" }}
-                >
-                  <ShieldCheck size={18} />
-                  <span>Admin Panel</span>
-                </div>
-              </Link>
-            )}
           </div>
         ))}
       </div>

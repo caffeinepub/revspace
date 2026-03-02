@@ -296,7 +296,9 @@ function ReelMedia({
     );
   }
 
-  const isVideoType = postType === "Reel" || postType === "Video";
+  // Case-insensitive check so backend lowercase "reel"/"video" values render as video
+  const isVideoType =
+    postType?.toLowerCase() === "reel" || postType?.toLowerCase() === "video";
 
   if (isVideoType) {
     if (videoError) {
@@ -384,8 +386,11 @@ export function ReelsPage() {
   const deletePostMutation = useDeletePost();
 
   // Only show Reel and Video posts — not Photos — on the Reels page
+  // Use case-insensitive comparison since backend may return lowercase "reel"/"video"
   const allPosts = (posts ?? []).filter(
-    (p) => p.postType === "Reel" || p.postType === "Video",
+    (p) =>
+      p.postType?.toLowerCase() === "reel" ||
+      p.postType?.toLowerCase() === "video",
   );
   const displayPosts =
     selectedTopic === "All"

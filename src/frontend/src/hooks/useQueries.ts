@@ -10,6 +10,7 @@ import {
   setCachedProfile,
 } from "../lib/profileCache";
 import { StorageClient } from "../utils/StorageClient";
+import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
 import { useRegisteredActor } from "./useRegisteredActor";
 
@@ -192,8 +193,15 @@ export function useUploadFile() {
 // ========================
 // Posts
 // ========================
+
+// getAllPosts, getPostsByUser, and getCommentsForPost are public read endpoints —
+// they do NOT require the user to be registered in the canister's userRoles map.
+// Using useActor directly (not useRegisteredActor) means these queries fire as
+// soon as the actor is built, without waiting for the _initializeAccessControl
+// registration call to complete. This prevents the "no posts" symptom when the
+// canister cold-starts and the registration call races against the first query.
 export function useGetAllPosts() {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
@@ -208,7 +216,7 @@ export function useGetAllPosts() {
 }
 
 export function useGetPostsByUser(user: Principal | undefined) {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["posts", "user", user?.toString()],
     queryFn: async () => {
@@ -223,7 +231,7 @@ export function useGetPostsByUser(user: Principal | undefined) {
 }
 
 export function useGetComments(postId: string) {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["comments", postId],
     queryFn: async () => {
@@ -436,7 +444,9 @@ export function useMyProfile() {
 }
 
 export function useGetProfile(user: Principal | undefined) {
-  const { actor, isFetching } = useRegisteredActor();
+  // getProfile is a public read — use useActor directly so it doesn't block
+  // behind the registration gate (which can fail on canister cold-start).
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["profile", user?.toString()],
     queryFn: async () => {

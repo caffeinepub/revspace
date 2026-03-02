@@ -13,6 +13,8 @@ import MixinStorage "blob-storage/Mixin";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
+
+
 actor {
   //-----------------------------
   // Types
@@ -372,10 +374,16 @@ actor {
   };
 
   public query ({ caller }) func getAllPosts() : async [Types.PostView] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view posts");
+    };
     posts.values().toArray().map(func(post) { Mappers.postToView(post) });
   };
 
   public query ({ caller }) func getPostsByUser(user : Principal) : async [Types.PostView] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view posts");
+    };
     let allPosts = posts.values().toArray();
     allPosts.filter(
       func(p) { p.author == user }
@@ -438,6 +446,9 @@ actor {
   };
 
   public query ({ caller }) func getCommentsForPost(postId : Text) : async [Types.Comment] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view comments");
+    };
     comments.values().toArray().filter(
       func(c) { c.postId == postId }
     );
@@ -476,7 +487,9 @@ actor {
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?Types.Profile {
-    // Public function - anyone can view any user's profile
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     profiles.get(user);
   };
 
@@ -502,7 +515,9 @@ actor {
   };
 
   public query ({ caller }) func getProfile(user : Principal) : async ?Types.Profile {
-    // Public function - anyone can view any user's profile
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     profiles.get(user);
   };
 
@@ -539,7 +554,9 @@ actor {
   };
 
   public query ({ caller }) func getGarageByUser(user : Principal) : async [Types.Car] {
-    // Public function - anyone can view any user's garage
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view garages");
+    };
     cars.values().toArray().filter(
       func(c) { c.owner == user }
     );
@@ -586,6 +603,9 @@ actor {
   };
 
   public query ({ caller }) func listAllEvents() : async [Types.EventView] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view events");
+    };
     events.values().toArray().map(func(event) { Mappers.eventToView(event) });
   };
 
@@ -617,6 +637,9 @@ actor {
   };
 
   public query ({ caller }) func getEventAttendees(eventId : Text) : async [Principal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view event attendees");
+    };
     switch (events.get(eventId)) {
       case (null) { [] };
       case (?event) {
@@ -657,6 +680,9 @@ actor {
 
   // New Function: Get Event Photos
   public query ({ caller }) func getEventPhotos(eventId : Text) : async [Text] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view event photos");
+    };
     switch (events.get(eventId)) {
       case (null) { [] };
       case (?event) { event.photos.toArray() };
@@ -688,6 +714,9 @@ actor {
   };
 
   public query ({ caller }) func listAllListings() : async [Types.Listing] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view listings");
+    };
     listings.values().toArray().filter(
       func(l) { not l.isSold }
     );
@@ -748,6 +777,9 @@ actor {
   };
 
   public query ({ caller }) func listAllClubs() : async [Types.ClubView] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clubs");
+    };
     clubs.values().toArray().map(func(club) { Mappers.clubToView(club) });
   };
 
@@ -778,6 +810,9 @@ actor {
   };
 
   public query ({ caller }) func getClubMembers(clubId : Text) : async [Principal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view club members");
+    };
     switch (clubs.get(clubId)) {
       case (null) { [] };
       case (?club) {
@@ -839,6 +874,9 @@ actor {
   };
 
   public query ({ caller }) func getFollowers(user : Principal) : async [Principal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view followers");
+    };
     switch (followers.get(user)) {
       case (null) { [] };
       case (?followersList) { followersList.toArray() };
@@ -846,6 +884,9 @@ actor {
   };
 
   public query ({ caller }) func getFollowing(user : Principal) : async [Principal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view following");
+    };
     switch (follows.get(user)) {
       case (null) { [] };
       case (?followingList) { followingList.toArray() };
@@ -977,4 +1018,3 @@ actor {
     );
   };
 };
-
