@@ -105,14 +105,38 @@ const NAV_GROUPS = [
 
 function useIsAdmin(): boolean {
   const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  const principal = identity?.getPrincipal().toText();
+  const storageKey = principal ? `revspace_admin_${principal}` : null;
+
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Read from localStorage immediately when we know who the user is
+  useEffect(() => {
+    if (!storageKey) return;
+    if (localStorage.getItem(storageKey) === "1") {
+      setIsAdmin(true);
+    }
+  }, [storageKey]);
+
+  // Verify from backend and update localStorage cache
   useEffect(() => {
     if (!actor || isFetching) return;
     actor
       .isCallerAdmin()
-      .then(setIsAdmin)
+      .then((result) => {
+        setIsAdmin(result);
+        if (storageKey) {
+          if (result) {
+            localStorage.setItem(storageKey, "1");
+          } else {
+            localStorage.removeItem(storageKey);
+          }
+        }
+      })
       .catch(() => setIsAdmin(false));
-  }, [actor, isFetching]);
+  }, [actor, isFetching, storageKey]);
+
   return isAdmin;
 }
 
@@ -333,26 +357,20 @@ function MobileNav({ unreadCount }: { unreadCount: number }) {
                   </Link>
                 );
               })}
+              {/* Admin Panel — appended inside the Info group for admins */}
+              {group.label === "Info" && isAdmin && (
+                <Link to="/admin" onClick={() => setOpen(false)}>
+                  <div
+                    className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
+                    style={{ color: "oklch(0.8 0.22 75)" }}
+                  >
+                    <ShieldCheck size={18} />
+                    <span>Admin Panel</span>
+                  </div>
+                </Link>
+              )}
             </div>
           ))}
-
-          {/* Admin Panel — only shown to admins */}
-          {isAdmin && (
-            <Link to="/admin" onClick={() => setOpen(false)}>
-              <div
-                className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
-                style={{
-                  borderTop: "1px solid oklch(0.55 0.22 75 / 0.2)",
-                  marginTop: 4,
-                  paddingTop: 10,
-                  color: "oklch(0.8 0.22 75)",
-                }}
-              >
-                <ShieldCheck size={18} />
-                <span>Admin Panel</span>
-              </div>
-            </Link>
-          )}
         </nav>
 
         {/* Ad banner — shrinks but never pushes nav off screen */}
@@ -468,29 +486,20 @@ function Sidebar({ unreadCount }: { unreadCount: number }) {
                 </Link>
               );
             })}
+            {/* Admin Panel — appended inside the Info group for admins */}
+            {group.label === "Info" && isAdmin && (
+              <Link to="/admin">
+                <div
+                  className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
+                  style={{ color: "oklch(0.8 0.22 75)" }}
+                >
+                  <ShieldCheck size={18} />
+                  <span>Admin Panel</span>
+                </div>
+              </Link>
+            )}
           </div>
         ))}
-
-        {/* Admin Panel link — only for admins */}
-        {isAdmin && (
-          <div
-            style={{
-              borderTop: "1px solid oklch(0.55 0.22 75 / 0.2)",
-              marginTop: 6,
-              paddingTop: 6,
-            }}
-          >
-            <Link to="/admin">
-              <div
-                className={`sidebar-item ${matchRoute({ to: "/admin" }) !== false ? "active" : ""}`}
-                style={{ color: "oklch(0.8 0.22 75)" }}
-              >
-                <ShieldCheck size={18} />
-                <span>Admin Panel</span>
-              </div>
-            </Link>
-          </div>
-        )}
       </div>
 
       {/* Ad banner */}

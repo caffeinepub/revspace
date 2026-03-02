@@ -66,13 +66,23 @@ export function mergeWithCache(
 
   const trimmed = (s: string) => (s ?? "").trim();
 
+  const backendLocation = trimmed(backendProfile.location);
+  const cachedLocation = cached.location ?? "";
+
+  // For the location field: the backend value is always authoritative when
+  // non-empty, because it carries the __meta__ encoded Pro/RevBucks/Model
+  // status. Only fall back to the cache when the backend returns nothing.
+  // We must NOT let a cached plain-text location overwrite an on-chain
+  // __meta__ string — that would silently erase Pro status.
+  const mergedLocation = backendLocation || cachedLocation;
+
   return {
     // Prefer backend value if it has actual content, otherwise fall back to cache
     displayName: trimmed(backendProfile.displayName) || cached.displayName,
     bio: trimmed(backendProfile.bio) || cached.bio,
     avatarUrl: trimmed(backendProfile.avatarUrl) || cached.avatarUrl,
     bannerUrl: trimmed(backendProfile.bannerUrl) || cached.bannerUrl,
-    location: trimmed(backendProfile.location) || cached.location,
+    location: mergedLocation,
   };
 }
 

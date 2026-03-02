@@ -361,6 +361,10 @@ export function useMyProfile() {
 
         // If merge recovered fields not in the backend, push them back silently.
         // Only do this once per session to avoid repeated write calls on every refetch.
+        // NOTE: we intentionally do NOT include `location` in the needsRestore
+        // check — the location field holds __meta__ encoded Pro/RevBucks/Model
+        // state and is always authoritative from the backend. We must never
+        // overwrite a backend __meta__ location with a cached plain-text value.
         const needsRestore =
           principalId &&
           !profileRestoredThisSession.has(principalId) &&

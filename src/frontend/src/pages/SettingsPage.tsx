@@ -32,11 +32,7 @@ import { setModelAccount, setModelAccountData } from "../lib/modelAccount";
 import { setUserPro } from "../lib/pro";
 import { getCachedProfile } from "../lib/profileCache";
 import { validateFile } from "../lib/uploadValidator";
-import {
-  decodeMetaFromLocation,
-  encodeMetaToLocation,
-  getDisplayLocation,
-} from "../lib/userMeta";
+import { encodeMetaToLocation, getDisplayLocation } from "../lib/userMeta";
 import { getInitials } from "../utils/format";
 
 const MODEL_VIBES = [
@@ -538,6 +534,10 @@ function ProCard() {
 export function SettingsPage() {
   const { identity } = useInternetIdentity();
   const { data: profile, isLoading } = useMyProfile();
+  // useUserMeta gives us the decoded on-chain meta (Pro, RevBucks, Model status).
+  // We use it as the authoritative base when re-encoding the location on save,
+  // so that saving profile from Settings never accidentally wipes Pro/RB/Model status.
+  const { meta: currentMeta } = useUserMeta();
   const updateProfile = useUpdateProfile();
   const uploadFile = useUploadFile();
 
@@ -661,8 +661,12 @@ export function SettingsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Re-encode location: preserve existing __meta__ data, update only loc
-    const currentMeta = decodeMetaFromLocation(profile?.location ?? "");
+    // Re-encode location: preserve existing __meta__ data (Pro, RevBucks, Model),
+    // only update the display `loc` string. We intentionally use `currentMeta`
+    // from the useUserMeta hook (decoded from the on-chain profile) rather than
+    // re-decoding `profile?.location`, because `profile` in the query cache could
+    // be a localStorage-restored snapshot with a plain location string — which
+    // would decode to DEFAULT_META and silently erase Pro/RevBucks/Model status.
     const encodedLocation = encodeMetaToLocation({
       ...currentMeta,
       loc: form.location,
