@@ -33,6 +33,7 @@ export interface ClubView {
 export interface Comment {
   'id' : string,
   'content' : string,
+  'parentCommentId' : [] | [string],
   'author' : Principal,
   'timestamp' : bigint,
   'postId' : string,
@@ -137,6 +138,7 @@ export interface _SERVICE {
     string
   >,
   'addComment' : ActorMethod<[string, string], string>,
+  'addCommentReply' : ActorMethod<[string, string, string], string>,
   'addEventPhoto' : ActorMethod<[string, string], undefined>,
   'adminBanUser' : ActorMethod<[Principal], undefined>,
   'adminDeleteListing' : ActorMethod<[string], undefined>,
@@ -178,6 +180,7 @@ export interface _SERVICE {
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
   'getPostsByUser' : ActorMethod<[Principal], Array<PostView>>,
   'getProfile' : ActorMethod<[Principal], [] | [Profile]>,
+  'getRepliesToComment' : ActorMethod<[string], Array<Comment>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [Profile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isFollowing' : ActorMethod<[Principal], boolean>,

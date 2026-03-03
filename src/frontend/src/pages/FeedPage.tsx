@@ -6,16 +6,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Principal } from "@icp-sdk/core/principal";
 import { Link } from "@tanstack/react-router";
-import { Car, Crown } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { Car, CornerDownRight, Crown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
-import { useGetAllPosts, useGetProfile } from "../hooks/useQueries";
-import { useAddComment, useGetComments } from "../hooks/useQueries";
+import {
+  useAddComment,
+  useAddCommentReply,
+  useGetAllPosts,
+  useGetCommentReplies,
+  useGetComments,
+  useGetProfile,
+} from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
 function CommentAuthor({ author }: { author: Principal }) {
@@ -48,6 +54,160 @@ function CommentAuthor({ author }: { author: Principal }) {
   );
 }
 
+/** Shows replies for a single comment with expand/collapse toggle */
+function CommentRepliesSection({
+  commentId,
+  postId,
+}: {
+  commentId: string;
+  postId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyOpen, setReplyOpen] = useState(false);
+  const { data: replies, isLoading: repliesLoading } = useGetCommentReplies(
+    expanded || replyOpen ? commentId : null,
+  );
+  const addReply = useAddCommentReply();
+
+  const replyCount = replies?.length ?? 0;
+
+  const handleReplySubmit = () => {
+    if (!replyText.trim()) return;
+    addReply.mutate(
+      { postId, parentCommentId: commentId, content: replyText.trim() },
+      {
+        onSuccess: () => {
+          setReplyText("");
+          setReplyOpen(false);
+          setExpanded(true);
+          toast.success("Reply sent");
+        },
+        onError: () => toast.error("Failed to send reply"),
+      },
+    );
+  };
+
+  return (
+    <div className="mt-1.5 ml-9">
+      {/* Action row: Reply button + View replies */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          data-ocid="comment.reply.button"
+          onClick={() => setReplyOpen((v) => !v)}
+          className="flex items-center gap-1 text-[11px] text-steel hover:text-foreground transition-colors"
+        >
+          <CornerDownRight size={11} />
+          Reply
+        </button>
+        {replyCount > 0 && (
+          <button
+            type="button"
+            data-ocid="comment.replies.toggle"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[11px] font-medium transition-colors"
+            style={{ color: "oklch(var(--orange))" }}
+          >
+            {expanded
+              ? "Hide replies"
+              : `View ${replyCount} repl${replyCount === 1 ? "y" : "ies"}`}
+          </button>
+        )}
+      </div>
+
+      {/* Inline reply input */}
+      {replyOpen && (
+        <div className="flex items-center gap-2 mt-2">
+          <Input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Write a reply..."
+            data-ocid="comment.reply.input"
+            className="h-8 text-xs"
+            style={{
+              background: "oklch(var(--surface-elevated))",
+              borderColor: "oklch(var(--border))",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleReplySubmit();
+              }
+              if (e.key === "Escape") setReplyOpen(false);
+            }}
+            autoFocus
+          />
+          <Button
+            type="button"
+            size="sm"
+            data-ocid="comment.reply.submit_button"
+            onClick={handleReplySubmit}
+            disabled={!replyText.trim() || addReply.isPending}
+            className="h-8 px-3 text-xs shrink-0"
+            style={{
+              background: "oklch(var(--orange))",
+              color: "oklch(var(--carbon))",
+            }}
+          >
+            {addReply.isPending ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              "Post"
+            )}
+          </Button>
+          <button
+            type="button"
+            data-ocid="comment.reply.cancel_button"
+            onClick={() => {
+              setReplyOpen(false);
+              setReplyText("");
+            }}
+            className="text-[11px] text-steel hover:text-foreground transition-colors shrink-0"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Expanded replies list */}
+      {expanded && (
+        <div
+          className="mt-2 space-y-2 pl-3"
+          style={{ borderLeft: "2px solid oklch(var(--orange) / 0.35)" }}
+        >
+          {repliesLoading ? (
+            <div className="text-[11px] text-steel py-1">
+              Loading replies...
+            </div>
+          ) : replies && replies.length > 0 ? (
+            replies.map((r, idx) => (
+              <div
+                key={r.id}
+                data-ocid={`comment.replies.item.${idx + 1}`}
+                className="flex gap-2"
+              >
+                <Avatar className="w-6 h-6 shrink-0">
+                  <AvatarFallback className="text-[9px]">
+                    {r.author.toString().slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <CommentAuthor author={r.author} />
+                  <p className="text-xs text-foreground mt-0.5">{r.content}</p>
+                  <span className="text-[10px] text-steel">
+                    {timeAgo(r.timestamp)}
+                  </span>
+                </div>
+              </div>
+            ))
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CommentsDialog({
   postId,
   open,
@@ -60,6 +220,9 @@ function CommentsDialog({
   const [text, setText] = useState("");
   const addComment = useAddComment();
   const { data: comments, isLoading } = useGetComments(postId);
+
+  // Only show top-level comments (no parentCommentId)
+  const topLevelComments = (comments ?? []).filter((c) => !c.parentCommentId);
 
   const handleSubmit = () => {
     if (!text.trim()) return;
@@ -79,6 +242,7 @@ function CommentsDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         className="max-w-md w-full"
+        data-ocid="comments.dialog"
         style={{
           background: "oklch(var(--surface))",
           border: "1px solid oklch(var(--border))",
@@ -88,25 +252,39 @@ function CommentsDialog({
           <DialogTitle className="font-display text-lg">Comments</DialogTitle>
         </DialogHeader>
 
-        <div className="max-h-72 overflow-y-auto space-y-3 py-2">
+        <div className="max-h-[60vh] overflow-y-auto space-y-4 py-2 pr-1">
           {isLoading ? (
-            <div className="text-center py-4 text-steel text-sm">
+            <div
+              className="text-center py-4 text-steel text-sm"
+              data-ocid="comments.loading_state"
+            >
               Loading...
             </div>
-          ) : comments && comments.length > 0 ? (
-            comments.map((c) => (
-              <div key={c.id} className="flex gap-2">
-                <CommentAuthor author={c.author} />
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-steel">
-                    {timeAgo(c.timestamp)}
-                  </span>
-                  <p className="text-sm text-foreground">{c.content}</p>
+          ) : topLevelComments.length > 0 ? (
+            topLevelComments.map((c, idx) => (
+              <div
+                key={c.id}
+                data-ocid={`comments.item.${idx + 1}`}
+                className="space-y-0.5"
+              >
+                <div className="flex gap-2">
+                  <CommentAuthor author={c.author} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] text-steel">
+                      {timeAgo(c.timestamp)}
+                    </span>
+                    <p className="text-sm text-foreground">{c.content}</p>
+                  </div>
                 </div>
+                {/* Replies section per comment */}
+                <CommentRepliesSection commentId={c.id} postId={postId} />
               </div>
             ))
           ) : (
-            <p className="text-center py-4 text-steel text-sm">
+            <p
+              className="text-center py-4 text-steel text-sm"
+              data-ocid="comments.empty_state"
+            >
               No comments yet. Be the first!
             </p>
           )}
@@ -117,6 +295,7 @@ function CommentsDialog({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Add a comment..."
+            data-ocid="comments.textarea"
             className="min-h-[60px] resize-none text-sm"
             style={{
               background: "oklch(var(--surface-elevated))",
@@ -131,6 +310,7 @@ function CommentsDialog({
           />
           <Button
             type="button"
+            data-ocid="comments.submit_button"
             onClick={handleSubmit}
             disabled={!text.trim() || addComment.isPending}
             style={{

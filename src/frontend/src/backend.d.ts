@@ -27,6 +27,7 @@ export interface ProfileWithPrincipal {
 export interface Comment {
     id: string;
     content: string;
+    parentCommentId?: string;
     author: Principal;
     timestamp: bigint;
     postId: string;
@@ -109,6 +110,7 @@ export enum UserRole {
 export interface backendInterface {
     addCar(make: string, model: string, year: string, color: string, description: string, modifications: Array<string>, imageUrls: Array<string>): Promise<string>;
     addComment(postId: string, content: string): Promise<string>;
+    addCommentReply(postId: string, parentCommentId: string, content: string): Promise<string>;
     addEventPhoto(eventId: string, photoUrl: string): Promise<void>;
     adminBanUser(user: Principal): Promise<void>;
     adminDeleteListing(listingId: string): Promise<void>;
@@ -144,6 +146,7 @@ export interface backendInterface {
     getMyProfile(): Promise<Profile | null>;
     getPostsByUser(user: Principal): Promise<Array<PostView>>;
     getProfile(user: Principal): Promise<Profile | null>;
+    getRepliesToComment(commentId: string): Promise<Array<Comment>>;
     getUserProfile(user: Principal): Promise<Profile | null>;
     isCallerAdmin(): Promise<boolean>;
     isFollowing(user: Principal): Promise<boolean>;

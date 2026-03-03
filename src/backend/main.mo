@@ -13,6 +13,8 @@ import MixinStorage "blob-storage/Mixin";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
+
+
 actor {
   //-----------------------------
   // Types
@@ -48,6 +50,7 @@ actor {
       content : Text;
       postId : Text;
       timestamp : Int;
+      parentCommentId : ?Text;
     };
 
     public type Profile = {
@@ -436,6 +439,7 @@ actor {
     };
   };
 
+  // Updated addComment (parentCommentId is now null for top-level comments)
   public shared ({ caller }) func addComment(postId : Text, content : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can comment on posts");
@@ -447,6 +451,7 @@ actor {
       content;
       postId;
       timestamp = Time.now();
+      parentCommentId = null; // Top-level comment (no parent)
     };
     comments.add(id, comment);
     switch (posts.get(postId)) {
@@ -460,6 +465,56 @@ actor {
       };
     };
     id;
+  };
+
+  // New function: addCommentReply
+  public shared ({ caller }) func addCommentReply(postId : Text, parentCommentId : Text, content : Text) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can reply to comments");
+    };
+
+    if (not posts.containsKey(postId)) {
+      Runtime.trap("Post not found");
+    };
+
+    switch (comments.get(parentCommentId)) {
+      case (null) { Runtime.trap("Parent comment not found") };
+      case (?parentComment) {
+        let id = generateId("COMMENT");
+        let comment : Types.Comment = {
+          id;
+          author = caller;
+          content;
+          postId;
+          timestamp = Time.now();
+          parentCommentId = ?parentCommentId;
+        };
+        comments.add(id, comment);
+
+        switch (posts.get(postId)) {
+          case (null) {}; // Should not happen, already checked
+          case (?post) {
+            post.comments.add(id);
+            posts.add(postId, post);
+          };
+        };
+
+        if (parentComment.author != caller) {
+          let _ = pushNotification(parentComment.author, "reply", "Someone replied to your comment", parentCommentId);
+        };
+        id;
+      };
+    };
+  };
+
+  // New function: getRepliesToComment
+  public query ({ caller }) func getRepliesToComment(commentId : Text) : async [Types.Comment] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view replies");
+    };
+    comments.values().toArray().filter(
+      func(c) { c.parentCommentId == ?commentId }
+    );
   };
 
   public query ({ caller }) func getCommentsForPost(postId : Text) : async [Types.Comment] {

@@ -287,6 +287,38 @@ export function useAddComment() {
   });
 }
 
+export function useAddCommentReply() {
+  const { actor } = useRegisteredActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      postId,
+      parentCommentId,
+      content,
+    }: { postId: string; parentCommentId: string; content: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addCommentReply(postId, parentCommentId, content);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["comments", vars.postId] });
+      qc.invalidateQueries({ queryKey: ["replies", vars.parentCommentId] });
+    },
+  });
+}
+
+export function useGetCommentReplies(commentId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["replies", commentId],
+    queryFn: async () => {
+      if (!actor || !commentId) return [];
+      return actor.getRepliesToComment(commentId);
+    },
+    enabled: !!actor && !isFetching && !!commentId,
+    staleTime: 15_000,
+  });
+}
+
 export function useCreatePost() {
   const { actor } = useRegisteredActor();
   const qc = useQueryClient();

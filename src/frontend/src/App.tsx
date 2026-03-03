@@ -107,6 +107,9 @@ const ShopPage = lazy(() =>
 const TrackReadyPage = lazy(() =>
   import("./pages/TrackReadyPage").then((m) => ({ default: m.TrackReadyPage })),
 );
+const DynoOSPage = lazy(() =>
+  import("./pages/DynoOSPage").then((m) => ({ default: m.DynoOSPage })),
+);
 const UserProfilePage = lazy(() =>
   import("./pages/UserProfilePage").then((m) => ({
     default: m.UserProfilePage,
@@ -479,6 +482,16 @@ const creatorRoute = createRoute({
   ),
 });
 
+const dynoOsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dyno-os",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <DynoOSPage />
+    </Suspense>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reelsRoute,
@@ -508,6 +521,7 @@ const routeTree = rootRoute.addChildren([
   gameRoute,
   trackReadyRoute,
   creatorRoute,
+  dynoOsRoute,
 ]);
 
 const router = createRouter({ routeTree });

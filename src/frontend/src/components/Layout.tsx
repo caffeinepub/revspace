@@ -1,5 +1,6 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
+  Activity,
   Bell,
   BookOpen,
   Calendar,
@@ -9,6 +10,7 @@ import {
   Compass,
   Film,
   Gamepad2,
+  Gauge,
   GaugeCircle,
   Home,
   Info,
@@ -187,6 +189,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/game", label: "Rev Racing", icon: Gamepad2 },
       { to: "/track-ready", label: "Track Ready", icon: GaugeCircle },
+      { to: "/dyno-os", label: "DynoOS", icon: Gauge },
     ],
   },
   {
