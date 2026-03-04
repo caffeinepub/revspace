@@ -8,6 +8,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
 import {
@@ -17,6 +24,7 @@ import {
   Lock,
   Package,
   ShoppingBag,
+  Sparkles,
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -25,6 +33,13 @@ import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useRevBucksSync } from "../hooks/useRevBucksSync";
 import { useUserMeta } from "../hooks/useUserMeta";
+import {
+  FLAIR_OPTIONS,
+  getUserFlair,
+  hasReactionPack,
+  setUserFlair,
+  unlockReactionPack,
+} from "../lib/customizations";
 import { isModelAccountFromMeta } from "../lib/modelAccount";
 import {
   MODEL_GIFT_ITEMS,
@@ -318,6 +333,311 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
   },
 ];
 
+// ─── Customize Items ──────────────────────────────────────────────────────────
+
+interface CustomizeItem {
+  id: "reaction-pack" | "custom-flair";
+  name: string;
+  emoji: string;
+  cost: number;
+  rarity: "common" | "rare";
+  description: string;
+  gradient: [string, string];
+}
+
+const CUSTOMIZE_ITEMS: CustomizeItem[] = [
+  {
+    id: "reaction-pack",
+    name: "Reaction Pack",
+    emoji: "🔥",
+    cost: 150,
+    rarity: "rare",
+    description: "Unlock 5 custom reactions on any post: 🔥🏎️⚡🤙💨",
+    gradient: ["oklch(0.22 0.08 40)", "oklch(0.17 0.05 35)"],
+  },
+  {
+    id: "custom-flair",
+    name: "Custom Title / Flair",
+    emoji: "🏷️",
+    cost: 100,
+    rarity: "common",
+    description: "Add a custom flair tag under your username",
+    gradient: ["oklch(0.2 0.06 280)", "oklch(0.16 0.04 275)"],
+  },
+];
+
+// ─── Buy Customization Modal ──────────────────────────────────────────────────
+
+function BuyCustomizationModal({
+  item,
+  myPrincipal,
+  myBalance,
+  onClose,
+  onPurchased,
+  onDeductBalance,
+}: {
+  item: CustomizeItem | null;
+  myPrincipal: string;
+  myBalance: number;
+  onClose: () => void;
+  onPurchased: () => void;
+  onDeductBalance?: (cost: number) => void;
+}) {
+  const [isBuying, setIsBuying] = useState(false);
+  const [selectedFlair, setSelectedFlair] = useState<string>("");
+  const [step, setStep] = useState<"confirm" | "pick-flair">("confirm");
+
+  // Reset when item changes
+  const prevItemId = useRef<string | null>(null);
+  if (item?.id !== prevItemId.current) {
+    prevItemId.current = item?.id ?? null;
+    // Can't call setState directly in render, so we track a derived reset
+  }
+
+  const canAfford = item ? myBalance >= item.cost : false;
+  const rarityConfig = item ? RARITY_CONFIG[item.rarity] : null;
+
+  const handleBuy = useCallback(() => {
+    if (!item) return;
+    if (!canAfford) {
+      toast.error("Insufficient RevBucks balance");
+      return;
+    }
+    setIsBuying(true);
+    setTimeout(() => {
+      const ok = deductBalance(myPrincipal, item.cost);
+      if (!ok) {
+        toast.error("Insufficient RevBucks balance");
+        setIsBuying(false);
+        return;
+      }
+      addTransaction(myPrincipal, {
+        type: "spend",
+        description: `Purchased ${item.emoji} ${item.name}`,
+        amount: -item.cost,
+      });
+      onDeductBalance?.(item.cost);
+
+      if (item.id === "reaction-pack") {
+        unlockReactionPack(myPrincipal);
+        toast.success("🔥 Reaction Pack unlocked! Tap the heart on any post.");
+        setIsBuying(false);
+        onPurchased();
+      } else {
+        // Custom flair — move to picker step
+        setIsBuying(false);
+        setStep("pick-flair");
+      }
+    }, 500);
+  }, [item, canAfford, myPrincipal, onDeductBalance, onPurchased]);
+
+  const handleConfirmFlair = useCallback(() => {
+    if (!selectedFlair) {
+      toast.error("Please select a flair first");
+      return;
+    }
+    setUserFlair(myPrincipal, selectedFlair);
+    toast.success(`🏷️ Flair set to "${selectedFlair}"!`);
+    onPurchased();
+  }, [selectedFlair, myPrincipal, onPurchased]);
+
+  const handleClose = () => {
+    setStep("confirm");
+    setSelectedFlair("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!item} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent
+        className="max-w-sm"
+        style={{
+          background: "oklch(var(--surface))",
+          border: `1px solid ${rarityConfig?.color ?? "oklch(var(--border))"}`,
+          boxShadow: rarityConfig ? `0 0 30px ${rarityConfig.glow}` : undefined,
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display text-lg flex items-center gap-2">
+            <span className="text-2xl">{item?.emoji}</span>
+            {step === "pick-flair" ? "Choose Your Flair" : item?.name}
+          </DialogTitle>
+        </DialogHeader>
+
+        {item && rarityConfig && step === "confirm" && (
+          <div className="space-y-4">
+            {/* Item preview */}
+            <div
+              className="rounded-xl p-4 flex items-center gap-3 relative overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, ${item.gradient[0]}, ${item.gradient[1]})`,
+                border: `1px solid ${rarityConfig.color}`,
+              }}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: `radial-gradient(circle at 20% 50%, ${rarityConfig.glow} 0%, transparent 60%)`,
+                }}
+              />
+              <span className="text-4xl relative z-10">{item.emoji}</span>
+              <div className="relative z-10">
+                <p className="font-bold text-foreground">{item.name}</p>
+                <p className="text-xs text-steel">{item.description}</p>
+                <span
+                  className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full mt-1"
+                  style={{
+                    background: `${rarityConfig.color}22`,
+                    color: rarityConfig.color,
+                    border: `1px solid ${rarityConfig.color}55`,
+                  }}
+                >
+                  {rarityConfig.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Cost / Balance */}
+            <div
+              className="rounded-lg p-3 flex items-center justify-between"
+              style={{ background: "oklch(var(--surface-elevated))" }}
+            >
+              <div>
+                <p className="text-xs text-steel">Cost</p>
+                <p
+                  className="text-xl font-bold font-display"
+                  style={{ color: "oklch(var(--orange))" }}
+                >
+                  ⚡ {item.cost} RB
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-steel">Your Balance</p>
+                <p
+                  className="text-xl font-bold font-display"
+                  style={{
+                    color: canAfford
+                      ? "oklch(var(--foreground))"
+                      : "oklch(0.65 0.22 27)",
+                  }}
+                >
+                  ⚡ {myBalance} RB
+                </p>
+              </div>
+            </div>
+
+            {!canAfford && (
+              <p
+                className="text-sm text-center"
+                style={{ color: "oklch(0.65 0.22 27)" }}
+              >
+                Not enough RevBucks. Buy more in the Balance tab.
+              </p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-border text-steel"
+                onClick={handleClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!canAfford || isBuying}
+                onClick={handleBuy}
+                className="flex-1 font-bold"
+                style={
+                  canAfford
+                    ? {
+                        background: "oklch(var(--orange))",
+                        color: "oklch(var(--carbon))",
+                      }
+                    : undefined
+                }
+              >
+                {isBuying ? (
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                ) : null}
+                {isBuying ? "Unlocking..." : "Buy & Unlock"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "pick-flair" && (
+          <div className="space-y-4">
+            <p className="text-sm text-steel">
+              Select a flair that will appear under your username on your
+              profile.
+            </p>
+            <Select value={selectedFlair} onValueChange={setSelectedFlair}>
+              <SelectTrigger
+                style={{
+                  background: "oklch(var(--surface-elevated))",
+                  borderColor: "oklch(var(--border))",
+                }}
+              >
+                <SelectValue placeholder="Choose your flair…" />
+              </SelectTrigger>
+              <SelectContent style={{ background: "oklch(var(--surface))" }}>
+                {FLAIR_OPTIONS.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    🏷️ {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {selectedFlair && (
+              <div
+                className="rounded-lg px-3 py-2 flex items-center gap-2 text-sm"
+                style={{
+                  background: "oklch(var(--orange) / 0.12)",
+                  border: "1px solid oklch(var(--orange) / 0.3)",
+                  color: "oklch(var(--orange-bright))",
+                }}
+              >
+                <span>🏷️</span>
+                <span className="font-semibold">{selectedFlair}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-border text-steel"
+                onClick={handleClose}
+              >
+                Skip
+              </Button>
+              <Button
+                type="button"
+                disabled={!selectedFlair}
+                onClick={handleConfirmFlair}
+                className="flex-1 font-bold"
+                style={
+                  selectedFlair
+                    ? {
+                        background: "oklch(var(--orange))",
+                        color: "oklch(var(--carbon))",
+                      }
+                    : undefined
+                }
+              >
+                Set Flair
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Shop Tab ─────────────────────────────────────────────────────────────────
 
 function ShopTab({
@@ -334,6 +654,12 @@ function ShopTab({
   onDeductBalance?: (cost: number) => void;
 }) {
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
+  const [selectedCustomizeItem, setSelectedCustomizeItem] =
+    useState<CustomizeItem | null>(null);
+
+  // Force re-render to reflect newly unlocked items
+  const [, forceUpdate] = useState(0);
+  const refreshOwnership = () => forceUpdate((n) => n + 1);
 
   const renderItemCard = (item: ShopItem) => {
     const canAfford = balance >= item.cost;
@@ -434,6 +760,129 @@ function ShopTab({
     );
   };
 
+  const renderCustomizeCard = (item: CustomizeItem) => {
+    const canAfford = balance >= item.cost;
+    const rarityConfig = RARITY_CONFIG[item.rarity];
+    const isOwned =
+      item.id === "reaction-pack"
+        ? hasReactionPack(myPrincipal)
+        : getUserFlair(myPrincipal) !== null;
+
+    return (
+      <motion.div
+        key={item.id}
+        whileHover={{ scale: 1.02, y: -2 }}
+        whileTap={{ scale: 0.97 }}
+        className="rounded-xl overflow-hidden cursor-pointer relative"
+        style={{
+          background: `linear-gradient(135deg, ${item.gradient[0]}, ${item.gradient[1]})`,
+          border: `1.5px solid ${isOwned ? "oklch(0.65 0.18 145)" : canAfford ? rarityConfig.color : "oklch(var(--border))"}`,
+          boxShadow: isOwned
+            ? "0 0 16px oklch(0.65 0.18 145 / 0.3)"
+            : canAfford
+              ? `0 0 16px ${rarityConfig.glow}`
+              : "none",
+          opacity: isOwned ? 0.9 : canAfford ? 1 : 0.6,
+        }}
+      >
+        {isOwned && (
+          <div
+            className="absolute top-2 right-2 z-20 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+            style={{
+              background: "oklch(0.35 0.14 145 / 0.8)",
+              color: "oklch(0.72 0.2 145)",
+              border: "1px solid oklch(0.55 0.18 145 / 0.5)",
+            }}
+          >
+            ✓ Owned
+          </div>
+        )}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 15% 40%, ${rarityConfig.glow} 0%, transparent 55%)`,
+          }}
+        />
+
+        <div className="relative z-10 p-4 flex flex-col gap-3">
+          <div className="flex items-start justify-between">
+            <div
+              className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0"
+              style={{
+                background: `${rarityConfig.color}18`,
+                border: `1px solid ${rarityConfig.color}40`,
+              }}
+            >
+              {item.emoji}
+            </div>
+            <span
+              className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wider"
+              style={{
+                background: `${rarityConfig.color}22`,
+                color: rarityConfig.color,
+                border: `1px solid ${rarityConfig.color}50`,
+              }}
+            >
+              {rarityConfig.label}
+            </span>
+          </div>
+
+          <div>
+            <p className="font-bold text-foreground text-sm leading-tight">
+              {item.name}
+            </p>
+            <p className="text-[11px] text-steel mt-0.5 leading-relaxed">
+              {item.description}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-1">
+              <Zap size={13} style={{ color: "oklch(var(--orange))" }} />
+              <span
+                className="font-black font-display text-base"
+                style={{ color: "oklch(var(--orange))" }}
+              >
+                {item.cost.toLocaleString()} RB
+              </span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canAfford || isOwned}
+              onClick={() => !isOwned && setSelectedCustomizeItem(item)}
+              className="text-xs h-8 font-bold px-3 rounded-lg"
+              style={
+                isOwned
+                  ? {
+                      background: "oklch(0.25 0.08 145 / 0.5)",
+                      color: "oklch(0.72 0.2 145)",
+                      border: "1px solid oklch(0.45 0.14 145 / 0.4)",
+                    }
+                  : canAfford
+                    ? {
+                        background: rarityConfig.color,
+                        color: "oklch(0.12 0.01 250)",
+                      }
+                    : {
+                        background: "oklch(var(--surface))",
+                        color: "oklch(var(--steel))",
+                        border: "1px solid oklch(var(--border))",
+                      }
+              }
+            >
+              {isOwned
+                ? "✓ Owned"
+                : canAfford
+                  ? "🎯 Buy & Use"
+                  : "Need More RB"}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <>
       {/* Buy More RevBucks banner */}
@@ -527,6 +976,34 @@ function ShopTab({
             </div>
           );
         })}
+
+        {/* ── Customize Section ─────────────────────────────────────────── */}
+        <div>
+          <h3
+            className="text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"
+            style={{ color: "oklch(0.75 0.2 50)" }}
+          >
+            <span
+              className="flex-1 h-px"
+              style={{ background: "oklch(0.45 0.14 50 / 0.45)" }}
+            />
+            <Sparkles size={13} style={{ color: "oklch(0.75 0.2 50)" }} />
+            Customize
+            <span
+              className="flex-1 h-px"
+              style={{ background: "oklch(0.45 0.14 50 / 0.45)" }}
+            />
+          </h3>
+          <p
+            className="text-[11px] text-center mb-3"
+            style={{ color: "oklch(0.55 0.1 50)" }}
+          >
+            Unlock profile perks &amp; post reactions
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {CUSTOMIZE_ITEMS.map((item) => renderCustomizeCard(item))}
+          </div>
+        </div>
 
         {/* Send to a Model section — visible to all users */}
         <div>
@@ -632,6 +1109,19 @@ function ShopTab({
         onDeductBalance={onDeductBalance}
         onSent={() => {
           setSelectedItem(null);
+          onBalanceChange();
+        }}
+      />
+
+      <BuyCustomizationModal
+        item={selectedCustomizeItem}
+        myPrincipal={myPrincipal}
+        myBalance={balance}
+        onClose={() => setSelectedCustomizeItem(null)}
+        onDeductBalance={onDeductBalance}
+        onPurchased={() => {
+          setSelectedCustomizeItem(null);
+          refreshOwnership();
           onBalanceChange();
         }}
       />

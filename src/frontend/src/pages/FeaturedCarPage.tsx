@@ -11,12 +11,15 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Camera,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   ImagePlus,
   Loader2,
   Star,
   Trash2,
   Trophy,
+  X,
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -38,13 +41,15 @@ import { addTransaction, deductBalance, getBalance } from "../lib/revbucks";
 
 // ─── Submit Form State ─────────────────────────────────────────────────────────
 
+const FC_MAX_IMAGES = 5;
+
 interface FormData {
   ownerName: string;
   carName: string;
   year: string;
   description: string;
-  imageFile: File | null;
-  imagePreview: string | null;
+  imageFiles: File[];
+  imagePreviews: string[];
 }
 
 const DEFAULT_FORM: FormData = {
@@ -52,8 +57,8 @@ const DEFAULT_FORM: FormData = {
   carName: "",
   year: "",
   description: "",
-  imageFile: null,
-  imagePreview: null,
+  imageFiles: [],
+  imagePreviews: [],
 };
 
 // ─── Countdown Badge ──────────────────────────────────────────────────────────
@@ -130,7 +135,18 @@ function FeaturedCarCard({
   onDelete: (id: string) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [imgIndex, setImgIndex] = useState(0);
   const isOwner = myPrincipal && car.ownerPrincipal === myPrincipal;
+
+  // Support both legacy imageUrl and new imageUrls array
+  const images =
+    car.imageUrls && car.imageUrls.length > 0
+      ? car.imageUrls
+      : car.imageUrl
+        ? [car.imageUrl]
+        : [];
+  const hasMultiple = images.length > 1;
+  const currentImage = images[imgIndex] ?? null;
 
   const handleDeleteClick = () => {
     if (!confirmDelete) {
@@ -169,10 +185,10 @@ function FeaturedCarCard({
     >
       {/* Photo with gradient overlay */}
       <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-        {car.imageUrl ? (
+        {currentImage ? (
           <img
-            src={car.imageUrl}
-            alt={`${car.year} ${car.carName}`}
+            src={currentImage}
+            alt={`${car.year} ${car.carName} view ${imgIndex + 1}`}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -191,9 +207,58 @@ function FeaturedCarCard({
           </div>
         )}
 
+        {/* Carousel controls */}
+        {hasMultiple && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous photo"
+              onClick={(e) => {
+                e.stopPropagation();
+                setImgIndex((i) => (i - 1 + images.length) % images.length);
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "oklch(0 0 0 / 0.55)" }}
+            >
+              <ChevronLeft size={15} color="white" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next photo"
+              onClick={(e) => {
+                e.stopPropagation();
+                setImgIndex((i) => (i + 1) % images.length);
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "oklch(0 0 0 / 0.55)" }}
+            >
+              <ChevronRight size={15} color="white" />
+            </button>
+            {/* Dot indicators */}
+            <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-1.5">
+              {images.map((_, i) => (
+                <button
+                  key={`fcdot-${car.id}-${i}`}
+                  type="button"
+                  aria-label={`Go to photo ${i + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIndex(i);
+                  }}
+                  className="w-1.5 h-1.5 rounded-full transition-all"
+                  style={{
+                    background:
+                      i === imgIndex ? "oklch(1 0 0)" : "oklch(1 0 0 / 0.4)",
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Dark gradient overlay at bottom */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background:
               "linear-gradient(to bottom, transparent 30%, oklch(0 0 0 / 0.75) 100%)",
@@ -309,36 +374,58 @@ function SubmitModal({
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStep, setUploadStep] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadFile = useUploadFile();
 
-  const handleFieldChange = (field: keyof FormData, value: string) => {
+  const handleFieldChange = (
+    field: keyof Pick<
+      FormData,
+      "ownerName" | "carName" | "year" | "description"
+    >,
+    value: string,
+  ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
+    if (form.imageFiles.length >= FC_MAX_IMAGES) {
+      toast.error(`Maximum ${FC_MAX_IMAGES} photos allowed`);
+      return;
+    }
 
     // Convert HEIC/HEIF/WebP to JPEG for broader browser compatibility
     file = await convertToJpegIfNeeded(file);
 
-    // Preview
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setForm((prev) => ({
+    const preview = URL.createObjectURL(file);
+    setForm((prev) => ({
+      ...prev,
+      imageFiles: [...prev.imageFiles, file as File],
+      imagePreviews: [...prev.imagePreviews, preview],
+    }));
+    // Reset so same file can be chosen again after removal
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFormImage = (index: number) => {
+    setForm((prev) => {
+      URL.revokeObjectURL(prev.imagePreviews[index]);
+      return {
         ...prev,
-        imageFile: file as File,
-        imagePreview: ev.target?.result as string,
-      }));
-    };
-    reader.readAsDataURL(file);
+        imageFiles: prev.imageFiles.filter((_, i) => i !== index),
+        imagePreviews: prev.imagePreviews.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const handleClose = () => {
     if (isSubmitting) return;
+    for (const p of form.imagePreviews) URL.revokeObjectURL(p);
     setForm(DEFAULT_FORM);
     setUploadProgress(0);
+    setUploadStep("");
     onClose();
   };
 
@@ -355,8 +442,8 @@ function SubmitModal({
       toast.error("Please enter a valid 4-digit year");
       return;
     }
-    if (!form.imageFile) {
-      toast.error("Please add a photo of your car");
+    if (form.imageFiles.length === 0) {
+      toast.error("Please add at least one photo of your car");
       return;
     }
 
@@ -373,15 +460,20 @@ function SubmitModal({
     setUploadProgress(0);
 
     try {
-      // 1. Upload photo
-      let imageUrl = "";
-      try {
-        imageUrl = await uploadFile(form.imageFile, (pct) => {
-          setUploadProgress(pct);
-        });
-      } catch {
-        // If upload fails, use the local preview as fallback
-        imageUrl = form.imagePreview ?? "";
+      // 1. Upload all photos sequentially
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < form.imageFiles.length; i++) {
+        setUploadStep(`Uploading photo ${i + 1}/${form.imageFiles.length}...`);
+        try {
+          const url = await uploadFile(form.imageFiles[i], (pct) => {
+            const overall = ((i + pct / 100) / form.imageFiles.length) * 100;
+            setUploadProgress(Math.round(overall));
+          });
+          uploadedUrls.push(url);
+        } catch {
+          // Fallback to preview URL if upload fails
+          uploadedUrls.push(form.imagePreviews[i] ?? "");
+        }
       }
 
       // 2. Deduct RevBucks
@@ -406,15 +498,18 @@ function SubmitModal({
         carName: form.carName.trim(),
         year: form.year.trim(),
         description: form.description.trim(),
-        imageUrl,
+        imageUrl: uploadedUrls[0] ?? "",
+        imageUrls: uploadedUrls,
       });
 
       toast.success("🌟 Your car is now featured for 1 week!", {
         duration: 5000,
       });
 
+      for (const p of form.imagePreviews) URL.revokeObjectURL(p);
       setForm(DEFAULT_FORM);
       setUploadProgress(0);
+      setUploadStep("");
       onSubmitted();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -463,50 +558,84 @@ function SubmitModal({
 
         {/* Form fields */}
         <div className="space-y-4">
-          {/* Car photo upload */}
+          {/* Car photo upload — up to 5 photos */}
           <div>
             <Label className="text-sm font-semibold mb-2 block">
-              Car Photo <span className="text-ember">*</span>
+              Car Photos <span className="text-ember">*</span>
+              <span
+                className="ml-1 text-xs font-normal"
+                style={{ color: "oklch(var(--steel))" }}
+              >
+                ({form.imagePreviews.length}/{FC_MAX_IMAGES})
+              </span>
             </Label>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full relative overflow-hidden rounded-lg transition-all duration-200"
-              style={{
-                border: "2px dashed oklch(var(--border))",
-                background: form.imagePreview
-                  ? "transparent"
-                  : "oklch(var(--surface-raised))",
-                aspectRatio: "16/9",
-                minHeight: 140,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor =
-                  "oklch(var(--orange) / 0.6)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor =
-                  "oklch(var(--border))";
-              }}
-            >
-              {form.imagePreview ? (
-                <>
-                  <img
-                    src={form.imagePreview}
-                    alt="Car preview"
-                    className="w-full h-full object-cover"
-                  />
+
+            {/* Thumbnail strip */}
+            {form.imagePreviews.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+                {form.imagePreviews.map((preview, i) => (
                   <div
-                    className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                    style={{ background: "oklch(0 0 0 / 0.5)" }}
+                    key={preview}
+                    className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden"
+                    style={{ border: "1px solid oklch(var(--border))" }}
                   >
-                    <ImagePlus
-                      size={32}
-                      style={{ color: "oklch(0.95 0.005 240)" }}
+                    <img
+                      src={preview}
+                      alt={`Car view ${i + 1}`}
+                      className="w-full h-full object-cover"
                     />
+                    <button
+                      type="button"
+                      aria-label={`Remove car view ${i + 1}`}
+                      onClick={() => removeFormImage(i)}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: "oklch(0 0 0 / 0.65)" }}
+                    >
+                      <X size={10} color="white" />
+                    </button>
                   </div>
-                </>
-              ) : (
+                ))}
+
+                {/* Add More button */}
+                {form.imagePreviews.length < FC_MAX_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="shrink-0 w-20 h-20 rounded-lg flex flex-col items-center justify-center gap-1 text-xs transition-opacity hover:opacity-80"
+                    style={{
+                      background: "oklch(var(--surface-raised))",
+                      border: "2px dashed oklch(var(--border))",
+                      color: "oklch(var(--steel-light))",
+                    }}
+                  >
+                    <ImagePlus size={16} />
+                    Add
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Initial upload area when no images */}
+            {form.imagePreviews.length === 0 && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full relative overflow-hidden rounded-lg transition-all duration-200"
+                style={{
+                  border: "2px dashed oklch(var(--border))",
+                  background: "oklch(var(--surface-raised))",
+                  aspectRatio: "16/9",
+                  minHeight: 140,
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "oklch(var(--orange) / 0.6)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "oklch(var(--border))";
+                }}
+              >
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
                   <ImagePlus
                     size={32}
@@ -517,17 +646,18 @@ function SubmitModal({
                     className="text-sm font-medium"
                     style={{ color: "oklch(var(--steel-light))" }}
                   >
-                    Tap to upload photo
+                    Tap to upload photos
                   </p>
                   <p
                     className="text-xs"
                     style={{ color: "oklch(var(--steel))" }}
                   >
-                    JPG, PNG, HEIC supported
+                    Up to {FC_MAX_IMAGES} photos · JPG, PNG, HEIC
                   </p>
                 </div>
-              )}
-            </button>
+              </button>
+            )}
+
             <input
               ref={fileInputRef}
               type="file"
@@ -625,7 +755,7 @@ function SubmitModal({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span style={{ color: "oklch(var(--steel-light))" }}>
-                Uploading photo...
+                {uploadStep || "Uploading photos..."}
               </span>
               <span style={{ color: "oklch(var(--orange-bright))" }}>
                 {uploadProgress}%

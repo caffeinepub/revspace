@@ -10,14 +10,19 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PostView } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetProfile, useLikePost, useUnlikePost } from "../hooks/useQueries";
+import { hasReactionPack } from "../lib/customizations";
 import { awardLikeReceived } from "../lib/revbucks";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
 import { ProBadge } from "./ProBadge";
+
+const REACTION_EMOJIS = ["❤️", "🔥", "🏎️", "⚡", "🤙", "💨"] as const;
+type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
 interface PostCardProps {
   post: PostView;
@@ -56,6 +61,15 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     : false;
   const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
   const [likeCount, setLikeCount] = useState(post.likes.length);
+  const [selectedReaction, setSelectedReaction] =
+    useState<ReactionEmoji | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const reactionButtonRef = useRef<HTMLButtonElement>(null);
+
+  const userHasReactionPack = myPrincipal
+    ? hasReactionPack(myPrincipal)
+    : false;
 
   const liked = optimisticLiked !== null ? optimisticLiked : hasLiked;
 
@@ -73,6 +87,22 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       videoRef.current.muted = true;
     }
   }, []);
+
+  // Close reaction picker when clicking outside
+  useEffect(() => {
+    if (!showReactionPicker) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        reactionPickerRef.current &&
+        !reactionPickerRef.current.contains(e.target as Node) &&
+        !reactionButtonRef.current?.contains(e.target as Node)
+      ) {
+        setShowReactionPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showReactionPicker]);
 
   // Directly set the DOM property since React's muted prop isn't always reliable
   const handleVideoMuteToggle = (e: React.MouseEvent) => {
@@ -106,14 +136,29 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
 
-  const handleLike = () => {
+  const handleLikeButtonClick = () => {
     if (!myPrincipal) {
       toast.error("Please sign in to like posts");
       return;
     }
+    // If user has reaction pack and hasn't liked yet, show picker
+    if (userHasReactionPack && !liked) {
+      setShowReactionPicker((prev) => !prev);
+      return;
+    }
+    // Otherwise do regular like/unlike
+    handleLikeWithReaction(null);
+  };
+
+  const handleLikeWithReaction = (reaction: ReactionEmoji | null) => {
+    if (!myPrincipal) return;
+    setShowReactionPicker(false);
+    if (reaction) setSelectedReaction(reaction);
+
     if (liked) {
       setOptimisticLiked(false);
       setLikeCount((c) => Math.max(0, c - 1));
+      setSelectedReaction(null);
       unlikeMutation.mutate(post.id, {
         onError: () => {
           setOptimisticLiked(null);
@@ -133,10 +178,13 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
         onError: () => {
           setOptimisticLiked(null);
           setLikeCount(post.likes.length);
+          setSelectedReaction(null);
         },
       });
     }
   };
+
+  const handleLike = handleLikeButtonClick;
 
   const isVideoPost =
     post.postType?.toLowerCase() === "video" ||
@@ -377,18 +425,61 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       {/* Actions */}
       <div className="flex items-center justify-between px-4 pb-3">
         <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={handleLike}
-            className={`action-btn ${liked ? "liked" : ""}`}
-          >
-            <Heart
-              size={20}
-              fill={liked ? "currentColor" : "none"}
-              className="transition-transform active:scale-110"
-            />
-            <span>{likeCount > 0 ? likeCount : ""}</span>
-          </button>
+          {/* Like / Reaction button */}
+          <div className="relative">
+            <button
+              ref={reactionButtonRef}
+              type="button"
+              onClick={handleLike}
+              className={`action-btn ${liked ? "liked" : ""}`}
+            >
+              {liked && selectedReaction ? (
+                <span className="text-lg leading-none">{selectedReaction}</span>
+              ) : (
+                <Heart
+                  size={20}
+                  fill={liked ? "currentColor" : "none"}
+                  className="transition-transform active:scale-110"
+                />
+              )}
+              <span>{likeCount > 0 ? likeCount : ""}</span>
+            </button>
+
+            {/* Reaction picker */}
+            <AnimatePresence>
+              {showReactionPicker && (
+                <motion.div
+                  ref={reactionPickerRef}
+                  initial={{ opacity: 0, scale: 0.85, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.85, y: 8 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute bottom-full left-0 mb-2 z-50 flex items-center gap-1 px-2 py-1.5 rounded-2xl shadow-xl"
+                  style={{
+                    background: "oklch(0.18 0.02 240)",
+                    border: "1px solid oklch(0.3 0.02 240)",
+                    boxShadow:
+                      "0 8px 32px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.35 0.02 240)",
+                  }}
+                >
+                  {REACTION_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      aria-label={`React with ${emoji}`}
+                      onClick={() => handleLikeWithReaction(emoji)}
+                      className="text-xl w-9 h-9 flex items-center justify-center rounded-xl transition-transform hover:scale-125 active:scale-110"
+                      style={{
+                        background: "transparent",
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <button
             type="button"
             className="action-btn"

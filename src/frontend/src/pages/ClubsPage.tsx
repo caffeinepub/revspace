@@ -27,6 +27,7 @@ import {
   useJoinClub,
   useLeaveClub,
 } from "../hooks/useQueries";
+import { clearUserClub, setUserClub } from "../lib/customizations";
 
 const CLUB_CATEGORIES = [
   "JDM",
@@ -60,12 +61,18 @@ function ClubDetailModal({
     }
     if (isMember) {
       leaveClub.mutate(club.id, {
-        onSuccess: () => toast.success(`Left ${club.name}`),
+        onSuccess: () => {
+          clearUserClub(myPrincipal);
+          toast.success(`Left ${club.name}`);
+        },
         onError: () => toast.error("Failed"),
       });
     } else {
       joinClub.mutate(club.id, {
-        onSuccess: () => toast.success(`Joined ${club.name}! 🎉`),
+        onSuccess: () => {
+          setUserClub(myPrincipal, club.name);
+          toast.success(`Joined ${club.name}! 🎉`);
+        },
         onError: () => toast.error("Failed"),
       });
     }

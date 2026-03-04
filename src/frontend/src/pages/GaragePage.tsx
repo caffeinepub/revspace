@@ -10,7 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Car, ImagePlus, Loader2, Plus, Trash2, Wrench } from "lucide-react";
+import {
+  Car,
+  ChevronLeft,
+  ChevronRight,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Trash2,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Car as CarType } from "../backend.d";
@@ -28,6 +38,9 @@ function CarDetailModal({
   onClose,
 }: { car: CarType; open: boolean; onClose: () => void }) {
   const removeCar = useRemoveCar();
+  const [imgIndex, setImgIndex] = useState(0);
+  const images = car.imageUrls.filter(Boolean);
+  const hasMultiple = images.length > 1;
 
   const handleRemove = () => {
     removeCar.mutate(car.id, {
@@ -54,12 +67,56 @@ function CarDetailModal({
           </DialogTitle>
         </DialogHeader>
 
-        {car.imageUrls[0] && (
-          <img
-            src={car.imageUrls[0]}
-            alt={`${car.year} ${car.make} ${car.model}`}
-            className="w-full h-52 object-cover rounded-lg"
-          />
+        {images.length > 0 && (
+          <div className="relative rounded-lg overflow-hidden">
+            <img
+              src={images[imgIndex]}
+              alt={`${car.year} ${car.make} ${car.model} — view ${imgIndex + 1}`}
+              className="w-full h-52 object-cover"
+            />
+            {hasMultiple && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous photo"
+                  onClick={() =>
+                    setImgIndex((i) => (i - 1 + images.length) % images.length)
+                  }
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-opacity"
+                  style={{ background: "oklch(0 0 0 / 0.55)" }}
+                >
+                  <ChevronLeft size={16} color="white" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next photo"
+                  onClick={() => setImgIndex((i) => (i + 1) % images.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-opacity"
+                  style={{ background: "oklch(0 0 0 / 0.55)" }}
+                >
+                  <ChevronRight size={16} color="white" />
+                </button>
+                {/* Dot indicators */}
+                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                  {images.map((_, i) => (
+                    <button
+                      key={`dot-${car.id}-${i}`}
+                      type="button"
+                      aria-label={`Go to photo ${i + 1}`}
+                      onClick={() => setImgIndex(i)}
+                      className="w-1.5 h-1.5 rounded-full transition-all"
+                      style={{
+                        background:
+                          i === imgIndex
+                            ? "oklch(1 0 0)"
+                            : "oklch(1 0 0 / 0.4)",
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         <div className="space-y-3">
@@ -127,6 +184,8 @@ function CarDetailModal({
   );
 }
 
+const MAX_IMAGES = 5;
+
 function AddCarModal({
   open,
   onClose,
@@ -139,9 +198,10 @@ function AddCarModal({
     description: "",
     modificationsText: "",
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStep, setUploadStep] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -151,10 +211,24 @@ function AddCarModal({
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file) return;
+    if (imageFiles.length >= MAX_IMAGES) {
+      toast.error(`Maximum ${MAX_IMAGES} photos allowed`);
+      return;
+    }
     file = await convertToJpegIfNeeded(file);
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    const preview = URL.createObjectURL(file);
+    setImageFiles((prev) => [...prev, file as File]);
+    setImagePreviews((prev) => [...prev, preview]);
+    // Reset file input so same file can be re-added if removed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeImage = (index: number) => {
+    setImagePreviews((prev) => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const resetForm = () => {
@@ -166,10 +240,11 @@ function AddCarModal({
       description: "",
       modificationsText: "",
     });
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(null);
-    setImagePreview(null);
+    for (const p of imagePreviews) URL.revokeObjectURL(p);
+    setImageFiles([]);
+    setImagePreviews([]);
     setUploadProgress(null);
+    setUploadStep("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -182,24 +257,30 @@ function AddCarModal({
 
     let imageUrls: string[] = [];
 
-    if (imageFile) {
+    if (imageFiles.length > 0) {
       setIsUploading(true);
       setUploadProgress(0);
       try {
-        const url = await uploadFile(imageFile, (pct) =>
-          setUploadProgress(pct),
-        );
-        imageUrls = [url];
+        for (let i = 0; i < imageFiles.length; i++) {
+          setUploadStep(`Uploading ${i + 1}/${imageFiles.length}...`);
+          const url = await uploadFile(imageFiles[i], (pct) => {
+            const overall = ((i + pct / 100) / imageFiles.length) * 100;
+            setUploadProgress(Math.round(overall));
+          });
+          imageUrls.push(url);
+        }
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Failed to upload image",
         );
         setIsUploading(false);
         setUploadProgress(null);
+        setUploadStep("");
         return;
       }
       setIsUploading(false);
       setUploadProgress(null);
+      setUploadStep("");
     }
 
     addCar.mutate(
@@ -348,9 +429,14 @@ function AddCarModal({
             />
           </div>
 
-          {/* Image Upload */}
+          {/* Image Upload — up to 5 photos */}
           <div>
-            <Label className="text-xs text-steel mb-1 block">Car Photo</Label>
+            <Label className="text-xs text-steel mb-1 block">
+              Car Photos{" "}
+              <span className="text-[10px]">
+                ({imagePreviews.length}/{MAX_IMAGES})
+              </span>
+            </Label>
             <input
               ref={fileInputRef}
               type="file"
@@ -358,28 +444,54 @@ function AddCarModal({
               className="hidden"
               onChange={handleImageChange}
             />
-            {imagePreview ? (
-              <div className="relative rounded-lg overflow-hidden">
-                <img
-                  src={imagePreview}
-                  alt="Car preview"
-                  className="w-full h-32 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (imagePreview) URL.revokeObjectURL(imagePreview);
-                    setImageFile(null);
-                    setImagePreview(null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white"
-                  style={{ background: "oklch(0 0 0 / 0.6)" }}
-                >
-                  ×
-                </button>
+
+            {/* Thumbnail strip */}
+            {imagePreviews.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+                {imagePreviews.map((preview, i) => (
+                  <div
+                    key={preview}
+                    className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden"
+                    style={{ border: "1px solid oklch(var(--border))" }}
+                  >
+                    <img
+                      src={preview}
+                      alt={`Car view ${i + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Remove car view ${i + 1}`}
+                      onClick={() => removeImage(i)}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: "oklch(0 0 0 / 0.65)" }}
+                    >
+                      <X size={10} color="white" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add More button — only if under max */}
+                {imagePreviews.length < MAX_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="shrink-0 w-20 h-20 rounded-lg flex flex-col items-center justify-center gap-1 text-xs transition-opacity hover:opacity-80"
+                    style={{
+                      background: "oklch(var(--surface-elevated))",
+                      border: "2px dashed oklch(var(--border))",
+                      color: "oklch(var(--steel-light))",
+                    }}
+                  >
+                    <ImagePlus size={16} />
+                    Add
+                  </button>
+                )}
               </div>
-            ) : (
+            )}
+
+            {/* Initial upload button when no images yet */}
+            {imagePreviews.length === 0 && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -391,13 +503,16 @@ function AddCarModal({
                 }}
               >
                 <ImagePlus size={16} />
-                Upload car photo
+                Upload car photos (up to {MAX_IMAGES})
               </button>
             )}
+
             {uploadProgress !== null && (
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-steel">Uploading...</span>
+                  <span className="text-xs text-steel">
+                    {uploadStep || "Uploading..."}
+                  </span>
                   <span
                     className="text-xs font-semibold"
                     style={{ color: "oklch(var(--orange))" }}
@@ -433,7 +548,7 @@ function AddCarModal({
             {isUploading ? (
               <>
                 <Loader2 size={14} className="mr-2 animate-spin" />
-                Uploading photo...
+                {uploadStep || "Uploading photos..."}
               </>
             ) : addCar.isPending ? (
               <>

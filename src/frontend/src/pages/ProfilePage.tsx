@@ -28,6 +28,7 @@ import {
   useMyGarage,
   useMyProfile,
 } from "../hooks/useQueries";
+import { getUserClub, getUserFlair } from "../lib/customizations";
 import { getCachedProfile } from "../lib/profileCache";
 import { getGiftSummary } from "../lib/revbucks";
 import { getDisplayLocation } from "../lib/userMeta";
@@ -72,6 +73,8 @@ export function ProfilePage() {
   const bannerUrl = effectiveProfile?.bannerUrl ?? "";
   const bio = effectiveProfile?.bio ?? "";
   const location = getDisplayLocation(effectiveProfile?.location ?? "");
+  const userFlair = getUserFlair(myPrincipalStr);
+  const userClub = getUserClub(myPrincipalStr);
 
   const displayPosts = posts ?? [];
   const displayGarage = garage ?? [];
@@ -212,6 +215,20 @@ export function ProfilePage() {
                   <ProBadge />
                   <FriendBadge principalStr={myPrincipalStr} />
                 </h2>
+                {userFlair && (
+                  <div className="mt-0.5">
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                      style={{
+                        background: "oklch(var(--orange) / 0.15)",
+                        color: "oklch(var(--orange-bright))",
+                        border: "1px solid oklch(var(--orange) / 0.3)",
+                      }}
+                    >
+                      🏷️ {userFlair}
+                    </span>
+                  </div>
+                )}
                 {location && (
                   <div className="flex items-center gap-1 text-steel text-xs mt-0.5">
                     <MapPin size={11} />
@@ -608,6 +625,25 @@ export function ProfilePage() {
                   Location
                 </p>
                 <p className="text-sm text-foreground">{location}</p>
+              </div>
+            )}
+            {userClub && (
+              <div>
+                <p className="text-xs text-steel uppercase tracking-wider mb-1 font-semibold">
+                  Club
+                </p>
+                <p className="text-sm text-foreground flex items-center gap-1.5">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{
+                      background: "oklch(var(--orange) / 0.15)",
+                      color: "oklch(var(--orange-bright))",
+                      border: "1px solid oklch(var(--orange) / 0.3)",
+                    }}
+                  >
+                    🏁 {userClub}
+                  </span>
+                </p>
               </div>
             )}
             <div>

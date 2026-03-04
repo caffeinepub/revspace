@@ -12,6 +12,7 @@ export interface FeaturedCar {
   year: string;
   description: string;
   imageUrl: string;
+  imageUrls?: string[]; // up to 5 images (imageUrl is kept for backwards compatibility)
   submittedAt: number; // ms timestamp
 }
 
