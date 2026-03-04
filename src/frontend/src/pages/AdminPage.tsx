@@ -28,9 +28,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import type { backendInterface } from "../backend";
 import type { Listing, PostView, Profile, UserRole } from "../backend.d";
-import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { usePublicActor } from "../hooks/usePublicActor";
 import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -131,9 +132,11 @@ function RowSkeleton() {
 function UsersTab({
   actor,
   myPrincipal,
+  backendAdminReady,
 }: {
-  actor: ReturnType<typeof useActor>["actor"];
+  actor: backendInterface | null;
   myPrincipal: string | undefined;
+  backendAdminReady: boolean;
 }) {
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,6 +265,12 @@ function UsersTab({
   // Give RevBucks — calls adminUpdateUserLocation to persist changes on-chain immediately.
   async function handleAddRb(user: MergedUser) {
     if (!actor) return;
+    if (!backendAdminReady) {
+      toast.error(
+        "Admin session still initializing — wait a moment and try again",
+      );
+      return;
+    }
     const amtStr = rbInputs[user.principal.toString()] ?? "";
     const amt = Number.parseInt(amtStr, 10);
     if (Number.isNaN(amt) || amt <= 0) {
@@ -305,6 +314,12 @@ function UsersTab({
 
   async function handleProToggle(user: MergedUser) {
     if (!actor) return;
+    if (!backendAdminReady) {
+      toast.error(
+        "Admin session still initializing — wait a moment and try again",
+      );
+      return;
+    }
     const currentMeta = decodeMetaFromLocation(user.locationRaw);
     const newMeta = { ...currentMeta, isPro: !currentMeta.isPro };
     const newEncoded = encodeMetaToLocation(newMeta);
@@ -708,7 +723,7 @@ function UsersTab({
 
 // ── Posts tab ─────────────────────────────────────────────────────────────────
 
-function PostsTab({ actor }: { actor: ReturnType<typeof useActor>["actor"] }) {
+function PostsTab({ actor }: { actor: backendInterface | null }) {
   const [posts, setPosts] = useState<PostView[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -866,9 +881,7 @@ function PostsTab({ actor }: { actor: ReturnType<typeof useActor>["actor"] }) {
 
 // ── Marketplace tab ───────────────────────────────────────────────────────────
 
-function MarketplaceTab({
-  actor,
-}: { actor: ReturnType<typeof useActor>["actor"] }) {
+function MarketplaceTab({ actor }: { actor: backendInterface | null }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -1032,7 +1045,7 @@ function MarketplaceTab({
 // ── AdminTokenGate ────────────────────────────────────────────────────────────
 
 interface AdminTokenGateProps {
-  actor: ReturnType<typeof useActor>["actor"];
+  actor: backendInterface | null;
   onSuccess: () => void;
 }
 
@@ -1184,7 +1197,10 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 // ── AdminPage ─────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const { actor } = useActor();
+  // Use publicActor — it always resolves without calling _initializeAccessControlWithSecret,
+  // so we never get stuck waiting. We call _initializeAccessControlWithSecret("Meonly123$")
+  // manually after confirming the admin token.
+  const { actor } = usePublicActor();
   const { identity } = useInternetIdentity();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -1193,41 +1209,34 @@ export function AdminPage() {
 
   const myPrincipal = identity?.getPrincipal().toString();
 
-  // ── Step 1: Check localStorage immediately on mount (no actor needed) ──────
-  // This runs synchronously before any actor is ready, so returning admins
-  // never see the loading screen or token gate.
+  const [backendAdminReady, setBackendAdminReady] = useState(false);
+
+  // ── Check saved token immediately (no actor needed for UI gate) ──────────
   useEffect(() => {
-    if (localStorage.getItem("rs_admin_unlocked") === "Meonly123$") {
+    const savedToken = localStorage.getItem("rs_admin_unlocked");
+    if (savedToken === "Meonly123$") {
+      // Grant UI access immediately — don't wait for actor
       setIsAdmin(true);
+    } else {
+      // No saved token — show token gate immediately (no spinner)
+      setIsAdmin(false);
     }
   }, []);
 
-  // ── Step 2: Safety timeout — if still null after 4s, show token gate ───────
+  // ── Re-establish backend admin session once actor resolves ───────────────
+  // Called when we already have the token saved. Runs in background.
   useEffect(() => {
-    const t = setTimeout(() => {
-      setIsAdmin((prev) => (prev === null ? false : prev));
-    }, 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  // ── Step 3: Once actor is ready, confirm via backend (secondary check) ─────
-  useEffect(() => {
-    if (!actor) return;
-    // If already admitted via localStorage, just confirm silently in background
-    if (localStorage.getItem("rs_admin_unlocked") === "Meonly123$") {
-      setIsAdmin(true);
-      return;
-    }
-    // Otherwise ask the backend
+    if (!actor || backendAdminReady) return;
+    const savedToken = localStorage.getItem("rs_admin_unlocked");
+    if (savedToken !== "Meonly123$") return;
     actor
-      .isCallerAdmin()
-      .then((result: boolean) => {
-        setIsAdmin(result);
-      })
+      ._initializeAccessControlWithSecret("Meonly123$")
+      .then(() => setBackendAdminReady(true))
       .catch(() => {
-        setIsAdmin(false);
+        // Already registered or canister returned error — still mark ready
+        setBackendAdminReady(true);
       });
-  }, [actor]);
+  }, [actor, backendAdminReady]);
 
   // Count badges — derive user count from unique post authors (public call)
   useEffect(() => {
@@ -1242,7 +1251,7 @@ export function AdminPage() {
     ]).catch(() => {});
   }, [actor, isAdmin]);
 
-  // Loading state — only block while isAdmin is still unknown (max 4s)
+  // Loading state — only block while isAdmin is still unknown (should be instant now)
   if (isAdmin === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1253,9 +1262,7 @@ export function AdminPage() {
           >
             <ShieldCheck size={24} style={{ color: "oklch(var(--orange))" }} />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Verifying admin access…
-          </p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         </div>
       </div>
     );
@@ -1263,7 +1270,21 @@ export function AdminPage() {
 
   // Not yet admin — show token claim form
   if (!isAdmin) {
-    return <AdminTokenGate actor={actor} onSuccess={() => setIsAdmin(true)} />;
+    return (
+      <AdminTokenGate
+        actor={actor}
+        onSuccess={() => {
+          setIsAdmin(true);
+          // Re-establish backend session after token entry
+          if (actor) {
+            actor
+              ._initializeAccessControlWithSecret("Meonly123$")
+              .then(() => setBackendAdminReady(true))
+              .catch(() => setBackendAdminReady(true));
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -1291,13 +1312,34 @@ export function AdminPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <AlertTriangle size={14} style={{ color: "oklch(var(--ember))" }} />
-          <span
-            className="text-xs font-medium"
-            style={{ color: "oklch(var(--ember))" }}
-          >
-            Destructive actions are permanent
-          </span>
+          {!backendAdminReady ? (
+            <>
+              <Loader2
+                size={13}
+                className="animate-spin"
+                style={{ color: "oklch(var(--orange))" }}
+              />
+              <span
+                className="text-xs font-medium"
+                style={{ color: "oklch(var(--orange))" }}
+              >
+                Connecting…
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle
+                size={14}
+                style={{ color: "oklch(var(--ember))" }}
+              />
+              <span
+                className="text-xs font-medium"
+                style={{ color: "oklch(var(--ember))" }}
+              >
+                Destructive actions are permanent
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -1444,7 +1486,11 @@ export function AdminPage() {
 
             <div className="px-4 pb-4">
               <TabsContent value="users" className="mt-0">
-                <UsersTab actor={actor} myPrincipal={myPrincipal} />
+                <UsersTab
+                  actor={actor}
+                  myPrincipal={myPrincipal}
+                  backendAdminReady={backendAdminReady}
+                />
               </TabsContent>
               <TabsContent value="posts" className="mt-0">
                 <PostsTab actor={actor} />
