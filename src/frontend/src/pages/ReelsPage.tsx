@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProBadge } from "../components/ProBadge";
 import { useActor } from "../hooks/useActor";
@@ -273,6 +273,7 @@ interface ReelMediaProps {
   postId: string;
   postType: string;
   isMuted?: boolean;
+  isVisible?: boolean; // only play when this reel is in the viewport
   videoRef?: (el: HTMLVideoElement | null) => void;
   onTimeUpdate?: (postId: string, progress: number) => void;
 }
@@ -282,6 +283,7 @@ function ReelMedia({
   postId,
   postType,
   isMuted = true,
+  isVisible = false,
   videoRef,
   onTimeUpdate,
 }: ReelMediaProps) {
@@ -319,18 +321,21 @@ function ReelMedia({
       <video
         key={mediaUrl}
         ref={(el) => {
-          // Apply current muted state immediately on mount so the video
-          // respects the toggle without waiting for a useEffect cycle
-          if (el) el.muted = isMuted;
-          // Forward to the parent ref callback
+          if (el) {
+            el.muted = isMuted;
+            // Only preload metadata for off-screen reels; preload full data for
+            // the visible one so it plays instantly without buffering freeze.
+            el.preload = isVisible ? "auto" : "none";
+          }
           if (typeof videoRef === "function") videoRef(el);
         }}
         src={mediaUrl}
-        autoPlay
+        // Do NOT use autoPlay — visibility is controlled via play()/pause() in
+        // the parent's IntersectionObserver so only one video loads at a time.
         muted={isMuted}
         loop
         playsInline
-        preload="metadata"
+        // preload is set via the ref above based on visibility
         className="absolute inset-0 w-full h-full object-cover"
         onTimeUpdate={(e) => {
           const video = e.currentTarget;
@@ -389,7 +394,12 @@ export function ReelsPage() {
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [selectedTopic, setSelectedTopic] = useState("All");
+  // Track which single reel is currently visible in the viewport
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  // Map postId → reel container DOM element for IntersectionObserver
+  const reelContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
@@ -405,6 +415,73 @@ export function ReelsPage() {
     selectedTopic === "All"
       ? allPosts
       : allPosts.filter((p) => p.topic === selectedTopic);
+
+  // ── IntersectionObserver: play only the visible reel, pause all others ──────
+  // This is the primary fix for reels freezing. Without it every mounted video
+  // tries to decode and play simultaneously, starving bandwidth and locking the
+  // main thread. With it only one video is active at a time.
+  const registerReelContainer = useCallback(
+    (postId: string, el: HTMLDivElement | null) => {
+      if (el) {
+        reelContainerRefs.current.set(postId, el);
+      } else {
+        reelContainerRefs.current.delete(postId);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    // Tear down any previous observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const postId = (entry.target as HTMLElement).dataset.postId;
+          if (!postId) continue;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            setVisiblePostId(postId);
+          }
+        }
+      },
+      {
+        // Fire when 60% of the reel card is visible — avoids flickering at edges
+        threshold: 0.6,
+      },
+    );
+
+    for (const [_postId, el] of reelContainerRefs.current.entries()) {
+      observerRef.current.observe(el);
+    }
+
+    return () => {
+      observerRef.current?.disconnect();
+    };
+    // Empty deps — the observer reads from refs (reelContainerRefs) which are
+    // mutated directly and don't need to be in the dependency array. The observer
+    // callback only calls setVisiblePostId so it is always current via closure.
+  }, []);
+
+  // ── Play/pause based on visibility ──────────────────────────────────────────
+  useEffect(() => {
+    for (const [postId, video] of videoRefs.current.entries()) {
+      video.muted = isMuted;
+      if (postId === visiblePostId) {
+        // Ensure preload is set to auto for the visible video so it buffers
+        video.preload = "auto";
+        video.play().catch(() => {
+          // Autoplay blocked (uncommon since muted) — silently ignore
+        });
+      } else {
+        video.pause();
+        // Release memory for off-screen videos: remove preload hint
+        video.preload = "none";
+      }
+    }
+  }, [visiblePostId, isMuted]);
 
   // Sync muted state directly on video DOM elements (React prop alone isn't always reliable)
   useEffect(() => {
@@ -613,8 +690,15 @@ export function ReelsPage() {
         const liked = likedPosts.has(post.id) || serverLiked;
         const postProgress = progress[post.id] ?? 0;
 
+        const isVisible = visiblePostId === post.id;
+
         return (
-          <div key={post.id} className="reel-card shrink-0">
+          <div
+            key={post.id}
+            className="reel-card shrink-0"
+            data-post-id={post.id}
+            ref={(el) => registerReelContainer(post.id, el)}
+          >
             {/* Background media */}
             <div className="absolute inset-0">
               <ReelMedia
@@ -622,10 +706,9 @@ export function ReelsPage() {
                 postId={post.id}
                 postType={post.postType}
                 isMuted={isMuted}
+                isVisible={isVisible}
                 videoRef={(el) => {
                   if (el) {
-                    // Apply current muted state immediately so newly-mounted
-                    // videos respect the toggle without waiting for the effect
                     el.muted = isMuted;
                     videoRefs.current.set(post.id, el);
                   } else {

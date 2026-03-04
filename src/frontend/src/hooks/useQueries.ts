@@ -236,7 +236,8 @@ export function useGetAllPosts() {
     },
     // Run even without actor so we can serve cache immediately
     enabled: true,
-    staleTime: 5_000,
+    // Keep posts fresh for 30s — reduces redundant refetches on every actor change
+    staleTime: 30_000,
     refetchOnMount: true,
     // When actor becomes available, refetch to get live data
     refetchInterval: !actor ? 2_000 : false,

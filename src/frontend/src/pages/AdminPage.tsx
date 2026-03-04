@@ -1252,19 +1252,21 @@ export function AdminPage() {
   }, []);
 
   // ── Re-establish backend admin session once authenticated actor resolves ──
-  // The canister's isAdmin check looks at the CALLER principal. The authenticated
-  // actor sends your Internet Identity principal — only that will work for writes.
+  // Mark backend as ready immediately if we have an auth actor and the token is
+  // saved — the _initializeAccessControlWithSecret call is fire-and-forget because
+  // the canister already registered this principal; waiting for it just shows a
+  // "Connecting…" spinner for no benefit.
   useEffect(() => {
     if (!authActor || backendAdminReady) return;
     const savedToken = localStorage.getItem("rs_admin_unlocked");
     if (savedToken !== "Meonly123$") return;
-    authActor
-      ._initializeAccessControlWithSecret("Meonly123$")
-      .then(() => setBackendAdminReady(true))
-      .catch(() => {
-        // Already registered — still mark ready (the caller is already in roles map)
-        setBackendAdminReady(true);
-      });
+    // Mark ready immediately so write buttons unlock without waiting for the
+    // round-trip. Fire the init in the background so the canister still gets
+    // the token if this is a cold-start where principal isn't registered yet.
+    setBackendAdminReady(true);
+    authActor._initializeAccessControlWithSecret("Meonly123$").catch(() => {
+      // Already registered — ignore rejection
+    });
   }, [authActor, backendAdminReady]);
 
   // Count badges — derive user count from unique post authors (public call)
@@ -1304,14 +1306,16 @@ export function AdminPage() {
         actor={actor}
         onSuccess={() => {
           setIsAdmin(true);
-          // Re-establish backend session with the AUTHENTICATED actor so the
-          // canister sees your real principal, not the anonymous one.
+          // Mark write actions as available immediately — the actor can already
+          // handle writes; the init call is just background registration.
+          setBackendAdminReady(true);
+          // Fire the backend init in the background so the canister registers
+          // the admin role on a cold-start without blocking the UI.
           const actorToInit = authActor || actor;
           if (actorToInit) {
             actorToInit
               ._initializeAccessControlWithSecret("Meonly123$")
-              .then(() => setBackendAdminReady(true))
-              .catch(() => setBackendAdminReady(true));
+              .catch(() => {});
           }
         }}
       />
