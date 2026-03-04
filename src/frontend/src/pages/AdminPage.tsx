@@ -151,42 +151,49 @@ function UsersTab({
     if (!actor) return;
     setLoading(true);
     // Use adminGetAllProfiles() as primary source — it has EVERY user who saved a profile.
-    // adminGetAllUsers() is secondary — just provides role data.
-    Promise.all([actor.adminGetAllProfiles(), actor.adminGetAllUsers()])
-      .then(
-        ([profilesArr, usersArr]: [ProfileWithPrincipal[], UserWithRole[]]) => {
-          // Build a role lookup from the users list
-          const roleMap = new Map<string, UserRole>();
-          for (const u of usersArr) {
-            roleMap.set(u.principal.toString(), u.role);
-          }
+    // adminGetAllUsers() is secondary — just provides role data (graceful fallback if it fails).
+    Promise.allSettled([actor.adminGetAllProfiles(), actor.adminGetAllUsers()])
+      .then(([profilesResult, usersResult]) => {
+        if (profilesResult.status === "rejected") {
+          toast.error("Failed to load users");
+          return;
+        }
 
-          const merged: MergedUser[] = profilesArr.map((pp) => {
-            const meta = decodeMetaFromLocation(pp.profile.location ?? "");
-            return {
-              principal: pp.principal,
-              role:
-                roleMap.get(pp.principal.toString()) ?? ("user" as UserRole),
-              displayName:
-                pp.profile.displayName || truncPrincipal(pp.principal),
-              avatarUrl: pp.profile.avatarUrl || "",
-              revBucks: meta.rb,
-              isPro: meta.isPro,
-              isModel: meta.isModel,
-              locationRaw: pp.profile.location ?? "",
-            };
-          });
+        const profilesArr = profilesResult.value as ProfileWithPrincipal[];
+        const usersArr: UserWithRole[] =
+          usersResult.status === "fulfilled"
+            ? (usersResult.value as UserWithRole[])
+            : [];
 
-          // Sort: admins first, then alphabetically by display name
-          merged.sort((a, b) => {
-            if (a.role === "admin" && b.role !== "admin") return -1;
-            if (b.role === "admin" && a.role !== "admin") return 1;
-            return a.displayName.localeCompare(b.displayName);
-          });
+        // Build a role lookup from the users list
+        const roleMap = new Map<string, UserRole>();
+        for (const u of usersArr) {
+          roleMap.set(u.principal.toString(), u.role);
+        }
 
-          setUsers(merged);
-        },
-      )
+        const merged: MergedUser[] = profilesArr.map((pp) => {
+          const meta = decodeMetaFromLocation(pp.profile.location ?? "");
+          return {
+            principal: pp.principal,
+            role: roleMap.get(pp.principal.toString()) ?? ("user" as UserRole),
+            displayName: pp.profile.displayName || truncPrincipal(pp.principal),
+            avatarUrl: pp.profile.avatarUrl || "",
+            revBucks: meta.rb,
+            isPro: meta.isPro,
+            isModel: meta.isModel,
+            locationRaw: pp.profile.location ?? "",
+          };
+        });
+
+        // Sort: admins first, then alphabetically by display name
+        merged.sort((a, b) => {
+          if (a.role === "admin" && b.role !== "admin") return -1;
+          if (b.role === "admin" && a.role !== "admin") return 1;
+          return a.displayName.localeCompare(b.displayName);
+        });
+
+        setUsers(merged);
+      })
       .catch(() => toast.error("Failed to load users"))
       .finally(() => setLoading(false));
   }, [actor]);

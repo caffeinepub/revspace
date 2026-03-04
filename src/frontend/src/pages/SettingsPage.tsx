@@ -184,7 +184,7 @@ function ModelAccountCard() {
                 : "oklch(var(--steel))",
             }}
           >
-            Just a fan
+            Enthusiast
           </span>
           {!isModel && (
             <div

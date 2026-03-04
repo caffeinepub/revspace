@@ -351,10 +351,13 @@ function MobileNav({
           className="flex items-center justify-center gap-2 px-3 py-1.5"
         >
           <img
-            src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
+            src="/assets/generated/ebay-parts-banner.dim_400x90.png"
             alt="JDM Store - Shop Parts & Accessories"
             className="h-8 object-contain"
-            style={{ maxWidth: 120, background: "#000", borderRadius: 4 }}
+            style={{ maxWidth: 160, background: "#000", borderRadius: 4 }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
           <span
             className="text-xs font-semibold tracking-wide"
@@ -795,10 +798,24 @@ function Sidebar({
           }}
         >
           <img
-            src="/assets/uploads/Black-and-White-Graffiti-Urban-Clothing-Brand-Logo-1.png"
+            src="/assets/generated/ebay-parts-banner.dim_400x90.png"
             alt="JDM Store - Parts and Accessories"
             className="w-full object-contain"
             style={{ height: 90, background: "#000" }}
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              img.style.display = "none";
+              const parent = img.parentElement;
+              if (parent) {
+                parent.style.display = "flex";
+                parent.style.alignItems = "center";
+                parent.style.justifyContent = "center";
+                parent.style.height = "90px";
+                parent.style.background = "#000";
+                parent.innerHTML =
+                  '<span style="color: oklch(var(--orange)); font-size: 12px; font-weight: 600;">Shop JDM Parts &amp; Accessories →</span>';
+              }
+            }}
           />
         </a>
       </div>
@@ -840,15 +857,18 @@ export function BullBoostBanner() {
       }}
     >
       <img
-        src="/assets/uploads/z86GgQCwZ7Hm4-1.png"
+        src="/assets/generated/bull-boost-banner.dim_600x80.png"
         alt="Bull Boost Performance"
-        style={{ height: 36, maxWidth: 200, objectFit: "contain" }}
+        style={{ height: 36, maxWidth: 240, objectFit: "contain" }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
       />
       <span
-        className="text-xs font-semibold tracking-wider uppercase hidden sm:inline"
+        className="text-xs font-semibold tracking-wider uppercase"
         style={{ color: "oklch(var(--orange-bright))", letterSpacing: "0.1em" }}
       >
-        bullboostperformance.com →
+        Bull Boost Performance →
       </span>
     </a>
   );
