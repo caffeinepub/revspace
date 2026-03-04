@@ -1,7 +1,15 @@
 import { Toaster } from "@/components/ui/sonner";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { Outlet, createRootRoute, createRoute } from "@tanstack/react-router";
-import { Suspense, lazy, useEffect, useState } from "react";
+import {
+  Component,
+  type ErrorInfo,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
@@ -10,107 +18,179 @@ import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { setFriendOfCreator } from "./lib/friendBadge";
 import { setUserPro } from "./lib/pro";
 
-const AdminPage = lazy(() =>
+/**
+ * Wraps a lazy import so that if a chunk fails to load (stale deploy cache),
+ * the app does ONE hard reload to pick up the fresh index.html + new chunk hashes.
+ * A sessionStorage flag prevents infinite reload loops.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lazyWithRetry<T extends { default: React.ComponentType<any> }>(
+  factory: () => Promise<T>,
+): React.LazyExoticComponent<T["default"]> {
+  return lazy(() =>
+    factory().catch((err: unknown) => {
+      const isChunkError =
+        err instanceof Error &&
+        (err.message.includes("Failed to fetch dynamically imported module") ||
+          err.message.includes("Importing a module script failed") ||
+          err.name === "ChunkLoadError");
+      if (isChunkError) {
+        const key = "rs_chunk_reload";
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          window.location.reload();
+          // Return a dummy module while reloading
+          return { default: (() => null) as unknown as T["default"] } as T;
+        }
+      }
+      throw err;
+    }),
+  );
+}
+
+// Global error boundary that catches chunk errors at the React tree level too
+class ChunkErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    const isChunkError =
+      error instanceof Error &&
+      (error.message.includes("Failed to fetch dynamically imported module") ||
+        error.message.includes("Importing a module script failed") ||
+        error.name === "ChunkLoadError");
+    if (isChunkError) {
+      const key = "rs_chunk_reload";
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+      }
+    }
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("ChunkErrorBoundary caught:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-[40vh] text-steel text-sm">
+          Reloading...
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const AdminPage = lazyWithRetry(() =>
   import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
-const BuildBattlePage = lazy(() =>
+const BuildBattlePage = lazyWithRetry(() =>
   import("./pages/BuildBattlePage").then((m) => ({
     default: m.BuildBattlePage,
   })),
 );
-const ClubsPage = lazy(() =>
+const ClubsPage = lazyWithRetry(() =>
   import("./pages/ClubsPage").then((m) => ({ default: m.ClubsPage })),
 );
-const CreatePostPage = lazy(() =>
+const CreatePostPage = lazyWithRetry(() =>
   import("./pages/CreatePostPage").then((m) => ({ default: m.CreatePostPage })),
 );
-const CreatorPage = lazy(() =>
+const CreatorPage = lazyWithRetry(() =>
   import("./pages/CreatorPage").then((m) => ({ default: m.CreatorPage })),
 );
-const EventsPage = lazy(() =>
+const EventsPage = lazyWithRetry(() =>
   import("./pages/EventsPage").then((m) => ({ default: m.EventsPage })),
 );
-const ExplorePage = lazy(() =>
+const ExplorePage = lazyWithRetry(() =>
   import("./pages/ExplorePage").then((m) => ({ default: m.ExplorePage })),
 );
-const FeaturedCarPage = lazy(() =>
+const FeaturedCarPage = lazyWithRetry(() =>
   import("./pages/FeaturedCarPage").then((m) => ({
     default: m.FeaturedCarPage,
   })),
 );
-const FeedPage = lazy(() =>
+const FeedPage = lazyWithRetry(() =>
   import("./pages/FeedPage").then((m) => ({ default: m.FeedPage })),
 );
-const GamePage = lazy(() =>
+const GamePage = lazyWithRetry(() =>
   import("./pages/GamePage").then((m) => ({ default: m.GamePage })),
 );
-const GaragePage = lazy(() =>
+const GaragePage = lazyWithRetry(() =>
   import("./pages/GaragePage").then((m) => ({ default: m.GaragePage })),
 );
-const GuidePage = lazy(() =>
+const GuidePage = lazyWithRetry(() =>
   import("./pages/GuidePage").then((m) => ({ default: m.GuidePage })),
 );
-const LeaderboardPage = lazy(() =>
+const LeaderboardPage = lazyWithRetry(() =>
   import("./pages/LeaderboardPage").then((m) => ({
     default: m.LeaderboardPage,
   })),
 );
-const MarketplacePage = lazy(() =>
+const MarketplacePage = lazyWithRetry(() =>
   import("./pages/MarketplacePage").then((m) => ({
     default: m.MarketplacePage,
   })),
 );
-const MechanicsPage = lazy(() =>
+const MechanicsPage = lazyWithRetry(() =>
   import("./pages/MechanicsPage").then((m) => ({ default: m.MechanicsPage })),
 );
-const MessagesPage = lazy(() =>
+const MessagesPage = lazyWithRetry(() =>
   import("./pages/MessagesPage").then((m) => ({ default: m.MessagesPage })),
 );
-const ModelGalleryPage = lazy(() =>
+const ModelGalleryPage = lazyWithRetry(() =>
   import("./pages/ModelGalleryPage").then((m) => ({
     default: m.ModelGalleryPage,
   })),
 );
-const ModelReelsPage = lazy(() =>
+const ModelReelsPage = lazyWithRetry(() =>
   import("./pages/ModelReelsPage").then((m) => ({
     default: m.ModelReelsPage,
   })),
 );
-const NotificationsPage = lazy(() =>
+const NotificationsPage = lazyWithRetry(() =>
   import("./pages/NotificationsPage").then((m) => ({
     default: m.NotificationsPage,
   })),
 );
-const ProPage = lazy(() =>
+const ProPage = lazyWithRetry(() =>
   import("./pages/ProPage").then((m) => ({ default: m.ProPage })),
 );
-const ProfilePage = lazy(() =>
+const ProfilePage = lazyWithRetry(() =>
   import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
-const ReelsPage = lazy(() =>
+const ReelsPage = lazyWithRetry(() =>
   import("./pages/ReelsPage").then((m) => ({ default: m.ReelsPage })),
 );
-const RevBucksPage = lazy(() =>
+const RevBucksPage = lazyWithRetry(() =>
   import("./pages/RevBucksPage").then((m) => ({ default: m.RevBucksPage })),
 );
-const RevSpaceInfoPage = lazy(() =>
+const RevSpaceInfoPage = lazyWithRetry(() =>
   import("./pages/RevSpaceInfoPage").then((m) => ({
     default: m.RevSpaceInfoPage,
   })),
 );
-const SettingsPage = lazy(() =>
+const SettingsPage = lazyWithRetry(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
-const ShopPage = lazy(() =>
+const ShopPage = lazyWithRetry(() =>
   import("./pages/ShopPage").then((m) => ({ default: m.ShopPage })),
 );
-const TrackReadyPage = lazy(() =>
+const TrackReadyPage = lazyWithRetry(() =>
   import("./pages/TrackReadyPage").then((m) => ({ default: m.TrackReadyPage })),
 );
-const DynoOSPage = lazy(() =>
+const DynoOSPage = lazyWithRetry(() =>
   import("./pages/DynoOSPage").then((m) => ({ default: m.DynoOSPage })),
 );
-const UserProfilePage = lazy(() =>
+const UserProfilePage = lazyWithRetry(() =>
   import("./pages/UserProfilePage").then((m) => ({
     default: m.UserProfilePage,
   })),
@@ -581,13 +661,13 @@ function DeployGuard() {
 
 export default function App() {
   return (
-    <>
+    <ChunkErrorBoundary>
       <DeployGuard />
       <ProSuccessHandler />
       <FriendBadgeActivator />
       <RouterProvider router={router} />
       <Toaster position="top-center" theme="dark" />
       <BullBoostBanner />
-    </>
+    </ChunkErrorBoundary>
   );
 }
