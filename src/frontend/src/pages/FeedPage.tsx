@@ -348,7 +348,7 @@ export function FeedPage() {
       {/* Header Banner */}
       <div className="relative w-full h-[260px] md:h-[360px] overflow-hidden">
         <img
-          src="/assets/uploads/20a6241e809d72a3483bfd2fc4848f41-1.jpg"
+          src="/assets/uploads/20a6241e809d72a3483bfd2fc4848f41-1-1.jpg"
           alt="RevSpace Banner"
           className="w-full h-full object-cover"
           style={{ objectPosition: "center 55%" }}

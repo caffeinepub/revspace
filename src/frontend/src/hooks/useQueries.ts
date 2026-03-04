@@ -200,15 +200,17 @@ export function useUploadFile() {
 // soon as the actor is built, without waiting for the _initializeAccessControl
 // registration call to complete. This prevents the "no posts" symptom when the
 // canister cold-starts and the registration call races against the first query.
+// NOTE: We intentionally do NOT gate on !isFetching for public reads so that
+// reels/feed load even if actor init takes a while after a fresh deploy.
 export function useGetAllPosts() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getAllPosts();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     staleTime: 5_000,
     refetchOnMount: true,
     retry: 3,
@@ -217,14 +219,14 @@ export function useGetAllPosts() {
 }
 
 export function useGetPostsByUser(user: Principal | undefined) {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["posts", "user", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return [];
       return actor.getPostsByUser(user);
     },
-    enabled: !!actor && !isFetching && !!user,
+    enabled: !!actor && !!user,
     staleTime: 5_000,
     refetchOnMount: true,
     retry: 3,
@@ -233,14 +235,14 @@ export function useGetPostsByUser(user: Principal | undefined) {
 }
 
 export function useGetComments(postId: string) {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["comments", postId],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getCommentsForPost(postId);
     },
-    enabled: !!actor && !isFetching && !!postId,
+    enabled: !!actor && !!postId,
     staleTime: 15_000,
   });
 }
@@ -307,14 +309,14 @@ export function useAddCommentReply() {
 }
 
 export function useGetCommentReplies(commentId: string | null) {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["replies", commentId],
     queryFn: async () => {
       if (!actor || !commentId) return [];
       return actor.getRepliesToComment(commentId);
     },
-    enabled: !!actor && !isFetching && !!commentId,
+    enabled: !!actor && !!commentId,
     staleTime: 15_000,
   });
 }
@@ -362,7 +364,7 @@ export function useDeletePost() {
 const profileRestoredThisSession = new Set<string>();
 
 export function useMyProfile() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   const { identity } = useInternetIdentity();
   const principalId = identity?.getPrincipal().toString() ?? "";
 
@@ -464,7 +466,7 @@ export function useMyProfile() {
 
       return null;
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     // Keep data in memory for 5 minutes across page navigations
     staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
@@ -481,14 +483,14 @@ export function useMyProfile() {
 export function useGetProfile(user: Principal | undefined) {
   // getProfile is a public read — use useActor directly so it doesn't block
   // behind the registration gate (which can fail on canister cold-start).
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["profile", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return null;
       return actor.getProfile(user);
     },
-    enabled: !!actor && !isFetching && !!user,
+    enabled: !!actor && !!user,
     staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
     retry: 3,
@@ -662,14 +664,14 @@ export function useRemoveCar() {
 // Events
 // ========================
 export function useAllEvents() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["events"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listAllEvents();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     staleTime: 60_000,
   });
 }
@@ -772,14 +774,14 @@ export function useGetEventPhotos(eventId: string | null) {
 // Marketplace
 // ========================
 export function useAllListings() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["listings"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listAllListings();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     staleTime: 60_000,
   });
 }
@@ -840,14 +842,14 @@ export function useDeleteListing() {
 // Clubs
 // ========================
 export function useAllClubs() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["clubs"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listAllClubs();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     staleTime: 60_000,
   });
 }
@@ -936,42 +938,42 @@ export function useUnfollowUser() {
 export function useGetFollowers(user: Principal | undefined) {
   // getFollowers is a public read — use useActor directly so it fires
   // immediately without waiting for the registration gate.
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["followers", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return [];
       return actor.getFollowers(user);
     },
-    enabled: !!actor && !isFetching && !!user,
+    enabled: !!actor && !!user,
     staleTime: 30_000,
   });
 }
 
 export function useGetFollowing(user: Principal | undefined) {
   // getFollowing is a public read — use useActor directly.
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["following", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return [];
       return actor.getFollowing(user);
     },
-    enabled: !!actor && !isFetching && !!user,
+    enabled: !!actor && !!user,
     staleTime: 30_000,
   });
 }
 
 export function useIsFollowing(user: Principal | undefined) {
   // isFollowing is a public read — use useActor directly.
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery({
     queryKey: ["isFollowing", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return false;
       return actor.isFollowing(user);
     },
-    enabled: !!actor && !isFetching && !!user,
+    enabled: !!actor && !!user,
     staleTime: 30_000,
   });
 }
