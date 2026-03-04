@@ -26,7 +26,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type {
   Listing,
@@ -143,19 +143,23 @@ function UsersTab({
 }) {
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   // Per-user RB input values
   const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
-  useEffect(() => {
+  const loadUsers = useCallback(() => {
     if (!actor) return;
     setLoading(true);
+    setLoadError(false);
     // Use adminGetAllProfiles() as primary source — it has EVERY user who saved a profile.
     // adminGetAllUsers() is secondary — just provides role data (graceful fallback if it fails).
     Promise.allSettled([actor.adminGetAllProfiles(), actor.adminGetAllUsers()])
       .then(([profilesResult, usersResult]) => {
         if (profilesResult.status === "rejected") {
-          toast.error("Failed to load users");
+          console.error("adminGetAllProfiles failed:", profilesResult.reason);
+          toast.error("Failed to load users — tap Retry to try again");
+          setLoadError(true);
           return;
         }
 
@@ -193,10 +197,20 @@ function UsersTab({
         });
 
         setUsers(merged);
+        setLoadError(false);
       })
-      .catch(() => toast.error("Failed to load users"))
+      .catch((err) => {
+        console.error("loadUsers error:", err);
+        toast.error("Failed to load users — tap Retry to try again");
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [actor]);
+
+  useEffect(() => {
+    if (!actor) return;
+    loadUsers();
+  }, [actor, loadUsers]);
 
   async function handleDeleteProfile(principal: Principal) {
     if (!actor) return;
@@ -276,8 +290,14 @@ function UsersTab({
       toast.success(
         `+${amt} RB added to ${user.displayName}! New balance: ${newMeta.rb} RB`,
       );
-    } catch {
-      toast.error("Failed to update RevBucks");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("adminUpdateUserLocation (RB) failed:", msg);
+      toast.error(
+        msg.toLowerCase().includes("unauthorized")
+          ? "Unauthorized — your session may have expired. Refresh and re-enter the admin token."
+          : `Failed to update RevBucks: ${msg.slice(0, 120)}`,
+      );
     } finally {
       setPendingAction(null);
     }
@@ -303,8 +323,14 @@ function UsersTab({
       toast.success(
         `${user.displayName} Pro ${newMeta.isPro ? "enabled" : "removed"}`,
       );
-    } catch {
-      toast.error("Failed to update Pro status");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("adminUpdateUserLocation (Pro) failed:", msg);
+      toast.error(
+        msg.toLowerCase().includes("unauthorized")
+          ? "Unauthorized — your session may have expired. Refresh and re-enter the admin token."
+          : `Failed to update Pro status: ${msg.slice(0, 120)}`,
+      );
     } finally {
       setPendingAction(null);
     }
@@ -316,6 +342,35 @@ function UsersTab({
         {["u1", "u2", "u3", "u4"].map((k) => (
           <RowSkeleton key={k} />
         ))}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-16 text-center gap-4"
+        data-ocid="admin.users.error_state"
+      >
+        <Users
+          size={40}
+          className="mb-1"
+          style={{ color: "oklch(var(--ember))" }}
+        />
+        <p className="text-sm text-muted-foreground">
+          Could not load users. The canister may still be warming up.
+        </p>
+        <Button
+          size="sm"
+          onClick={loadUsers}
+          style={{
+            background: "oklch(var(--orange) / 0.2)",
+            border: "1px solid oklch(var(--orange) / 0.4)",
+            color: "oklch(var(--orange-bright))",
+          }}
+        >
+          Retry
+        </Button>
       </div>
     );
   }
@@ -1134,7 +1189,7 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 // ── AdminPage ─────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   const { identity } = useInternetIdentity();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -1143,29 +1198,32 @@ export function AdminPage() {
 
   const myPrincipal = identity?.getPrincipal().toString();
 
-  // Safety timeout — if isAdmin is still null after 5s, fall through to token gate
+  // ── Step 1: Check localStorage immediately on mount (no actor needed) ──────
+  // This runs synchronously before any actor is ready, so returning admins
+  // never see the loading screen or token gate.
+  useEffect(() => {
+    if (localStorage.getItem("rs_admin_unlocked") === "Meonly123$") {
+      setIsAdmin(true);
+    }
+  }, []);
+
+  // ── Step 2: Safety timeout — if still null after 4s, show token gate ───────
   useEffect(() => {
     const t = setTimeout(() => {
-      setIsAdmin((prev) => {
-        if (prev === null) return false;
-        return prev;
-      });
-    }, 5000);
+      setIsAdmin((prev) => (prev === null ? false : prev));
+    }, 4000);
     return () => clearTimeout(t);
   }, []);
 
-  // Auth check — also honour the local password unlock
+  // ── Step 3: Once actor is ready, confirm via backend (secondary check) ─────
   useEffect(() => {
-    if (isFetching) return;
-    // If the user already unlocked with the hardcoded password, skip backend check
+    if (!actor) return;
+    // If already admitted via localStorage, just confirm silently in background
     if (localStorage.getItem("rs_admin_unlocked") === "Meonly123$") {
       setIsAdmin(true);
       return;
     }
-    if (!actor) {
-      setIsAdmin(false);
-      return;
-    }
+    // Otherwise ask the backend
     actor
       .isCallerAdmin()
       .then((result: boolean) => {
@@ -1174,7 +1232,7 @@ export function AdminPage() {
       .catch(() => {
         setIsAdmin(false);
       });
-  }, [actor, isFetching]);
+  }, [actor]);
 
   // Count badges (best-effort) — use adminGetAllProfiles for accurate user count
   useEffect(() => {
@@ -1188,8 +1246,8 @@ export function AdminPage() {
     ]).catch(() => {});
   }, [actor, isAdmin]);
 
-  // Loading state
-  if (isAdmin === null || isFetching) {
+  // Loading state — only block while isAdmin is still unknown (max 4s)
+  if (isAdmin === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-3">
