@@ -44,7 +44,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     <div
       className="min-h-screen flex flex-col items-center justify-end pb-20 relative overflow-hidden"
       style={{
-        backgroundImage: "url('/assets/uploads/images-3--1.jpeg')",
+        backgroundImage: "url('/assets/uploads/images-3-2-1.jpeg')",
         backgroundSize: "cover",
         backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",

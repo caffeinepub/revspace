@@ -21,7 +21,9 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProBadge } from "../components/ProBadge";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { usePublicActor } from "../hooks/usePublicActor";
 import {
   useAddComment,
   useDeletePost,
@@ -370,6 +372,13 @@ const REEL_TOPICS = [
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
   const { data: posts, isLoading } = useGetAllPosts();
+  // Also track actor initialization — when both actors are still fetching,
+  // the query is disabled (enabled: !!actor) and isLoading stays false even
+  // though we haven't actually loaded anything yet. Without this check the
+  // empty-state "No Reels Yet" fires prematurely on every page load.
+  const { isFetching: publicActorFetching } = usePublicActor();
+  const { isFetching: authActorFetching } = useActor();
+  const actorLoading = publicActorFetching || authActorFetching;
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -504,7 +513,18 @@ export function ReelsPage() {
         />
       )}
 
-      {!isLoading && displayPosts.length === 0 && (
+      {(isLoading || actorLoading) && (
+        <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+          <Loader2
+            size={36}
+            className="animate-spin mb-4"
+            style={{ color: "oklch(var(--orange))" }}
+          />
+          <p className="text-white/50 text-sm">Loading reels...</p>
+        </div>
+      )}
+
+      {!isLoading && !actorLoading && displayPosts.length === 0 && (
         <div className="h-screen flex flex-col items-center justify-center text-center px-6">
           <Film size={48} className="text-white/30 mb-4" />
           <h3 className="text-white font-display text-xl font-bold mb-2">

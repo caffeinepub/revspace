@@ -14,6 +14,8 @@ import { Car, CornerDownRight, Crown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
+import { useActor } from "../hooks/useActor";
+import { usePublicActor } from "../hooks/usePublicActor";
 import {
   useAddComment,
   useAddCommentReply,
@@ -333,6 +335,15 @@ function CommentsDialog({
 
 export function FeedPage() {
   const { data: posts, isLoading } = useGetAllPosts();
+  // Track whether the public actor has resolved at least once.
+  // We intentionally use `actor` (not `isFetching`) here so that background
+  // refetches of the actor (triggered by invalidateQueries after auth) don't
+  // re-lock the feed into a permanent "Loading members…" state.
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  // actorLoading is only true while BOTH actors are null (first load).
+  // Once either resolves, we allow the feed to render.
+  const actorLoading = !publicActor && !authActor;
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
   const displayPosts = [...(posts ?? [])].sort((a, b) =>
@@ -403,7 +414,7 @@ export function FeedPage() {
             <p className="text-white/70 text-sm font-medium mt-1">
               The streets are watching
             </p>
-            {isLoading ? (
+            {isLoading || actorLoading ? (
               <span
                 className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold animate-pulse"
                 style={{
@@ -434,7 +445,7 @@ export function FeedPage() {
 
       {/* Feed */}
       <div className="space-y-0.5 py-2">
-        {isLoading
+        {isLoading || actorLoading
           ? ["s1", "s2", "s3"].map((k) => <PostCardSkeleton key={k} />)
           : displayPosts.map((post) => (
               <PostCard
@@ -444,7 +455,7 @@ export function FeedPage() {
               />
             ))}
 
-        {!isLoading && displayPosts.length === 0 && (
+        {!isLoading && !actorLoading && displayPosts.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
