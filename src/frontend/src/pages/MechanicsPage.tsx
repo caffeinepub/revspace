@@ -477,7 +477,9 @@ export function MechanicsPage() {
 
   // Get unique categories that have been used
   const usedCategories = Array.from(
-    new Set(mechanicsPosts.map((p) => p.topic).filter(Boolean)),
+    new Set(
+      mechanicsPosts.map((p) => p.topic).filter((t): t is string => Boolean(t)),
+    ),
   );
 
   return (

@@ -26,11 +26,17 @@ export function usePublicActor() {
       // This always succeeds as long as the canister is reachable.
       return createActorWithConfig();
     },
+    // Keep polling until the actor resolves, then stop
+    refetchInterval: (query) => {
+      // If we have data, stop polling. Otherwise retry every 1.5s.
+      return query.state.data ? false : 1500;
+    },
+    refetchIntervalInBackground: false,
     staleTime: Number.POSITIVE_INFINITY,
     enabled: true,
     // Retry aggressively so a transient network blip doesn't keep the actor null
-    retry: 5,
-    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 6000),
+    retry: 10,
+    retryDelay: (attempt) => Math.min(500 * (attempt + 1), 4000),
   });
 
   return {

@@ -336,7 +336,7 @@ function MobileNav({
         </div>
       </header>
 
-      {/* ── Mobile eBay ad strip below header ── */}
+      {/* ── Mobile RevSpace Parts ad strip below header ── */}
       <div
         className="fixed top-[53px] left-0 right-0 z-40 md:hidden"
         style={{
@@ -351,10 +351,10 @@ function MobileNav({
           className="flex items-center justify-center gap-2 px-3 py-1.5"
         >
           <img
-            src="/assets/generated/ebay-parts-banner.dim_400x90.png"
-            alt="JDM Store - Shop Parts & Accessories"
+            src="/assets/generated/revspace-parts-banner.dim_400x90.png"
+            alt="RevSpace Parts - Shop JDM & Performance Parts"
             className="h-8 object-contain"
-            style={{ maxWidth: 160, background: "#000", borderRadius: 4 }}
+            style={{ maxWidth: 200, borderRadius: 4 }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
@@ -363,7 +363,7 @@ function MobileNav({
             className="text-xs font-semibold tracking-wide"
             style={{ color: "oklch(var(--orange))" }}
           >
-            Shop Parts &amp; Accessories →
+            RevSpace Parts →
           </span>
         </a>
       </div>
@@ -785,7 +785,7 @@ function Sidebar({
           className="text-[10px] uppercase tracking-wider mb-1"
           style={{ color: "oklch(var(--steel))" }}
         >
-          Sponsored
+          RevSpace Parts
         </p>
         <a
           href="https://ebay.com/inf/revreel?mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=5339143418&toolid=80008&mkevt=1"
@@ -798,10 +798,10 @@ function Sidebar({
           }}
         >
           <img
-            src="/assets/generated/ebay-parts-banner.dim_400x90.png"
-            alt="JDM Store - Parts and Accessories"
+            src="/assets/generated/revspace-parts-banner.dim_400x90.png"
+            alt="RevSpace Parts - Shop JDM & Performance Parts"
             className="w-full object-contain"
-            style={{ height: 90, background: "#000" }}
+            style={{ height: 90 }}
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.style.display = "none";
@@ -811,9 +811,9 @@ function Sidebar({
                 parent.style.alignItems = "center";
                 parent.style.justifyContent = "center";
                 parent.style.height = "90px";
-                parent.style.background = "#000";
+                parent.style.background = "#111";
                 parent.innerHTML =
-                  '<span style="color: oklch(var(--orange)); font-size: 12px; font-weight: 600;">Shop JDM Parts &amp; Accessories →</span>';
+                  '<span style="color: oklch(var(--orange)); font-size: 12px; font-weight: 600;">RevSpace Parts →</span>';
               }
             }}
           />

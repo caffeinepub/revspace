@@ -24,6 +24,7 @@ import {
   useGetComments,
   useGetProfile,
 } from "../hooks/useQueries";
+import { getCachedPosts } from "../lib/postCache";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
 function CommentAuthor({ author }: { author: Principal }) {
@@ -334,11 +335,7 @@ function CommentsDialog({
 }
 
 export function FeedPage() {
-  const { data: posts, isLoading } = useGetAllPosts();
-  // Track whether the public actor has resolved at least once.
-  // We intentionally use `actor` (not `isFetching`) here so that background
-  // refetches of the actor (triggered by invalidateQueries after auth) don't
-  // re-lock the feed into a permanent "Loading members…" state.
+  const { data: livePosts, isLoading } = useGetAllPosts();
   const { actor: publicActor } = usePublicActor();
   const { actor: authActor } = useActor();
   // actorLoading is only true while BOTH actors are null (first load).
@@ -346,13 +343,24 @@ export function FeedPage() {
   const actorLoading = !publicActor && !authActor;
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
+  // Use live posts if available, otherwise fall back to localStorage cache
+  // so the feed is never blank while the actor is initializing after a deploy.
+  const cachedFallback = (getCachedPosts() as typeof livePosts) ?? [];
+  const posts =
+    livePosts && livePosts.length > 0
+      ? livePosts
+      : actorLoading
+        ? cachedFallback
+        : livePosts;
+
   const displayPosts = [...(posts ?? [])].sort((a, b) =>
     Number(b.timestamp - a.timestamp),
   );
 
-  const memberCount = posts
-    ? new Set(posts.map((p) => p.author.toString())).size
-    : null;
+  const memberCount =
+    displayPosts.length > 0
+      ? new Set(displayPosts.map((p) => p.author.toString())).size
+      : null;
 
   return (
     <div className="min-h-screen">
@@ -414,7 +422,7 @@ export function FeedPage() {
             <p className="text-white/70 text-sm font-medium mt-1">
               The streets are watching
             </p>
-            {isLoading || actorLoading ? (
+            {(isLoading || actorLoading) && displayPosts.length === 0 ? (
               <span
                 className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold animate-pulse"
                 style={{
@@ -445,7 +453,8 @@ export function FeedPage() {
 
       {/* Feed */}
       <div className="space-y-0.5 py-2">
-        {isLoading || actorLoading
+        {/* Show skeletons only when loading AND no cached posts to show */}
+        {(isLoading || actorLoading) && displayPosts.length === 0
           ? ["s1", "s2", "s3"].map((k) => <PostCardSkeleton key={k} />)
           : displayPosts.map((post) => (
               <PostCard

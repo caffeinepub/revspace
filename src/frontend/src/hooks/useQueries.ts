@@ -3,7 +3,9 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import type { backendInterface } from "../backend";
 import { loadConfig } from "../config";
+import { getCachedPosts, setCachedPosts } from "../lib/postCache";
 import {
   getCachedProfile,
   mergeWithCache,
@@ -207,23 +209,52 @@ export function useUploadFile() {
 // We fall back to useActor's actor if it happens to be available (e.g. the user
 // is authenticated and the actor built successfully), so authenticated reads still
 // benefit from the user's identity where needed.
+type AllPostsResult = Awaited<ReturnType<backendInterface["getAllPosts"]>>;
+
 export function useGetAllPosts() {
   const { actor: publicActor } = usePublicActor();
   const { actor: authActor } = useActor();
   // Prefer auth actor (has identity) but always fall back to anonymous actor
   const actor = authActor ?? publicActor;
-  return useQuery({
+  const query = useQuery({
     queryKey: ["posts"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllPosts();
+    queryFn: async (): Promise<AllPostsResult> => {
+      if (!actor) {
+        // Actor not ready yet — serve cached posts so feed isn't blank
+        const cached = getCachedPosts();
+        if (cached && cached.length > 0) return cached as AllPostsResult;
+        return [] as AllPostsResult;
+      }
+      const posts = await actor.getAllPosts();
+      // Persist to localStorage backup so next load has content immediately
+      if (Array.isArray(posts) && posts.length > 0) {
+        setCachedPosts(posts);
+      }
+      return posts;
     },
-    enabled: !!actor,
+    // Run even without actor so we can serve cache immediately
+    enabled: true,
     staleTime: 5_000,
     refetchOnMount: true,
+    // When actor becomes available, refetch to get live data
+    refetchInterval: !actor ? 2_000 : false,
+    refetchIntervalInBackground: false,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    // Pre-populate from localStorage cache so content shows instantly
+    initialData: (): AllPostsResult | undefined => {
+      const cached = getCachedPosts();
+      return cached && cached.length > 0
+        ? (cached as AllPostsResult)
+        : undefined;
+    },
+    initialDataUpdatedAt: () => {
+      // Treat cached data as immediately stale so a fresh fetch fires right away
+      return 0;
+    },
   });
+
+  return query;
 }
 
 export function useGetPostsByUser(user: Principal | undefined) {
