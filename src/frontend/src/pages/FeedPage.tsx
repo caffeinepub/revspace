@@ -346,12 +346,26 @@ export function FeedPage() {
   return (
     <div className="min-h-screen">
       {/* Header Banner */}
-      <div className="relative w-full h-[260px] md:h-[360px] overflow-hidden">
+      <div
+        className="relative w-full h-[260px] md:h-[360px] overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0d0d0d 100%)",
+        }}
+      >
         <img
-          src="/assets/uploads/20a6241e809d72a3483bfd2fc4848f41-1-1.jpg"
+          src="/assets/generated/feed-banner.dim_1200x400.jpg"
           alt="RevSpace Banner"
           className="w-full h-full object-cover"
-          style={{ objectPosition: "center 55%" }}
+          style={{ objectPosition: "center 60%" }}
+          onError={(e) => {
+            const img = e.currentTarget;
+            img.style.display = "none";
+            if (img.parentElement) {
+              img.parentElement.style.background =
+                "linear-gradient(135deg, #0a0a0a 0%, #1c0a00 40%, #0f0800 70%, #0a0a0a 100%)";
+            }
+          }}
         />
         <div
           className="absolute inset-0 flex flex-col justify-between p-6"
