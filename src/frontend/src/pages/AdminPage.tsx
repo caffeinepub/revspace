@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { backendInterface } from "../backend";
 import type { Listing, PostView, Profile, UserRole } from "../backend.d";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePublicActor } from "../hooks/usePublicActor";
 import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
@@ -131,10 +132,12 @@ function RowSkeleton() {
 
 function UsersTab({
   actor,
+  writeActor,
   myPrincipal,
   backendAdminReady,
 }: {
-  actor: backendInterface | null;
+  actor: backendInterface | null; // public actor for reads
+  writeActor: backendInterface | null; // authenticated actor for writes
   myPrincipal: string | undefined;
   backendAdminReady: boolean;
 }) {
@@ -216,11 +219,14 @@ function UsersTab({
   }, [actor, loadUsers]);
 
   async function handleDeleteProfile(principal: Principal) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     const key = `del-${principal.toString()}`;
     setPendingAction(key);
     try {
-      await actor.adminDeleteProfile(principal);
+      await writeActor.adminDeleteProfile(principal);
       setUsers((prev) =>
         prev.filter((u) => u.principal.toString() !== principal.toString()),
       );
@@ -233,20 +239,23 @@ function UsersTab({
   }
 
   async function handleBanToggle(user: MergedUser) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     const isBanned = user.role === "guest";
     const key = `ban-${user.principal.toString()}`;
     setPendingAction(key);
     try {
       if (isBanned) {
-        await actor.adminUnbanUser(user.principal);
+        await writeActor.adminUnbanUser(user.principal);
         toast.success(`${user.displayName} unbanned`);
       } else {
-        await actor.adminBanUser(user.principal);
+        await writeActor.adminBanUser(user.principal);
         toast.success(`${user.displayName} banned`);
       }
       // Refresh roles
-      const refreshed = await actor.adminGetAllUsers();
+      const refreshed = await writeActor.adminGetAllUsers();
       const roleMapNew = new Map<string, UserRole>();
       for (const u of refreshed) roleMapNew.set(u.principal.toString(), u.role);
       setUsers((prev) =>
@@ -264,7 +273,10 @@ function UsersTab({
 
   // Give RevBucks — calls adminUpdateUserLocation to persist changes on-chain immediately.
   async function handleAddRb(user: MergedUser) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     if (!backendAdminReady) {
       toast.error(
         "Admin session still initializing — wait a moment and try again",
@@ -288,7 +300,7 @@ function UsersTab({
     const rbKey = `rb-${user.principal.toString()}`;
     setPendingAction(rbKey);
     try {
-      await actor.adminUpdateUserLocation(user.principal, newEncoded);
+      await writeActor!.adminUpdateUserLocation(user.principal, newEncoded);
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -313,7 +325,10 @@ function UsersTab({
   }
 
   async function handleProToggle(user: MergedUser) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     if (!backendAdminReady) {
       toast.error(
         "Admin session still initializing — wait a moment and try again",
@@ -327,7 +342,7 @@ function UsersTab({
     const proKey = `pro-${user.principal.toString()}`;
     setPendingAction(proKey);
     try {
-      await actor.adminUpdateUserLocation(user.principal, newEncoded);
+      await writeActor!.adminUpdateUserLocation(user.principal, newEncoded);
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -723,7 +738,10 @@ function UsersTab({
 
 // ── Posts tab ─────────────────────────────────────────────────────────────────
 
-function PostsTab({ actor }: { actor: backendInterface | null }) {
+function PostsTab({
+  actor,
+  writeActor,
+}: { actor: backendInterface | null; writeActor: backendInterface | null }) {
   const [posts, setPosts] = useState<PostView[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -744,10 +762,13 @@ function PostsTab({ actor }: { actor: backendInterface | null }) {
   }, [actor]);
 
   async function handleDelete(postId: string) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     setPendingId(postId);
     try {
-      await actor.adminDeletePost(postId);
+      await writeActor.adminDeletePost(postId);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       setConfirmId(null);
       toast.success("Post deleted");
@@ -881,7 +902,10 @@ function PostsTab({ actor }: { actor: backendInterface | null }) {
 
 // ── Marketplace tab ───────────────────────────────────────────────────────────
 
-function MarketplaceTab({ actor }: { actor: backendInterface | null }) {
+function MarketplaceTab({
+  actor,
+  writeActor,
+}: { actor: backendInterface | null; writeActor: backendInterface | null }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -898,10 +922,13 @@ function MarketplaceTab({ actor }: { actor: backendInterface | null }) {
   }, [actor]);
 
   async function handleDelete(listingId: string) {
-    if (!actor) return;
+    if (!writeActor) {
+      toast.error("Not logged in — sign in with Internet Identity first");
+      return;
+    }
     setPendingId(listingId);
     try {
-      await actor.adminDeleteListing(listingId);
+      await writeActor.adminDeleteListing(listingId);
       setListings((prev) => prev.filter((l) => l.id !== listingId));
       setConfirmId(null);
       toast.success("Listing deleted");
@@ -1197,10 +1224,11 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 // ── AdminPage ─────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  // Use publicActor — it always resolves without calling _initializeAccessControlWithSecret,
-  // so we never get stuck waiting. We call _initializeAccessControlWithSecret("Meonly123$")
-  // manually after confirming the admin token.
+  // publicActor — anonymous, only for reads (getAllPosts, getProfile, listAllListings)
   const { actor } = usePublicActor();
+  // authenticatedActor — uses your Internet Identity; this is what the canister sees
+  // as `caller` on all admin write functions. MUST be logged in for writes to work.
+  const { actor: authActor } = useActor();
   const { identity } = useInternetIdentity();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -1223,20 +1251,21 @@ export function AdminPage() {
     }
   }, []);
 
-  // ── Re-establish backend admin session once actor resolves ───────────────
-  // Called when we already have the token saved. Runs in background.
+  // ── Re-establish backend admin session once authenticated actor resolves ──
+  // The canister's isAdmin check looks at the CALLER principal. The authenticated
+  // actor sends your Internet Identity principal — only that will work for writes.
   useEffect(() => {
-    if (!actor || backendAdminReady) return;
+    if (!authActor || backendAdminReady) return;
     const savedToken = localStorage.getItem("rs_admin_unlocked");
     if (savedToken !== "Meonly123$") return;
-    actor
+    authActor
       ._initializeAccessControlWithSecret("Meonly123$")
       .then(() => setBackendAdminReady(true))
       .catch(() => {
-        // Already registered or canister returned error — still mark ready
+        // Already registered — still mark ready (the caller is already in roles map)
         setBackendAdminReady(true);
       });
-  }, [actor, backendAdminReady]);
+  }, [authActor, backendAdminReady]);
 
   // Count badges — derive user count from unique post authors (public call)
   useEffect(() => {
@@ -1275,9 +1304,11 @@ export function AdminPage() {
         actor={actor}
         onSuccess={() => {
           setIsAdmin(true);
-          // Re-establish backend session after token entry
-          if (actor) {
-            actor
+          // Re-establish backend session with the AUTHENTICATED actor so the
+          // canister sees your real principal, not the anonymous one.
+          const actorToInit = authActor || actor;
+          if (actorToInit) {
+            actorToInit
               ._initializeAccessControlWithSecret("Meonly123$")
               .then(() => setBackendAdminReady(true))
               .catch(() => setBackendAdminReady(true));
@@ -1488,15 +1519,16 @@ export function AdminPage() {
               <TabsContent value="users" className="mt-0">
                 <UsersTab
                   actor={actor}
+                  writeActor={authActor}
                   myPrincipal={myPrincipal}
                   backendAdminReady={backendAdminReady}
                 />
               </TabsContent>
               <TabsContent value="posts" className="mt-0">
-                <PostsTab actor={actor} />
+                <PostsTab actor={actor} writeActor={authActor} />
               </TabsContent>
               <TabsContent value="marketplace" className="mt-0">
-                <MarketplaceTab actor={actor} />
+                <MarketplaceTab actor={actor} writeActor={authActor} />
               </TabsContent>
             </div>
           </Tabs>
