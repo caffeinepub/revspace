@@ -76,7 +76,7 @@ export function useRegisteredActor() {
         // registration before downstream queries fire.  Without this, queries
         // can race against the canister's in-memory role map update and get
         // "Unauthorized" errors that cause unnecessary retries.
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 50));
         setIsRegistered(true);
         setIsRegistering(false);
       }

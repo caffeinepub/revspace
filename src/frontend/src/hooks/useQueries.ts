@@ -362,7 +362,7 @@ export function useDeletePost() {
 const profileRestoredThisSession = new Set<string>();
 
 export function useMyProfile() {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   const { identity } = useInternetIdentity();
   const principalId = identity?.getPrincipal().toString() ?? "";
 
@@ -662,7 +662,7 @@ export function useRemoveCar() {
 // Events
 // ========================
 export function useAllEvents() {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["events"],
     queryFn: async () => {
@@ -772,7 +772,7 @@ export function useGetEventPhotos(eventId: string | null) {
 // Marketplace
 // ========================
 export function useAllListings() {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["listings"],
     queryFn: async () => {
@@ -840,7 +840,7 @@ export function useDeleteListing() {
 // Clubs
 // ========================
 export function useAllClubs() {
-  const { actor, isFetching } = useRegisteredActor();
+  const { actor, isFetching } = useActor();
   return useQuery({
     queryKey: ["clubs"],
     queryFn: async () => {
