@@ -17,7 +17,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useUserMeta } from "../hooks/useUserMeta";
-import { setUserPro } from "../lib/pro";
+import { isUserPro, setUserPro } from "../lib/pro";
 
 const PRO_PERKS = [
   {
@@ -89,41 +89,46 @@ const FREE_VS_PRO = [
 ];
 
 export function ProPage() {
-  const { meta, isLoading: metaLoading, saveMeta } = useUserMeta();
+  const { meta, isLoading: metaLoading, saveMetaWithRetry } = useUserMeta();
   const [upgradeHandled, setUpgradeHandled] = useState(false);
 
-  // Derive isPro from on-chain meta (primary) once loaded
-  const isPro = meta.isPro;
+  // Check BOTH on-chain meta AND localStorage for instant reads right after
+  // the Stripe redirect (localStorage is written immediately; on-chain may
+  // still be syncing).
+  const isPro = meta.isPro || isUserPro();
 
   // Detect Stripe redirect success — save on-chain + localStorage backup
   useEffect(() => {
-    if (metaLoading || upgradeHandled) return;
+    if (upgradeHandled) return;
     const params = new URLSearchParams(window.location.search);
     const justUpgraded = params.get("rs_pro") === "XR9k2mVp";
     if (justUpgraded) {
       setUpgradeHandled(true);
       window.history.replaceState(null, "", "/pro");
-      if (!meta.isPro) {
-        // Save Pro status on-chain
-        saveMeta({ isPro: true })
-          .then(() => {
-            toast.success(
-              "Welcome to RevSpace Pro! Your crown is now active.",
-              {
-                duration: 6000,
-              },
-            );
-          })
-          .catch(() => {
-            toast.error(
-              "Could not save Pro status. Please visit Settings to save your profile.",
-            );
-          });
-        // Also write localStorage backup for instant reads during load
-        setUserPro();
-      }
+
+      // ALWAYS write localStorage immediately so the crown shows right away —
+      // even if meta.isPro is already true (could be a re-purchase/re-sync).
+      setUserPro();
+      toast.success("Welcome to RevSpace Pro! Your crown is now active.", {
+        duration: 6000,
+      });
+
+      // Sync to on-chain in the background — retry aggressively.
+      // We don't gate the success toast on this because it may take a moment.
+      const loadingToastId = toast.loading("Syncing Pro status to chain…");
+      saveMetaWithRetry({ isPro: true }, 15)
+        .then(() => {
+          toast.dismiss(loadingToastId);
+        })
+        .catch(() => {
+          toast.dismiss(loadingToastId);
+          toast.warning(
+            "Pro is active. Visit Settings and tap Save Profile if the crown disappears.",
+            { duration: 8000 },
+          );
+        });
     }
-  }, [metaLoading, upgradeHandled, meta.isPro, saveMeta]);
+  }, [upgradeHandled, saveMetaWithRetry]);
 
   return (
     <div className="min-h-screen pb-20">

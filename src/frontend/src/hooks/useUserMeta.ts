@@ -39,7 +39,7 @@ export function useUserMeta() {
    */
   const saveMeta = useCallback(
     async (updates: Partial<UserMetaData>) => {
-      if (!profile) return;
+      if (!profile) throw new Error("Profile not loaded");
       const currentMeta = decodeMetaFromLocation(profile.location ?? "");
       const newMeta: UserMetaData = { ...currentMeta, ...updates };
       const encodedLocation = encodeMetaToLocation(newMeta);
@@ -54,10 +54,33 @@ export function useUserMeta() {
     [profile, updateProfile],
   );
 
+  /**
+   * Retries saveMeta every 2s (with linear back-off) until the profile is
+   * loaded and the on-chain write succeeds.  Resolves on first success,
+   * rejects after all attempts are exhausted.
+   */
+  const saveMetaWithRetry = useCallback(
+    async (updates: Partial<UserMetaData>, maxAttempts = 10): Promise<void> => {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          await saveMeta(updates);
+          return; // success
+        } catch {
+          if (attempt < maxAttempts - 1) {
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+          }
+        }
+      }
+      throw new Error("Could not save to chain after retries");
+    },
+    [saveMeta],
+  );
+
   return {
     meta,
     isLoading,
     saveMeta,
+    saveMetaWithRetry,
     isSaving: updateProfile.isPending,
     profileLoaded: !!profile,
   };

@@ -20,9 +20,10 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useRevBucksSync } from "../hooks/useRevBucksSync";
 import { useUserMeta } from "../hooks/useUserMeta";
 import { isModelAccountFromMeta } from "../lib/modelAccount";
 import {
@@ -897,35 +898,54 @@ function HistoryTab({ myPrincipal }: { myPrincipal: string }) {
 export function RevBucksPage() {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toText() ?? "";
-  const {
-    meta,
-    isLoading: metaLoading,
-    saveMeta,
-    profileLoaded,
-  } = useUserMeta();
+  const { meta, isLoading: metaLoading, profileLoaded } = useUserMeta();
+  const { syncBalance } = useRevBucksSync();
 
-  // On-chain balance is primary; fall back to localStorage while profile loads
-  const onChainBalance = meta.rb;
-  const localBalance = getBalance(myPrincipal);
-  // Show on-chain balance once loaded, otherwise show localStorage balance
-  const balance = profileLoaded ? onChainBalance : localBalance;
+  // Use local state as the live balance for instant UI updates.
+  // Initialise from localStorage immediately; sync from on-chain once loaded.
+  const [balance, setBalance] = useState<number>(() =>
+    myPrincipal ? getBalance(myPrincipal) : 0,
+  );
+  // Track whether we have already promoted the on-chain value to avoid downgrading
+  const onChainSynced = useRef(false);
+
+  // When the on-chain profile loads, take the higher of the two values
+  // (protects against a stale on-chain value overwriting a just-purchased balance).
+  useEffect(() => {
+    if (!profileLoaded || onChainSynced.current) return;
+    onChainSynced.current = true;
+    const localBal = getBalance(myPrincipal);
+    const chainBal = meta.rb;
+    const best = Math.max(localBal, chainBal);
+    // If chain has more (e.g. admin credited), update localStorage to match
+    // Set directly to avoid double-counting (don't use addBalance which increments)
+    if (chainBal > localBal) {
+      localStorage.setItem(`revbucks_balance_${myPrincipal}`, String(chainBal));
+      localStorage.setItem(
+        `revspace_rb_backup_${myPrincipal}`,
+        String(chainBal),
+      );
+    }
+    setBalance(best);
+  }, [profileLoaded, meta.rb, myPrincipal]);
+
   const isModel = isModelAccountFromMeta(meta);
 
   // Track if the Stripe redirect has been handled to avoid double-crediting
   const [purchaseHandled, setPurchaseHandled] = useState(false);
 
   const refreshBalance = useCallback(() => {
-    // Force a React Query cache invalidation by triggering re-render
-    // (on-chain balance comes from React Query so it auto-refreshes)
-  }, []);
+    if (myPrincipal) {
+      setBalance(getBalance(myPrincipal));
+    }
+  }, [myPrincipal]);
 
   // Auto-credit 550 RB when Stripe redirects back with ?purchased=true or ?success=true.
-  // Save BOTH on-chain (primary) AND localStorage (backup).
+  // We write localStorage immediately (instant UX) then sync to chain with retry.
   // This is the ONLY place credits are issued — the Stripe link button does NOT credit RB
   // on click to prevent double-counting.
   useEffect(() => {
-    if (!myPrincipal || metaLoading || purchaseHandled || !profileLoaded)
-      return;
+    if (!myPrincipal || purchaseHandled) return;
     const params = new URLSearchParams(window.location.search);
     if (
       params.get("purchased") === "true" ||
@@ -938,40 +958,28 @@ export function RevBucksPage() {
       url.searchParams.delete("success");
       window.history.replaceState({}, "", url.toString());
 
-      const newBalance = onChainBalance + 550;
-      // Save on-chain (primary)
-      saveMeta({ rb: newBalance })
-        .then(() => {
-          toast.success("⚡ 550 RevBucks added to your balance!", {
-            duration: 5000,
-          });
-        })
-        .catch(() => {
-          toast.error(
-            "Could not save balance on-chain. Check your balance in Settings.",
-          );
-        });
-      // Also update localStorage backup
+      // Credit localStorage immediately so the UI updates right away
       recordPurchase(myPrincipal, 550, "RevBucks Pack");
+      const newBal = getBalance(myPrincipal);
+      setBalance(newBal);
+      toast.success("⚡ 550 RevBucks added to your balance!", {
+        duration: 5000,
+      });
+
+      // Sync the new balance to chain with retry — runs in background
+      syncBalance(myPrincipal);
     }
-  }, [
-    myPrincipal,
-    metaLoading,
-    purchaseHandled,
-    profileLoaded,
-    onChainBalance,
-    saveMeta,
-  ]);
+  }, [myPrincipal, purchaseHandled, syncBalance]);
 
   const handleDeductBalance = useCallback(
-    (cost: number) => {
-      const newBalance = Math.max(0, onChainBalance - cost);
-      // Save on-chain asynchronously (best-effort — localStorage is already updated)
-      saveMeta({ rb: newBalance }).catch(() => {
-        // Silently fail — localStorage is still updated as backup
-      });
+    (_cost: number) => {
+      // localStorage was already updated by deductBalance() in SendGiftModal.
+      // Refresh local state and sync to chain.
+      const newBal = getBalance(myPrincipal);
+      setBalance(newBal);
+      syncBalance(myPrincipal);
     },
-    [onChainBalance, saveMeta],
+    [myPrincipal, syncBalance],
   );
 
   if (!myPrincipal) {
@@ -998,7 +1006,7 @@ export function RevBucksPage() {
             color: "oklch(var(--orange-bright))",
           }}
         >
-          {metaLoading ? (
+          {metaLoading && balance === 0 ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
             <>

@@ -142,6 +142,63 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
     post.postType?.toLowerCase() === "video" ||
     post.postType?.toLowerCase() === "reel";
 
+  const handleShare = async () => {
+    const shareUrl = `https://revspace-2ah.caffeine.xyz/#post-${post.id}`;
+    const shareText = post.content
+      ? post.content.length > 100
+        ? `${post.content.slice(0, 100)}…`
+        : post.content
+      : "Check this out on RevSpace";
+
+    const isPhoto = post.postType?.toLowerCase() === "photo";
+    const imageUrl = post.mediaUrls[0];
+
+    if (navigator.share) {
+      try {
+        // Try to attach the image file for photos (not videos — too large / often rejected)
+        if (isPhoto && imageUrl) {
+          try {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            const ext = blob.type.includes("png") ? "png" : "jpg";
+            const file = new File([blob], `revspace-post.${ext}`, {
+              type: blob.type,
+            });
+            if (navigator.canShare?.({ files: [file] })) {
+              await navigator.share({
+                title: "Check this out on RevSpace",
+                text: shareText,
+                url: shareUrl,
+                files: [file],
+              });
+              return;
+            }
+          } catch {
+            // Image fetch/attach failed — fall through to URL-only share
+          }
+        }
+
+        // URL-only share (videos, or when image attach fails)
+        await navigator.share({
+          title: "Check this out on RevSpace",
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        toast.error("Sharing failed");
+      }
+    } else {
+      // Desktop fallback — copy link to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Link copied!");
+      } catch {
+        toast.error("Sharing failed");
+      }
+    }
+  };
+
   return (
     <article className="post-card animate-fade-in">
       {/* Header */}
@@ -340,7 +397,12 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
             <MessageCircle size={20} />
             <span>{post.comments.length > 0 ? post.comments.length : ""}</span>
           </button>
-          <button type="button" className="action-btn">
+          <button
+            type="button"
+            className="action-btn"
+            onClick={handleShare}
+            data-ocid="post.share_button"
+          >
             <Share2 size={20} />
           </button>
         </div>

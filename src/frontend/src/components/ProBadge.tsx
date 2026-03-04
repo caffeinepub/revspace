@@ -1,12 +1,16 @@
 import { Crown } from "lucide-react";
+import { useUserMeta } from "../hooks/useUserMeta";
 import { isUserPro } from "../lib/pro";
 
 /**
  * Inline gold crown badge shown next to a user's display name when they are a Pro member.
- * Only visible for the current user (Pro status is stored in localStorage).
+ * Checks BOTH on-chain meta (authoritative) and localStorage (instant fallback while loading).
  */
 export function ProBadge() {
-  if (!isUserPro()) return null;
+  const { meta } = useUserMeta();
+  // Show crown if either on-chain OR localStorage says Pro
+  const isPro = meta.isPro || isUserPro();
+  if (!isPro) return null;
 
   return (
     <Crown

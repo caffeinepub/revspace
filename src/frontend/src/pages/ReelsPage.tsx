@@ -456,6 +456,62 @@ export function ReelsPage() {
     }
   };
 
+  const handleShare = async (post: (typeof displayPosts)[number]) => {
+    const shareUrl = `https://revspace-2ah.caffeine.xyz/#post-${post.id}`;
+    const shareText = post.content
+      ? post.content.length > 100
+        ? `${post.content.slice(0, 100)}…`
+        : post.content
+      : "Check this out on RevSpace";
+
+    // Reels/videos: skip file attachment (too large and often rejected by Web Share API)
+    // Photos: attempt to attach the image so share sheets show a preview
+    const isPhoto = post.postType?.toLowerCase() === "photo";
+    const imageUrl = post.mediaUrls[0];
+
+    if (navigator.share) {
+      try {
+        if (isPhoto && imageUrl) {
+          try {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            const ext = blob.type.includes("png") ? "png" : "jpg";
+            const file = new File([blob], `revspace-post.${ext}`, {
+              type: blob.type,
+            });
+            if (navigator.canShare?.({ files: [file] })) {
+              await navigator.share({
+                title: "Check this out on RevSpace",
+                text: shareText,
+                url: shareUrl,
+                files: [file],
+              });
+              return;
+            }
+          } catch {
+            // Image attach failed — fall through to URL-only share
+          }
+        }
+
+        await navigator.share({
+          title: "Check this out on RevSpace",
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        toast.error("Sharing failed");
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Link copied!");
+      } catch {
+        toast.error("Sharing failed");
+      }
+    }
+  };
+
   return (
     <div
       className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
@@ -676,6 +732,8 @@ export function ReelsPage() {
               <button
                 type="button"
                 className="flex flex-col items-center gap-1"
+                onClick={() => handleShare(post)}
+                data-ocid="reel.share_button"
               >
                 <div
                   className="w-11 h-11 rounded-full flex items-center justify-center"

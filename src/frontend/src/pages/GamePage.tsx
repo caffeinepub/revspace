@@ -6,7 +6,11 @@ import { useUserMeta } from "../hooks/useUserMeta";
 import { isUserPro } from "../lib/pro";
 
 const GAME_URL = "https://street-legends-racing-xbm.caffeine.xyz/";
-const GAME_SCREENSHOT = "/assets/uploads/Screenshot_20260301-213816-1--1.png";
+// Primary: generated image (always present in build output)
+// Fallback: uploaded screenshot
+const GAME_SCREENSHOT = "/assets/generated/street-legends-hero.dim_800x400.jpg";
+const GAME_SCREENSHOT_FALLBACK =
+  "/assets/uploads/Screenshot_20260301-213816-1--1.png";
 
 export function GamePage() {
   const { meta } = useUserMeta();
@@ -34,6 +38,12 @@ export function GamePage() {
             alt="Street Legends Racing"
             className="w-full object-cover object-top"
             style={{ maxHeight: 340 }}
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              if (img.src !== GAME_SCREENSHOT_FALLBACK) {
+                img.src = GAME_SCREENSHOT_FALLBACK;
+              }
+            }}
           />
           <div
             className="absolute bottom-0 left-0 right-0 h-24"
@@ -191,6 +201,12 @@ export function GamePage() {
             alt="Street Legends Racing"
             className="w-full object-cover object-top"
             style={{ maxHeight: 340 }}
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              if (img.src !== GAME_SCREENSHOT_FALLBACK) {
+                img.src = GAME_SCREENSHOT_FALLBACK;
+              }
+            }}
           />
           {/* teal glow overlay at bottom */}
           <div
@@ -397,6 +413,12 @@ export function GamePage() {
               src={GAME_SCREENSHOT}
               alt="Street Legends Racing — tap to play"
               className="w-full object-cover"
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (img.src !== GAME_SCREENSHOT_FALLBACK) {
+                  img.src = GAME_SCREENSHOT_FALLBACK;
+                }
+              }}
             />
             {/* Play overlay */}
             <div

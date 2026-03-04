@@ -11,6 +11,8 @@ import {
   mergeWithCache,
   setCachedProfile,
 } from "../lib/profileCache";
+import { addBalance, getBalance } from "../lib/revbucks";
+import { decodeMetaFromLocation } from "../lib/userMeta";
 import { StorageClient } from "../utils/StorageClient";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
@@ -448,6 +450,25 @@ export function useMyProfile() {
       }
 
       if (backendProfile) {
+        // ── Restore RB balance from on-chain if it's higher than localStorage ──
+        // This protects against data loss from cache clears while the balance
+        // has already been synced to chain.
+        if (principalId && backendProfile.location) {
+          try {
+            const onChainMeta = decodeMetaFromLocation(backendProfile.location);
+            if (onChainMeta.rb > 0) {
+              const localBalance = getBalance(principalId);
+              if (onChainMeta.rb > localBalance) {
+                // On-chain has more RB — restore the difference to localStorage
+                const diff = onChainMeta.rb - localBalance;
+                addBalance(principalId, diff);
+              }
+            }
+          } catch {
+            // best-effort — never block the profile load
+          }
+        }
+
         // Merge: prefer backend values but fall back to cache for any empty fields
         const merged = principalId
           ? mergeWithCache(principalId, backendProfile)
