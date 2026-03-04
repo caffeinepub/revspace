@@ -1,26 +1,20 @@
 # RevSpace
 
 ## Current State
-The app has two ad banners: a BullBoost Performance fixed bottom banner and an eBay parts sidebar/mobile strip banner. Both reference image files in `/assets/uploads/` that were reported as broken/not displaying. The BullBoost banner showed a broken image placeholder, and the eBay banner also showed broken.
+Full-stack social media platform for car enthusiasts. Reels, feed, and all public-read pages are broken after deploys because `useActor.ts` awaits `_initializeAccessControlWithSecret` inside the React Query `queryFn`. If that call fails or throws (which it can after a fresh deploy or canister cold-start), `actorQuery.data` stays null and every downstream query that checks `!!actor` never fires — causing Reels, Feed, profiles, and everything else to stay blank/broken.
 
 ## Requested Changes (Diff)
 
 ### Add
-- New generated image for Bull Boost Performance banner: `/assets/generated/bull-boost-banner.dim_600x80.png`
-- New generated image for eBay parts banner: `/assets/generated/ebay-parts-banner.dim_400x90.png`
+- Nothing new
 
 ### Modify
-- `BullBoostBanner` component: switch src from `/assets/uploads/z86GgQCwZ7Hm4-1.png` to new generated image; add `onError` handler to hide broken img; make text label always visible (removed `hidden sm:inline` so it shows on mobile too)
-- Mobile eBay ad strip: switch src to new generated image; add `onError` handler
-- Desktop sidebar eBay ad: switch src to new generated image; add `onError` handler with text fallback
+- `useActor.ts`: Build the actor first, then fire `_initializeAccessControlWithSecret` as a background/fire-and-forget call. Return the actor immediately once built so downstream queries are not blocked by the auth init call.
+- `useActor.ts`: Also handle the case where the actor query builds but `_initializeAccessControlWithSecret` throws — ensure the actor is still returned to callers so public reads work.
 
 ### Remove
-- Nothing removed
+- Blocking `await actor._initializeAccessControlWithSecret(adminToken)` from the React Query `queryFn` — move it to a non-blocking background call
 
 ## Implementation Plan
-1. Generate Bull Boost Performance banner image (done)
-2. Generate eBay parts banner image (done)
-3. Update Layout.tsx BullBoostBanner to use new image with onError fallback
-4. Update mobile eBay strip to use new image with onError fallback
-5. Update desktop sidebar eBay banner to use new image with onError fallback
-6. Deploy
+1. In `useActor.ts` queryFn: build the actor, then fire `_initializeAccessControlWithSecret` in the background (no await), and immediately return the actor. This ensures the actor is always available for public reads even if auth init is slow or throws.
+2. Re-verify `useRegisteredActor.ts` still does its own registration call (it does — it calls `_initializeAccessControlWithSecret("")` in a useEffect after the actor is received), so write mutations remain gated behind registration.

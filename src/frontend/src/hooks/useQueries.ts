@@ -12,6 +12,7 @@ import {
 import { StorageClient } from "../utils/StorageClient";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
+import { usePublicActor } from "./usePublicActor";
 import { useRegisteredActor } from "./useRegisteredActor";
 
 // ========================
@@ -196,14 +197,21 @@ export function useUploadFile() {
 
 // getAllPosts, getPostsByUser, and getCommentsForPost are public read endpoints —
 // they do NOT require the user to be registered in the canister's userRoles map.
-// Using useActor directly (not useRegisteredActor) means these queries fire as
-// soon as the actor is built, without waiting for the _initializeAccessControl
-// registration call to complete. This prevents the "no posts" symptom when the
-// canister cold-starts and the registration call races against the first query.
-// NOTE: We intentionally do NOT gate on !isFetching for public reads so that
-// reels/feed load even if actor init takes a while after a fresh deploy.
+//
+// IMPORTANT: We use usePublicActor (not useActor) as the PRIMARY actor source for
+// public reads. useActor awaits _initializeAccessControlWithSecret in its queryFn —
+// if that call throws after a fresh deploy/cold-start, useActor.actor stays null
+// forever and every public page stays blank. usePublicActor builds an anonymous
+// actor WITHOUT any auth init call, so it is always available for public reads.
+//
+// We fall back to useActor's actor if it happens to be available (e.g. the user
+// is authenticated and the actor built successfully), so authenticated reads still
+// benefit from the user's identity where needed.
 export function useGetAllPosts() {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  // Prefer auth actor (has identity) but always fall back to anonymous actor
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
@@ -219,7 +227,9 @@ export function useGetAllPosts() {
 }
 
 export function useGetPostsByUser(user: Principal | undefined) {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["posts", "user", user?.toString()],
     queryFn: async () => {
@@ -235,7 +245,9 @@ export function useGetPostsByUser(user: Principal | undefined) {
 }
 
 export function useGetComments(postId: string) {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["comments", postId],
     queryFn: async () => {
@@ -309,7 +321,9 @@ export function useAddCommentReply() {
 }
 
 export function useGetCommentReplies(commentId: string | null) {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["replies", commentId],
     queryFn: async () => {
@@ -364,7 +378,11 @@ export function useDeletePost() {
 const profileRestoredThisSession = new Set<string>();
 
 export function useMyProfile() {
-  const { actor } = useActor();
+  // For my own profile we need the auth actor (to call getMyProfile with identity)
+  // but fall back to publicActor so the profile page doesn't stay blank if auth init fails
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActorRaw } = useActor();
+  const actor = authActorRaw ?? publicActor;
   const { identity } = useInternetIdentity();
   const principalId = identity?.getPrincipal().toString() ?? "";
 
@@ -481,9 +499,11 @@ export function useMyProfile() {
 }
 
 export function useGetProfile(user: Principal | undefined) {
-  // getProfile is a public read — use useActor directly so it doesn't block
-  // behind the registration gate (which can fail on canister cold-start).
-  const { actor } = useActor();
+  // getProfile is a public read — use publicActor as primary so it always fires
+  // even if useActor's auth init throws after a fresh deploy.
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["profile", user?.toString()],
     queryFn: async () => {
@@ -664,7 +684,9 @@ export function useRemoveCar() {
 // Events
 // ========================
 export function useAllEvents() {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["events"],
     queryFn: async () => {
@@ -774,7 +796,9 @@ export function useGetEventPhotos(eventId: string | null) {
 // Marketplace
 // ========================
 export function useAllListings() {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["listings"],
     queryFn: async () => {
@@ -842,7 +866,9 @@ export function useDeleteListing() {
 // Clubs
 // ========================
 export function useAllClubs() {
-  const { actor } = useActor();
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["clubs"],
     queryFn: async () => {
@@ -936,9 +962,11 @@ export function useUnfollowUser() {
 }
 
 export function useGetFollowers(user: Principal | undefined) {
-  // getFollowers is a public read — use useActor directly so it fires
-  // immediately without waiting for the registration gate.
-  const { actor } = useActor();
+  // getFollowers is a public read — use publicActor as primary so it fires
+  // even if auth init throws after a fresh deploy.
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["followers", user?.toString()],
     queryFn: async () => {
@@ -951,8 +979,10 @@ export function useGetFollowers(user: Principal | undefined) {
 }
 
 export function useGetFollowing(user: Principal | undefined) {
-  // getFollowing is a public read — use useActor directly.
-  const { actor } = useActor();
+  // getFollowing is a public read — use publicActor as primary.
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["following", user?.toString()],
     queryFn: async () => {
@@ -965,8 +995,10 @@ export function useGetFollowing(user: Principal | undefined) {
 }
 
 export function useIsFollowing(user: Principal | undefined) {
-  // isFollowing is a public read — use useActor directly.
-  const { actor } = useActor();
+  // isFollowing is a public read — use publicActor as primary.
+  const { actor: publicActor } = usePublicActor();
+  const { actor: authActor } = useActor();
+  const actor = authActor ?? publicActor;
   return useQuery({
     queryKey: ["isFollowing", user?.toString()],
     queryFn: async () => {
