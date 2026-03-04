@@ -28,13 +28,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type {
-  Listing,
-  PostView,
-  ProfileWithPrincipal,
-  UserRole,
-  UserWithRole,
-} from "../backend.d";
+import type { Listing, PostView, Profile, UserRole } from "../backend.d";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
@@ -152,50 +146,56 @@ function UsersTab({
     if (!actor) return;
     setLoading(true);
     setLoadError(false);
-    // Use adminGetAllProfiles() as primary source — it has EVERY user who saved a profile.
-    // adminGetAllUsers() is secondary — just provides role data (graceful fallback if it fails).
-    Promise.allSettled([actor.adminGetAllProfiles(), actor.adminGetAllUsers()])
-      .then(([profilesResult, usersResult]) => {
-        if (profilesResult.status === "rejected") {
-          console.error("adminGetAllProfiles failed:", profilesResult.reason);
-          toast.error("Failed to load users — tap Retry to try again");
-          setLoadError(true);
+
+    // Strategy: use getAllPosts() (public, no auth) to discover every unique author
+    // principal, then fetch each profile with getProfile() (also public).
+    // This avoids adminGetAllProfiles() which requires backend admin role — a role
+    // that can't be reliably re-granted after a canister restart because regular users
+    // register first via the actor hook's empty-token call.
+    actor
+      .getAllPosts()
+      .then(async (posts: PostView[]) => {
+        // Collect unique principals from post authors
+        const seen = new Set<string>();
+        const principals: Principal[] = [];
+        for (const p of posts) {
+          const key = p.author.toString();
+          if (!seen.has(key)) {
+            seen.add(key);
+            principals.push(p.author);
+          }
+        }
+
+        if (principals.length === 0) {
+          setUsers([]);
           return;
         }
 
-        const profilesArr = profilesResult.value as ProfileWithPrincipal[];
-        const usersArr: UserWithRole[] =
-          usersResult.status === "fulfilled"
-            ? (usersResult.value as UserWithRole[])
-            : [];
+        // Fetch all profiles in parallel
+        const profileResults = await Promise.allSettled(
+          principals.map((pr) => actor.getProfile(pr)),
+        );
 
-        // Build a role lookup from the users list
-        const roleMap = new Map<string, UserRole>();
-        for (const u of usersArr) {
-          roleMap.set(u.principal.toString(), u.role);
-        }
-
-        const merged: MergedUser[] = profilesArr.map((pp) => {
-          const meta = decodeMetaFromLocation(pp.profile.location ?? "");
-          return {
-            principal: pp.principal,
-            role: roleMap.get(pp.principal.toString()) ?? ("user" as UserRole),
-            displayName: pp.profile.displayName || truncPrincipal(pp.principal),
-            avatarUrl: pp.profile.avatarUrl || "",
+        const merged: MergedUser[] = [];
+        for (let i = 0; i < principals.length; i++) {
+          const result = profileResults[i];
+          if (result.status === "rejected" || result.value === null) continue;
+          const profile = result.value as Profile;
+          const meta = decodeMetaFromLocation(profile.location ?? "");
+          merged.push({
+            principal: principals[i],
+            role: "user" as UserRole,
+            displayName: profile.displayName || truncPrincipal(principals[i]),
+            avatarUrl: profile.avatarUrl || "",
             revBucks: meta.rb,
             isPro: meta.isPro,
             isModel: meta.isModel,
-            locationRaw: pp.profile.location ?? "",
-          };
-        });
+            locationRaw: profile.location ?? "",
+          });
+        }
 
-        // Sort: admins first, then alphabetically by display name
-        merged.sort((a, b) => {
-          if (a.role === "admin" && b.role !== "admin") return -1;
-          if (b.role === "admin" && a.role !== "admin") return 1;
-          return a.displayName.localeCompare(b.displayName);
-        });
-
+        // Sort alphabetically by display name
+        merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
         setUsers(merged);
         setLoadError(false);
       })
@@ -1049,40 +1049,35 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 
     const entered = token.trim();
 
-    // Hardcoded password check — always works regardless of backend state
-    if (entered === "Meonly123$") {
-      localStorage.setItem("rs_admin_unlocked", "Meonly123$");
-      toast.success("Admin access granted!");
-      setIsPending(false);
-      onSuccess();
-      return;
-    }
-
-    // Fallback: try the backend token if actor is available
-    if (!actor) {
+    if (entered !== "Meonly123$") {
       setError("Incorrect token. Try again.");
       setIsPending(false);
       return;
     }
 
-    try {
-      const actorWithInit = actor as typeof actor & {
-        _initializeAccessControlWithSecret(secret: string): Promise<void>;
-      };
-      await actorWithInit._initializeAccessControlWithSecret(entered);
-      const isNowAdmin = await actor.isCallerAdmin();
-      if (isNowAdmin) {
-        localStorage.setItem("rs_admin_unlocked", "Meonly123$");
-        toast.success("Admin access granted!");
-        onSuccess();
-      } else {
-        setError("Incorrect token. Try again.");
+    // Store in both localStorage (UI gate) and sessionStorage (actor hook reads this
+    // as caffeineAdminToken to call _initializeAccessControlWithSecret with the real
+    // token on the NEXT actor creation — before the caller is registered as a regular user).
+    localStorage.setItem("rs_admin_unlocked", "Meonly123$");
+    sessionStorage.setItem("caffeineAdminToken", "Meonly123$");
+
+    // Try to immediately register this session as admin in the backend.
+    // This only works if the canister hasn't yet registered this principal —
+    // i.e., on a fresh canister cold start. On a warm canister the caller may
+    // already be registered as #user, so the backend initialize() returns early.
+    // The reload below ensures the actor is recreated with the token so that
+    // on future cold starts the admin is registered first.
+    if (actor) {
+      try {
+        await actor._initializeAccessControlWithSecret("Meonly123$");
+      } catch {
+        // ignore — may fail if already registered as user
       }
-    } catch {
-      setError("Incorrect token. Try again.");
-    } finally {
-      setIsPending(false);
     }
+
+    toast.success("Admin access granted!");
+    setIsPending(false);
+    onSuccess();
   }
 
   return (
@@ -1234,14 +1229,15 @@ export function AdminPage() {
       });
   }, [actor]);
 
-  // Count badges (best-effort) — use adminGetAllProfiles for accurate user count
+  // Count badges — derive user count from unique post authors (public call)
   useEffect(() => {
     if (!actor || !isAdmin) return;
-    Promise.all([
-      actor
-        .adminGetAllProfiles()
-        .then((p: ProfileWithPrincipal[]) => setUserCount(p.length)),
-      actor.getAllPosts().then((p: PostView[]) => setPostCount(p.length)),
+    Promise.allSettled([
+      actor.getAllPosts().then((p: PostView[]) => {
+        const unique = new Set(p.map((post) => post.author.toString()));
+        setUserCount(unique.size);
+        setPostCount(p.length);
+      }),
       actor.listAllListings().then((l: Listing[]) => setListingCount(l.length)),
     ]).catch(() => {});
   }, [actor, isAdmin]);
