@@ -39,8 +39,8 @@ import { getInitials, truncatePrincipal } from "../utils/format";
 // works reliably and videos/reels show in the profile grid.
 function safePostType(pt: unknown): string {
   if (!pt) return "";
-  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
-  return String(pt);
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "").toLowerCase();
+  return String(pt).toLowerCase();
 }
 
 export function ProfilePage() {

@@ -16,7 +16,7 @@ import { decodeMetaFromLocation } from "../lib/userMeta";
 import { StorageClient } from "../utils/StorageClient";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
-import { usePublicActor } from "./usePublicActor";
+import { getPublicActor, usePublicActor } from "./usePublicActor";
 import { useRegisteredActor } from "./useRegisteredActor";
 
 // ========================
@@ -221,31 +221,32 @@ export function useGetAllPosts() {
   const query = useQuery({
     queryKey: ["posts"],
     queryFn: async (): Promise<AllPostsResult> => {
-      if (!actor) {
-        // Actor not ready yet — serve cached posts so feed isn't blank
-        const cached = getCachedPosts();
-        if (cached && cached.length > 0) return cached as AllPostsResult;
-        return [] as AllPostsResult;
-      }
-      const posts = await actor.getAllPosts();
+      // If neither actor is ready yet, use getPublicActor() which awaits the
+      // module singleton — this avoids throwing and forcing React Query retries
+      // which hammer the canister.
+      const activeActor = actor ?? (await getPublicActor());
+      const posts = await activeActor.getAllPosts();
       // Persist to localStorage backup so next load has content immediately
       if (Array.isArray(posts) && posts.length > 0) {
         setCachedPosts(posts);
       }
       return posts;
     },
-    // Run even without actor so we can serve cache immediately
+    // Always enabled — initialData serves the cache while actor is loading
     enabled: true,
-    // Keep posts fresh for 30s — reduces redundant refetches on every actor change
-    staleTime: 30_000,
+    // Keep posts fresh for 60s to reduce redundant fetches
+    staleTime: 60_000,
     refetchOnMount: true,
-    // When actor becomes available, refetch to get live data
-    refetchInterval: !actor ? 2_000 : false,
+    // No polling interval — we rely on refetchOnMount + refetchOnWindowFocus
+    // The old 1s polling when actor==null was hammering the canister constantly
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
-    retry: 5,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
-    // Pre-populate from localStorage cache so content shows instantly
+    // Only retry a few times — the singleton approach means the actor will be
+    // ready quickly; excessive retries just slow everything down
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 4000),
+    // Pre-populate from localStorage cache so content shows instantly on mount
     initialData: (): AllPostsResult | undefined => {
       const cached = getCachedPosts();
       return cached && cached.length > 0
@@ -253,7 +254,7 @@ export function useGetAllPosts() {
         : undefined;
     },
     initialDataUpdatedAt: () => {
-      // Treat cached data as immediately stale so a fresh fetch fires right away
+      // Treat cached data as immediately stale so a live fetch fires right away
       return 0;
     },
   });
@@ -268,19 +269,18 @@ export function useGetPostsByUser(user: Principal | undefined) {
   return useQuery({
     queryKey: ["posts", "user", user?.toString()],
     queryFn: async () => {
-      if (!actor || !user) return [];
-      return actor.getPostsByUser(user);
+      if (!user) return [];
+      const activeActor = actor ?? (await getPublicActor());
+      return activeActor.getPostsByUser(user);
     },
-    // Always enabled so the query can be served from cache immediately.
-    // When actor isn't ready yet, refetchInterval kicks in and retries every 2s.
     enabled: !!user,
-    staleTime: 5_000,
+    staleTime: 30_000,
     refetchOnMount: true,
-    // Auto-retry until actor is available — same pattern as useGetAllPosts
-    refetchInterval: !actor ? 2_000 : false,
+    // No polling — the singleton actor is available almost immediately
+    refetchInterval: false,
     refetchIntervalInBackground: false,
-    retry: 5,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 5000),
   });
 }
 

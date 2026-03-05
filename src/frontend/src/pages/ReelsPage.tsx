@@ -36,11 +36,12 @@ import {
 } from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
-// Safe unwrap for Motoko optional postType ([] | [string] or plain string)
+// Safe unwrap for Motoko optional postType ([] | [string] or plain string).
+// Always returns lowercase for consistent comparison.
 function safePostType(pt: unknown): string {
   if (!pt) return "";
-  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
-  return String(pt);
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "").toLowerCase();
+  return String(pt).toLowerCase();
 }
 
 // ─── CommentAuthorRow ─────────────────────────────────────────────────────────
@@ -329,7 +330,7 @@ function ReelMedia({
     );
   }
 
-  // Use safePostType to handle Motoko optional array wrapping
+  // safePostType already returns lowercase — no need for additional .toLowerCase()
   const normalizedType = safePostType(postType);
   const isVideoType = normalizedType === "reel" || normalizedType === "video";
 
@@ -406,13 +407,18 @@ const REEL_TOPICS = [
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
   const { data: posts, isLoading } = useGetAllPosts();
-  // Also track actor initialization — when both actors are still fetching,
-  // the query is disabled (enabled: !!actor) and isLoading stays false even
-  // though we haven't actually loaded anything yet. Without this check the
-  // empty-state "No Reels Yet" fires prematurely on every page load.
-  const { isFetching: publicActorFetching } = usePublicActor();
-  const { isFetching: authActorFetching } = useActor();
-  const actorLoading = publicActorFetching || authActorFetching;
+  // We call usePublicActor and useActor so their side-effects run (invalidation
+  // after login), but we no longer block reel rendering on the actor state.
+  // The queryFn in useGetAllPosts awaits getPublicActor() internally, so posts
+  // will arrive as soon as the actor singleton resolves — no need for a separate
+  // actorLoading gate here.
+  usePublicActor();
+  useActor();
+  // Only show the loading screen if posts haven't arrived yet AND the query is
+  // still in-flight. Once we have any posts (even cached ones) we skip straight
+  // to rendering them.
+  const postsArray = posts as { id: string }[] | undefined;
+  const actorLoading = isLoading && (!postsArray || postsArray.length === 0);
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -434,7 +440,7 @@ export function ReelsPage() {
   const deletePostMutation = useDeletePost();
 
   // Only show Reel and Video posts — not Photos — on the Reels page.
-  // Use safePostType to handle Motoko optional arrays ([] | [string]) correctly.
+  // safePostType always returns lowercase so comparisons are safe.
   const allPosts = (posts ?? []).filter((p) => {
     const t = safePostType(p.postType);
     return t === "reel" || t === "video";
@@ -571,7 +577,7 @@ export function ReelsPage() {
 
     // Reels/videos: skip file attachment (too large and often rejected by Web Share API)
     // Photos: attempt to attach the image so share sheets show a preview
-    const isPhoto = safePostType(post.postType) === "photo";
+    const isPhoto = safePostType(post.postType).toLowerCase() === "photo";
     const imageUrl = post.mediaUrls[0];
 
     if (navigator.share) {

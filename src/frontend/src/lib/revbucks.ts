@@ -253,6 +253,8 @@ export interface ShopItem {
   gradient: [string, string];
   /** Accent color for the glow / border */
   accentColor: string;
+  /** Optional custom gift image path */
+  image?: string;
 }
 
 export const RARITY_CONFIG: Record<
@@ -302,6 +304,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.05 200)", "oklch(0.18 0.03 200)"],
     accentColor: "oklch(0.72 0.08 200)",
     description: "A rare JDM collector badge for your profile",
+    image: "/assets/generated/gift-jdm-badge.dim_200x200.png",
   },
   {
     id: "trophy-badge",
@@ -313,6 +316,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.08 260)", "oklch(0.19 0.05 260)"],
     accentColor: "oklch(0.65 0.22 260)",
     description: "Show off your best build with a trophy badge",
+    image: "/assets/generated/gift-trophy.dim_200x200.png",
   },
   {
     id: "build-certified",
@@ -324,6 +328,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.08 140)", "oklch(0.19 0.05 140)"],
     accentColor: "oklch(0.72 0.2 150)",
     description: "Animated 'Build Certified' sticker for your profile",
+    image: "/assets/generated/gift-build-certified.dim_200x200.png",
   },
   // Profile Upgrades
   {
@@ -336,6 +341,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.28 0.12 35)", "oklch(0.22 0.08 30)"],
     accentColor: "oklch(0.7 0.22 40)",
     description: "Animated flame border around your avatar",
+    image: "/assets/generated/gift-flame-border.dim_200x200.png",
   },
   {
     id: "custom-banner",
@@ -347,6 +353,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.26 0.1 310)", "oklch(0.21 0.07 310)"],
     accentColor: "oklch(0.7 0.25 310)",
     description: "Track, drag strip, or mountain road profile banner",
+    image: "/assets/generated/gift-track-banner.dim_200x200.png",
   },
   {
     id: "gold-frame",
@@ -358,6 +365,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.28 0.12 65)", "oklch(0.22 0.08 60)"],
     accentColor: "oklch(0.78 0.18 65)",
     description: "Gifted gold frame around the recipient's avatar",
+    image: "/assets/generated/gift-gold-crown.dim_200x200.png",
   },
   // Post Boosts
   {
@@ -370,6 +378,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.30 0.14 65)", "oklch(0.24 0.10 50)"],
     accentColor: "oklch(0.82 0.22 65)",
     description: "Pin a reel to the top of Explore for 24 hours",
+    image: "/assets/generated/gift-spotlight.dim_200x200.png",
   },
   {
     id: "fire-effect",
@@ -381,6 +390,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.28 0.14 27)", "oklch(0.22 0.10 25)"],
     accentColor: "oklch(0.65 0.24 27)",
     description: "Animated flames around a reel or post",
+    image: "/assets/generated/gift-fire-effect.dim_200x200.png",
   },
   {
     id: "front-page",
@@ -392,6 +402,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.32 0.16 300)", "oklch(0.25 0.12 310)"],
     accentColor: "oklch(0.75 0.28 310)",
     description: "Feature your car on the front page banner for 24 hours",
+    image: "/assets/generated/gift-front-page.dim_200x200.png",
   },
   // Virtual Trophies
   {
@@ -404,6 +415,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.26 0.10 70)", "oklch(0.21 0.07 65)"],
     accentColor: "oklch(0.76 0.18 72)",
     description: "A classic gold trophy for your collection",
+    image: "/assets/generated/gift-trophy.dim_200x200.png",
   },
   {
     id: "award-plaque",
@@ -415,6 +427,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.08 30)", "oklch(0.19 0.05 28)"],
     accentColor: "oklch(0.65 0.18 35)",
     description: "Custom award plaque to recognize great builds",
+    image: "/assets/generated/gift-award-plaque.dim_200x200.png",
   },
   {
     id: "build-battle-podium",
@@ -426,6 +439,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.26 0.10 260)", "oklch(0.21 0.07 270)"],
     accentColor: "oklch(0.68 0.24 265)",
     description: "Podium trophy for dominating Build Battles",
+    image: "/assets/generated/gift-build-battle-podium.dim_200x200.png",
   },
   // Garage Perks
   {
@@ -438,6 +452,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.07 180)", "oklch(0.19 0.05 180)"],
     accentColor: "oklch(0.68 0.18 185)",
     description: "Unlock an additional slot in the recipient's garage",
+    image: "/assets/generated/gift-garage-slot.dim_200x200.png",
   },
   {
     id: "featured-car",
@@ -449,6 +464,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.30 0.14 55)", "oklch(0.24 0.10 50)"],
     accentColor: "oklch(0.80 0.22 60)",
     description: "Highlight one car on the Explore page",
+    image: "/assets/generated/gift-featured-car-tag.dim_200x200.png",
   },
   {
     id: "plate-frame",
@@ -460,6 +476,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.05 230)", "oklch(0.18 0.03 230)"],
     accentColor: "oklch(0.65 0.14 235)",
     description: "Custom plate frame overlay for car photos",
+    image: "/assets/generated/gift-plate-frame.dim_200x200.png",
   },
   // Shoutouts
   {
@@ -472,6 +489,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.26 0.10 50)", "oklch(0.21 0.07 45)"],
     accentColor: "oklch(0.72 0.20 55)",
     description: "24-hour banner on the recipient's profile",
+    image: "/assets/generated/gift-rev-shoutout.dim_200x200.png",
   },
   {
     id: "leaderboard-feature",
@@ -483,6 +501,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.26 0.10 290)", "oklch(0.21 0.07 295)"],
     accentColor: "oklch(0.70 0.24 290)",
     description: "Featured spot in the weekly leaderboard",
+    image: "/assets/generated/gift-leaderboard.dim_200x200.png",
   },
 ];
 
@@ -499,6 +518,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.07 330)", "oklch(0.17 0.05 325)"],
     accentColor: "oklch(0.75 0.16 330)",
     description: "Send a heartfelt fan letter to a model",
+    image: "/assets/generated/gift-fan-letter.dim_200x200.png",
   },
   {
     id: "model-gift-rose-bouquet",
@@ -510,6 +530,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.08 340)", "oklch(0.17 0.05 335)"],
     accentColor: "oklch(0.72 0.18 340)",
     description: "Send a digital rose bouquet to your fave model",
+    image: "/assets/generated/gift-rose-bouquet.dim_200x200.png",
   },
   {
     id: "model-gift-gold-star",
@@ -521,6 +542,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.09 320)", "oklch(0.19 0.06 315)"],
     accentColor: "oklch(0.76 0.17 325)",
     description: "Drop a gold star on a model's profile",
+    image: "/assets/generated/gift-gold-star.dim_200x200.png",
   },
   {
     id: "model-gift-vip-pass",
@@ -532,6 +554,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.23 0.10 305)", "oklch(0.18 0.07 310)"],
     accentColor: "oklch(0.70 0.22 308)",
     description: "Grant a model VIP status on their next reel",
+    image: "/assets/generated/gift-vip-pass.dim_200x200.png",
   },
   {
     id: "model-gift-champagne",
@@ -543,6 +566,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.25 0.10 315)", "oklch(0.20 0.07 320)"],
     accentColor: "oklch(0.72 0.20 315)",
     description: "Celebrate a model's milestone in style",
+    image: "/assets/generated/gift-champagne.dim_200x200.png",
   },
   {
     id: "model-gift-red-carpet",
@@ -554,6 +578,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.12 310)", "oklch(0.19 0.09 305)"],
     accentColor: "oklch(0.74 0.26 310)",
     description: "Roll out the red carpet for a model",
+    image: "/assets/generated/gift-red-carpet.dim_200x200.png",
   },
   {
     id: "model-gift-supercar-keychain",
@@ -565,6 +590,7 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.11 300)", "oklch(0.19 0.08 295)"],
     accentColor: "oklch(0.72 0.25 300)",
     description: "A rare supercar keychain for their collection",
+    image: "/assets/generated/gift-supercar-key.dim_200x200.png",
   },
   {
     id: "model-gift-diamond-crown",
@@ -576,5 +602,6 @@ export const MODEL_GIFT_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.28 0.15 295)", "oklch(0.22 0.12 300)"],
     accentColor: "oklch(0.80 0.28 298)",
     description: "The ultimate tribute — a diamond crown for the model",
+    image: "/assets/generated/gift-diamond-crown.dim_200x200.png",
   },
 ];

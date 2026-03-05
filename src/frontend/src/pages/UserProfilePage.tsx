@@ -41,8 +41,8 @@ import { getInitials, truncatePrincipal } from "../utils/format";
 // Safe unwrap for Motoko optional postType ([] | [string] or plain string)
 function safePostType(pt: unknown): string {
   if (!pt) return "";
-  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
-  return String(pt);
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "").toLowerCase();
+  return String(pt).toLowerCase();
 }
 
 interface UserProfilePageProps {

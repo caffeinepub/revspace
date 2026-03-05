@@ -27,11 +27,12 @@ import { awardLikeReceived } from "../lib/revbucks";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
 import { ProBadge } from "./ProBadge";
 
-// Safe unwrap for Motoko optional postType ([] | [string] or plain string)
+// Safe unwrap for Motoko optional postType ([] | [string] or plain string).
+// Always returns lowercase so callers can safely compare with "reel", "video", "photo".
 function safePostType(pt: unknown): string {
   if (!pt) return "";
-  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
-  return String(pt);
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "").toLowerCase();
+  return String(pt).toLowerCase();
 }
 
 const REACTION_EMOJIS = ["❤️", "🔥", "🏎️", "⚡", "🤙", "💨"] as const;
@@ -41,6 +42,8 @@ interface PostCardProps {
   post: PostView;
   onCommentClick?: (postId: string) => void;
   isVisible?: boolean;
+  /** Zero-based position in the feed. Used to set eager loading on the first posts. */
+  index?: number;
 }
 
 function PostTypeBadge({ type }: { type: unknown }) {
@@ -59,7 +62,12 @@ function PostTypeBadge({ type }: { type: unknown }) {
   );
 }
 
-export function PostCard({ post, onCommentClick, isVisible }: PostCardProps) {
+export function PostCard({
+  post,
+  onCommentClick,
+  isVisible,
+  index = 0,
+}: PostCardProps) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const authorKey = post.author.toString();
@@ -111,12 +119,16 @@ export function PostCard({ post, onCommentClick, isVisible }: PostCardProps) {
     }
   }, []);
 
+  // For the first 2 posts, treat them as always visible so videos load immediately
+  // without waiting for IntersectionObserver to fire (which requires scrolling).
+  const effectivelyVisible = isVisible || index < 2;
+
   // Load / unload video source based on visibility to save bandwidth
   useEffect(() => {
     const mediaUrl = post.mediaUrls[0];
     if (!isVideoPost || !mediaUrl) return;
 
-    if (isVisible) {
+    if (effectivelyVisible) {
       setVideoSrc(mediaUrl);
       setVideoError(false);
       // Slight delay so the src is set before play() is called
@@ -132,7 +144,7 @@ export function PostCard({ post, onCommentClick, isVisible }: PostCardProps) {
     }
     setVideoSrc("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible, post.mediaUrls]);
+  }, [effectivelyVisible, post.mediaUrls]);
 
   // Close reaction picker when clicking outside
   useEffect(() => {
@@ -418,7 +430,8 @@ export function PostCard({ post, onCommentClick, isVisible }: PostCardProps) {
               src={post.mediaUrls[0]}
               alt="Post media"
               className="feed-image aspect-[4/3]"
-              loading="lazy"
+              loading={index < 3 ? "eager" : "lazy"}
+              decoding="async"
               onError={() => setImgError(true)}
             />
           )}

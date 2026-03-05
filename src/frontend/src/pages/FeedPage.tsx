@@ -336,36 +336,41 @@ function CommentsDialog({
 }
 
 export function FeedPage() {
-  const { data: livePosts, isLoading } = useGetAllPosts();
+  const { data: livePosts, isLoading: postsLoading } = useGetAllPosts();
   const { actor: publicActor } = usePublicActor();
-  const { actor: authActor } = useActor();
+  // useActor side-effect: invalidates dependent queries after login
+  useActor();
   const qc = useQueryClient();
-  // actorLoading is only true while BOTH actors are null (first load).
-  // Once either resolves, we allow the feed to render.
-  const actorLoading = !publicActor && !authActor;
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [postCount, setPostCount] = useState(0);
 
-  // When publicActor resolves, immediately refetch posts.
-  // This fixes the case where useGetAllPosts fired before publicActor was ready
-  // (returning [] from the "no actor" path) and never re-ran.
+  // When publicActor resolves for the first time, refetch posts to get live data.
+  // Use a ref to avoid refetching on every render after the actor is set.
+  const publicActorRefetchedRef = useRef(false);
   useEffect(() => {
-    if (publicActor) {
+    if (publicActor && !publicActorRefetchedRef.current) {
+      publicActorRefetchedRef.current = true;
       qc.invalidateQueries({ queryKey: ["posts"] });
     }
   }, [publicActor, qc]);
 
-  // Use live posts if available, otherwise fall back to localStorage cache
-  // so the feed is never blank while the actor is initializing after a deploy.
+  // Show live posts if available, otherwise fall back to localStorage cache.
+  // The feed should NEVER be blank if there are cached posts.
   const cachedFallback = (getCachedPosts() as typeof livePosts) ?? [];
   const posts =
     livePosts && livePosts.length > 0
       ? livePosts
-      : actorLoading
+      : cachedFallback.length > 0
         ? cachedFallback
         : livePosts;
+
+  // actorLoading: only show skeleton when truly nothing is available —
+  // no cached posts, no live posts, and the query is still in-flight.
+  // The singleton actor approach means the actor resolves almost immediately,
+  // so this state should be very brief (< 500ms) on any normal connection.
+  const actorLoading = postsLoading && (!posts || posts.length === 0);
 
   const displayPosts = [...(posts ?? [])].sort((a, b) =>
     Number(b.timestamp - a.timestamp),
@@ -467,7 +472,7 @@ export function FeedPage() {
             <p className="text-white/70 text-sm font-medium mt-1">
               The streets are watching
             </p>
-            {(isLoading || actorLoading) && displayPosts.length === 0 ? (
+            {actorLoading && displayPosts.length === 0 ? (
               <span
                 className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold animate-pulse"
                 style={{
@@ -497,8 +502,8 @@ export function FeedPage() {
       </div>
 
       {/* Snap-scroll feed — one post per screen, newest first */}
-      {(isLoading || actorLoading) && displayPosts.length === 0 ? (
-        /* Single skeleton while loading */
+      {actorLoading && displayPosts.length === 0 ? (
+        /* Single skeleton while actors are initializing */
         <div
           className="snap-start snap-always"
           style={{ height: "100dvh", overflowY: "auto" }}
@@ -506,7 +511,7 @@ export function FeedPage() {
         >
           <PostCardSkeleton />
         </div>
-      ) : !isLoading && !actorLoading && displayPosts.length === 0 ? (
+      ) : !actorLoading && displayPosts.length === 0 ? (
         /* Empty state */
         <div
           className="flex flex-col items-center justify-center py-24 px-6 text-center"
@@ -552,6 +557,7 @@ export function FeedPage() {
                 post={post}
                 onCommentClick={(id) => setCommentPostId(id)}
                 isVisible={index === visibleIndex}
+                index={index}
               />
             </div>
           ))}

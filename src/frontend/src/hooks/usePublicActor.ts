@@ -1,46 +1,117 @@
 /**
- * usePublicActor — a lightweight actor hook for public (unauthenticated) reads.
+ * usePublicActor — lightweight hook for public (unauthenticated) reads.
  *
- * The protected `useActor.ts` awaits `_initializeAccessControlWithSecret` inside
- * its React Query queryFn. If that call throws (common after a fresh deploy or
- * canister cold-start), `actorQuery.data` is never set, and every downstream
- * query that checks `!!actor` stays permanently blocked — causing reels, feed,
- * profiles, and all public pages to show nothing.
+ * KEY CHANGE (v180): The actor is now created as a module-level singleton that
+ * initialises eagerly when this module is first imported — before any React
+ * component renders. This eliminates the React Query polling loop that was
+ * the root cause of:
+ *   • Feed / reels staying blank until an async query resolved
+ *   • Canister hammering (800 ms poll × 20 retries)
+ *   • Race conditions between the actor query and downstream data queries
  *
- * This hook creates an anonymous actor WITHOUT any auth-init call, so it is
- * always available for public reads regardless of whether the auth init succeeds.
- * It should ONLY be used for read-only, unauthenticated canister queries.
+ * The hook itself is now a thin wrapper that subscribes to the singleton.
+ * No React Query, no polling, no retry loops.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import type { backendInterface } from "../backend";
 import { createActorWithConfig } from "../config";
 
-const PUBLIC_ACTOR_KEY = "publicActor";
+// ─── Module-level singleton ───────────────────────────────────────────────────
+
+let _publicActor: backendInterface | null = null;
+
+// Subscribers that want to be notified when the actor resolves
+const _subscribers = new Set<(actor: backendInterface) => void>();
+
+function notifySubscribers(actor: backendInterface) {
+  for (const cb of _subscribers) cb(actor);
+}
+
+// Tracks whether we've started (or are retrying) actor creation
+let _started = false;
+
+/**
+ * Starts the singleton actor creation if not already started.
+ * Safe to call multiple times — uses _started flag as guard.
+ */
+function startActorCreation(retryCount = 0) {
+  if (_started && retryCount === 0) return;
+  _started = true;
+  createActorWithConfig()
+    .then((actor) => {
+      _publicActor = actor;
+      notifySubscribers(actor);
+    })
+    .catch(() => {
+      // Allow retries by resetting the flag
+      _started = false;
+      if (retryCount < 3) {
+        setTimeout(
+          () => startActorCreation(retryCount + 1),
+          1500 * (retryCount + 1),
+        );
+      }
+    });
+}
+
+// Kick off actor creation immediately on module import
+startActorCreation();
+
+/**
+ * Returns the singleton public actor, creating it if needed.
+ * Resolves once the actor is built.
+ */
+export function getPublicActor(): Promise<backendInterface> {
+  if (_publicActor) return Promise.resolve(_publicActor);
+  return new Promise((resolve) => {
+    // If already resolved by the time the micro-task runs, return immediately
+    if (_publicActor) {
+      resolve(_publicActor);
+      return;
+    }
+    const cb = (actor: backendInterface) => {
+      _subscribers.delete(cb);
+      resolve(actor);
+    };
+    _subscribers.add(cb);
+    // Ensure creation is in-flight
+    startActorCreation();
+  });
+}
+
+// ─── React hook ──────────────────────────────────────────────────────────────
 
 export function usePublicActor() {
-  const actorQuery = useQuery<backendInterface>({
-    queryKey: [PUBLIC_ACTOR_KEY],
-    queryFn: async () => {
-      // Build an anonymous actor — no identity, no auth init.
-      // This always succeeds as long as the canister is reachable.
-      return createActorWithConfig();
-    },
-    // Keep polling until the actor resolves, then stop
-    refetchInterval: (query) => {
-      // If we have data, stop polling. Otherwise retry every 1.5s.
-      return query.state.data ? false : 1500;
-    },
-    refetchIntervalInBackground: false,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: true,
-    // Retry aggressively so a transient network blip doesn't keep the actor null
-    retry: 10,
-    retryDelay: (attempt) => Math.min(500 * (attempt + 1), 4000),
-  });
+  const [actor, setActor] = useState<backendInterface | null>(
+    () => _publicActor,
+  );
+
+  useEffect(() => {
+    // Already resolved — sync state immediately
+    if (_publicActor) {
+      setActor(_publicActor);
+      return;
+    }
+
+    // Subscribe to be notified when the actor resolves
+    const cb = (a: backendInterface) => {
+      setActor(a);
+      _subscribers.delete(cb);
+    };
+    _subscribers.add(cb);
+
+    // Ensure creation has started (idempotent)
+    startActorCreation();
+
+    return () => {
+      _subscribers.delete(cb);
+    };
+  }, []);
 
   return {
-    actor: actorQuery.data ?? null,
-    isFetching: actorQuery.isFetching,
+    actor,
+    // isFetching kept for API compatibility with existing callers
+    isFetching: actor === null,
   };
 }

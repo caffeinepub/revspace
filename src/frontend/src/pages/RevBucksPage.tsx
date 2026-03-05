@@ -286,6 +286,7 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.1 310)", "oklch(0.17 0.07 310)"],
     accentColor: "oklch(0.7 0.25 310)",
     description: "Display a verified badge on your model profile",
+    image: "/assets/generated/model-verified-badge.dim_200x200.png",
   },
   {
     id: "model-spotlight",
@@ -297,6 +298,7 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.12 290)", "oklch(0.18 0.08 295)"],
     accentColor: "oklch(0.7 0.22 295)",
     description: "Get featured at the top of Model Reels for 24 hours",
+    image: "/assets/generated/model-spotlight.dim_200x200.png",
   },
   {
     id: "model-featured-week",
@@ -308,6 +310,7 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.28 0.15 300)", "oklch(0.22 0.12 310)"],
     accentColor: "oklch(0.75 0.28 305)",
     description: "Featured model spot on the Model Gallery page for 7 days",
+    image: "/assets/generated/model-featured-crown.dim_200x200.png",
   },
   {
     id: "model-banner-frame",
@@ -319,6 +322,7 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.22 0.08 310)", "oklch(0.18 0.05 310)"],
     accentColor: "oklch(0.65 0.22 310)",
     description: "Unique banner frame for your model profile",
+    image: "/assets/generated/model-banner-frame.dim_200x200.png",
   },
   {
     id: "model-portfolio-boost",
@@ -330,6 +334,7 @@ const MODEL_EXCLUSIVE_ITEMS: ShopItem[] = [
     gradient: ["oklch(0.24 0.1 300)", "oklch(0.19 0.07 305)"],
     accentColor: "oklch(0.68 0.24 300)",
     description: "Boost your portfolio to the top of search for 48 hours",
+    image: "/assets/generated/model-portfolio-boost.dim_200x200.png",
   },
 ];
 
@@ -686,76 +691,154 @@ function ShopTab({
           }}
         />
 
-        <div className="relative z-10 p-4 flex flex-col gap-3">
-          {/* Top row: emoji + rarity badge */}
-          <div className="flex items-start justify-between">
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0"
-              style={{
-                background: `${rarityConfig.color}18`,
-                border: `1px solid ${rarityConfig.color}40`,
-                boxShadow: `inset 0 1px 0 ${rarityConfig.color}20`,
-              }}
-            >
-              {item.emoji}
+        {item.image ? (
+          /* ── Image-style card layout ─────────────────────────────────── */
+          <div className="relative z-10">
+            {/* Image hero */}
+            <div className="relative w-full h-32 overflow-hidden">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="w-full h-full object-cover"
+                style={{ filter: "brightness(0.95) saturate(1.1)" }}
+              />
+              {/* Gradient overlay so text is always readable */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, transparent 40%, oklch(0 0 0 / 0.65) 100%)",
+                }}
+              />
+              {/* Rarity badge top-right */}
+              <span
+                className="absolute top-2 right-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full tracking-wider backdrop-blur-sm"
+                style={{
+                  background: `${rarityConfig.color}33`,
+                  color: rarityConfig.color,
+                  border: `1px solid ${rarityConfig.color}66`,
+                }}
+              >
+                {rarityConfig.label}
+              </span>
+              {/* Name over image bottom */}
+              <p className="absolute bottom-2 left-3 font-bold text-white text-sm drop-shadow leading-tight">
+                {item.name}
+              </p>
             </div>
 
-            <span
-              className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wider"
-              style={{
-                background: `${rarityConfig.color}22`,
-                color: rarityConfig.color,
-                border: `1px solid ${rarityConfig.color}50`,
-              }}
-            >
-              {rarityConfig.label}
-            </span>
-          </div>
-
-          {/* Name + description */}
-          <div>
-            <p className="font-bold text-foreground text-sm leading-tight">
-              {item.name}
-            </p>
-            <p className="text-[11px] text-steel mt-0.5 leading-relaxed">
-              {item.description}
-            </p>
-          </div>
-
-          {/* Cost + action */}
-          <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center gap-1">
-              <Zap size={13} style={{ color: "oklch(var(--orange))" }} />
-              <span
-                className="font-black font-display text-base"
-                style={{ color: "oklch(var(--orange))" }}
+            {/* Card footer */}
+            <div className="px-3 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-steel leading-snug">
+                  {item.description}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Zap size={12} style={{ color: "oklch(var(--orange))" }} />
+                  <span
+                    className="font-black font-display text-sm"
+                    style={{ color: "oklch(var(--orange))" }}
+                  >
+                    {item.cost.toLocaleString()} RB
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!canAfford}
+                onClick={() => setSelectedItem(item)}
+                className="text-xs h-8 font-bold px-3 rounded-lg shrink-0 ml-2"
+                style={
+                  canAfford
+                    ? {
+                        background: rarityConfig.color,
+                        color: "oklch(0.12 0.01 250)",
+                      }
+                    : {
+                        background: "oklch(var(--surface))",
+                        color: "oklch(var(--steel))",
+                        border: "1px solid oklch(var(--border))",
+                      }
+                }
               >
-                {item.cost.toLocaleString()} RB
+                {canAfford ? "🎁 Send" : "Need More"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* ── Emoji-style card layout (fallback) ──────────────────────── */
+          <div className="relative z-10 p-4 flex flex-col gap-3">
+            {/* Top row: emoji + rarity badge */}
+            <div className="flex items-start justify-between">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0"
+                style={{
+                  background: `${rarityConfig.color}18`,
+                  border: `1px solid ${rarityConfig.color}40`,
+                  boxShadow: `inset 0 1px 0 ${rarityConfig.color}20`,
+                }}
+              >
+                {item.emoji}
+              </div>
+
+              <span
+                className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wider"
+                style={{
+                  background: `${rarityConfig.color}22`,
+                  color: rarityConfig.color,
+                  border: `1px solid ${rarityConfig.color}50`,
+                }}
+              >
+                {rarityConfig.label}
               </span>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!canAfford}
-              onClick={() => setSelectedItem(item)}
-              className="text-xs h-8 font-bold px-3 rounded-lg"
-              style={
-                canAfford
-                  ? {
-                      background: rarityConfig.color,
-                      color: "oklch(0.12 0.01 250)",
-                    }
-                  : {
-                      background: "oklch(var(--surface))",
-                      color: "oklch(var(--steel))",
-                      border: "1px solid oklch(var(--border))",
-                    }
-              }
-            >
-              {canAfford ? "🎁 Send" : "Need More RB"}
-            </Button>
+
+            {/* Name + description */}
+            <div>
+              <p className="font-bold text-foreground text-sm leading-tight">
+                {item.name}
+              </p>
+              <p className="text-[11px] text-steel mt-0.5 leading-relaxed">
+                {item.description}
+              </p>
+            </div>
+
+            {/* Cost + action */}
+            <div className="flex items-center justify-between mt-1">
+              <div className="flex items-center gap-1">
+                <Zap size={13} style={{ color: "oklch(var(--orange))" }} />
+                <span
+                  className="font-black font-display text-base"
+                  style={{ color: "oklch(var(--orange))" }}
+                >
+                  {item.cost.toLocaleString()} RB
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!canAfford}
+                onClick={() => setSelectedItem(item)}
+                className="text-xs h-8 font-bold px-3 rounded-lg"
+                style={
+                  canAfford
+                    ? {
+                        background: rarityConfig.color,
+                        color: "oklch(0.12 0.01 250)",
+                      }
+                    : {
+                        background: "oklch(var(--surface))",
+                        color: "oklch(var(--steel))",
+                        border: "1px solid oklch(var(--border))",
+                      }
+                }
+              >
+                {canAfford ? "🎁 Send" : "Need More RB"}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </motion.div>
     );
   };

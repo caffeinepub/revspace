@@ -1,37 +1,27 @@
 # RevSpace
 
 ## Current State
-The Feed page renders all posts at once in a vertical list using `PostCard` components. Videos use `autoPlay` with `preload="none"` but all cards mount simultaneously, causing browsers to compete for network resources. Broken media shows broken image icons. Posts are sorted newest-first but all load together. The `PostCard` component handles its own video playback with a ref.
+The app has a recurring loading failure where the feed, reels, and profile do not load (blank/spinner) after a deploy or on first visit. Root cause: `usePublicActor` builds the anonymous actor inside a React Query `queryFn`, which means it is async and dependent on the React Query lifecycle. When the query hasn't resolved yet, every downstream query (`useGetAllPosts`, `useGetProfile`, etc.) either returns stale empty data or spins on retry loops. Multiple competing retry intervals (publicActor polling 800ms, posts polling 1000ms, authActor invalidating, registeredActor invalidating) all hammer the canister simultaneously, causing slowness and unresponsiveness.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Full-screen snap-scroll feed layout: one post fills the viewport at a time, users swipe/scroll to move between posts (CSS `scroll-snap` on a full-height container)
-- IntersectionObserver on each post card so videos only play when the post is 80%+ visible in the viewport; video is paused and `src` cleared when off-screen to free memory
-- Skeleton/placeholder shown while the visible post's media is loading
-- Error fallback UI for broken images (placeholder car silhouette) and broken videos (error message with retry)
+- A module-level singleton for the public actor that is created once eagerly (synchronously triggered on module import) so it is available before any React component renders
+- A `getPublicActor()` utility function that returns the singleton, waiting for it if it hasn't resolved yet
+- A simple React hook `usePublicActorInstance()` that returns the singleton (no React Query, no polling, no retry loops)
 
 ### Modify
-- `FeedPage.tsx`: Replace the current `space-y-0.5` list with a full-viewport snap-scroll container. Each post takes `100dvh` (dynamic viewport height). Only render media for the currently visible post (virtualisation via IntersectionObserver).
-- `PostCard.tsx`: Add IntersectionObserver hook — when the card exits the viewport, pause video and set `src=""` to release the network connection. When it enters, restore `src` and play. Add image/video error state with a styled fallback.
-- Posts remain sorted newest-first (no change to sort logic).
+- `usePublicActor.ts` — replace the React Query-based approach with a direct reference to the module singleton; no more `refetchInterval`, no more 20 retries, no React Query overhead for actor creation
+- `useQueries.ts` `useGetAllPosts` — remove `refetchInterval: !actor ? 1_000 : false` (the constant polling hammers the canister); rely on `retry` and `refetchOnMount` instead; increase `staleTime` to 60s to reduce redundant fetches
+- `ReelsPage.tsx` — remove the `actorLoading = !publicActor` gate that blocks all reel rendering; show reels as soon as `posts` data arrives regardless of actor state
+- `FeedPage.tsx` — tighten the `actorLoading` check so it only shows skeleton when there is truly no data at all (neither live nor cached)
 
 ### Remove
-- `autoPlay` attribute on videos in the feed — replaced by IntersectionObserver-driven play/pause to prevent all videos autoplaying on mount.
+- The `refetchInterval` on `useGetAllPosts` that fires every 1 second when actor is null (this is the primary source of canister hammering and sluggishness)
+- The aggressive retry (20 retries) on `usePublicActor` since the singleton approach makes it unnecessary
 
 ## Implementation Plan
-1. Update `PostCard.tsx`:
-   - Accept an `isVisible` prop (boolean) from the parent feed
-   - When `isVisible` becomes false: pause video, clear `src` to drop network connection
-   - When `isVisible` becomes true: restore `src` from `post.mediaUrls[0]`, call `video.play()`
-   - Add `onError` image fallback (styled dark card with car icon + "Media unavailable")
-   - Add `onError` video fallback (same styled card + "Video unavailable" text)
-   - Remove `autoPlay` from `<video>` — playback driven by visibility
-
-2. Update `FeedPage.tsx`:
-   - Wrap the feed in a `h-[100dvh] overflow-y-scroll snap-y snap-mandatory` container
-   - Each post item: `h-[100dvh] snap-start snap-always flex flex-col`
-   - Use `IntersectionObserver` (threshold 0.8) to track which post index is currently visible
-   - Pass `isVisible={index === visibleIndex}` to each `PostCard`
-   - Keep the header banner above the snap container (sticky/fixed or as first snap section)
-   - Keep newest-first sort
+1. Rewrite `usePublicActor.ts` to use an eagerly-initialized module singleton instead of React Query
+2. Update `useGetAllPosts` in `useQueries.ts` to remove the per-second polling interval
+3. Update `ReelsPage.tsx` to decouple the loading gate from actor state
+4. Update `FeedPage.tsx` actorLoading logic to be less aggressive

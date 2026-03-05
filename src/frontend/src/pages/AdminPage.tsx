@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { backendInterface } from "../backend";
 import type { Listing, PostView, Profile, UserRole } from "../backend.d";
+import { useActor } from "../hooks/useActor";
 import { useAdminActor } from "../hooks/useAdminActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePublicActor } from "../hooks/usePublicActor";
@@ -133,10 +134,14 @@ function RowSkeleton() {
 function UsersTab({
   actor,
   writeActor,
+  fallbackActor,
+  adminActor,
   myPrincipal,
 }: {
   actor: backendInterface | null; // public actor for reads
-  writeActor: backendInterface | null; // authenticated actor for writes
+  writeActor: backendInterface | null; // adminActor for role-gated writes (ban/delete)
+  fallbackActor: backendInterface | null; // regular auth actor for secret-based writes
+  adminActor: backendInterface | null; // admin-promoted actor for adminGetAllProfiles
   myPrincipal: string | undefined;
 }) {
   const [users, setUsers] = useState<MergedUser[]>([]);
@@ -146,22 +151,37 @@ function UsersTab({
   // Per-user RB input values
   const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
-  const loadUsers = useCallback(() => {
+  const loadUsers = useCallback(async () => {
     if (!actor) return;
     setLoading(true);
     setLoadError(false);
 
-    // Strategy: use getAllPosts() (public, no auth) to discover every unique author
-    // principal, then fetch each profile with getProfile() (also public).
-    // This avoids adminGetAllProfiles() which requires backend admin role — a role
-    // that can't be reliably re-granted after a canister restart because regular users
-    // register first via the actor hook's empty-token call.
-    actor
-      .getAllPosts()
-      .then(async (posts: PostView[]) => {
-        // Collect unique principals from post authors
-        const seen = new Set<string>();
-        const principals: Principal[] = [];
+    try {
+      const seen = new Set<string>();
+      const principals: Principal[] = [];
+
+      // Strategy 1: Use adminGetAllProfiles if admin actor is available — most
+      // complete list, includes registered users even if they haven't posted.
+      if (adminActor) {
+        try {
+          const allProfiles = await adminActor.adminGetAllProfiles();
+          for (const pp of allProfiles) {
+            const key = pp.principal.toString();
+            if (!seen.has(key)) {
+              seen.add(key);
+              principals.push(pp.principal);
+            }
+          }
+        } catch {
+          // adminGetAllProfiles may fail if role not yet promoted — fall through
+          // to Strategy 2 which uses the public API.
+        }
+      }
+
+      // Strategy 2: Use getAllPosts() (public, no auth needed) to discover
+      // post authors. Always runs so we catch users the admin call may miss.
+      try {
+        const posts = await actor.getAllPosts();
         for (const p of posts) {
           const key = p.author.toString();
           if (!seen.has(key)) {
@@ -169,47 +189,51 @@ function UsersTab({
             principals.push(p.author);
           }
         }
+      } catch {
+        // posts call failed — OK if Strategy 1 already gave us users
+      }
 
-        if (principals.length === 0) {
-          setUsers([]);
-          return;
-        }
+      if (principals.length === 0) {
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
 
-        // Fetch all profiles in parallel
-        const profileResults = await Promise.allSettled(
-          principals.map((pr) => actor.getProfile(pr)),
-        );
+      // Fetch all profiles in parallel
+      const profileResults = await Promise.allSettled(
+        principals.map((pr) => actor.getProfile(pr)),
+      );
 
-        const merged: MergedUser[] = [];
-        for (let i = 0; i < principals.length; i++) {
-          const result = profileResults[i];
-          if (result.status === "rejected" || result.value === null) continue;
-          const profile = result.value as Profile;
-          const meta = decodeMetaFromLocation(profile.location ?? "");
-          merged.push({
-            principal: principals[i],
-            role: "user" as UserRole,
-            displayName: profile.displayName || truncPrincipal(principals[i]),
-            avatarUrl: profile.avatarUrl || "",
-            revBucks: meta.rb,
-            isPro: meta.isPro,
-            isModel: meta.isModel,
-            locationRaw: profile.location ?? "",
-          });
-        }
+      const merged: MergedUser[] = [];
+      for (let i = 0; i < principals.length; i++) {
+        const result = profileResults[i];
+        if (result.status === "rejected" || result.value === null) continue;
+        const profile = result.value as Profile;
+        const meta = decodeMetaFromLocation(profile.location ?? "");
+        merged.push({
+          principal: principals[i],
+          role: "user" as UserRole,
+          displayName: profile.displayName || truncPrincipal(principals[i]),
+          avatarUrl: profile.avatarUrl || "",
+          revBucks: meta.rb,
+          isPro: meta.isPro,
+          isModel: meta.isModel,
+          locationRaw: profile.location ?? "",
+        });
+      }
 
-        // Sort alphabetically by display name
-        merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
-        setUsers(merged);
-        setLoadError(false);
-      })
-      .catch((err) => {
-        console.error("loadUsers error:", err);
-        toast.error("Failed to load users — tap Retry to try again");
-        setLoadError(true);
-      })
-      .finally(() => setLoading(false));
-  }, [actor]);
+      // Sort alphabetically by display name
+      merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      setUsers(merged);
+      setLoadError(false);
+    } catch (err) {
+      console.error("loadUsers error:", err);
+      toast.error("Failed to load users — tap Retry to try again");
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [actor, adminActor]);
 
   useEffect(() => {
     if (!actor) return;
@@ -217,28 +241,42 @@ function UsersTab({
   }, [actor, loadUsers]);
 
   async function handleDeleteProfile(principal: Principal) {
-    if (!writeActor) {
-      toast.error("Not logged in — sign in with Internet Identity first");
+    // Destructive actions require the admin actor (needs #admin role)
+    const actor = writeActor;
+    if (!actor) {
+      toast.error(
+        writeActor === null && !fallbackActor
+          ? "Not logged in — sign in with Internet Identity first"
+          : "Admin session not ready yet — wait a moment and retry",
+      );
       return;
     }
     const key = `del-${principal.toString()}`;
     setPendingAction(key);
     try {
-      await writeActor.adminDeleteProfile(principal);
+      await actor.adminDeleteProfile(principal);
       setUsers((prev) =>
         prev.filter((u) => u.principal.toString() !== principal.toString()),
       );
       toast.success("Profile deleted");
     } catch {
-      toast.error("Failed to delete profile");
+      toast.error(
+        "Failed to delete profile — admin session may still be initializing",
+      );
     } finally {
       setPendingAction(null);
     }
   }
 
   async function handleBanToggle(user: MergedUser) {
-    if (!writeActor) {
-      toast.error("Not logged in — sign in with Internet Identity first");
+    // Ban/unban requires the admin actor (needs #admin role)
+    const actor = writeActor;
+    if (!actor) {
+      toast.error(
+        !fallbackActor
+          ? "Not logged in — sign in with Internet Identity first"
+          : "Admin session not ready yet — wait a moment and retry",
+      );
       return;
     }
     const isBanned = user.role === "guest";
@@ -246,14 +284,14 @@ function UsersTab({
     setPendingAction(key);
     try {
       if (isBanned) {
-        await writeActor.adminUnbanUser(user.principal);
+        await actor.adminUnbanUser(user.principal);
         toast.success(`${user.displayName} unbanned`);
       } else {
-        await writeActor.adminBanUser(user.principal);
+        await actor.adminBanUser(user.principal);
         toast.success(`${user.displayName} banned`);
       }
       // Refresh roles
-      const refreshed = await writeActor.adminGetAllUsers();
+      const refreshed = await actor.adminGetAllUsers();
       const roleMapNew = new Map<string, UserRole>();
       for (const u of refreshed) roleMapNew.set(u.principal.toString(), u.role);
       setUsers((prev) =>
@@ -263,16 +301,19 @@ function UsersTab({
         })),
       );
     } catch {
-      toast.error("Action failed");
+      toast.error("Action failed — admin session may still be initializing");
     } finally {
       setPendingAction(null);
     }
   }
 
-  // Give RevBucks — uses adminSetUserMeta (secret-based auth, no role check needed).
-  // Falls back to adminUpdateUserLocation if the new function isn't available.
+  // Give RevBucks — uses adminSetUserMeta which authenticates via SECRET only
+  // (no #admin role needed). Works with any authenticated actor (writeActor OR fallbackActor).
   async function handleAddRb(user: MergedUser) {
-    if (!writeActor) {
+    // Use writeActor first, fall back to the regular auth actor.
+    // adminSetUserMeta checks the secret directly, so no role is needed.
+    const effectiveActor = writeActor ?? fallbackActor;
+    if (!effectiveActor) {
       toast.error("Not logged in — sign in with Internet Identity first");
       return;
     }
@@ -293,17 +334,12 @@ function UsersTab({
     const rbKey = `rb-${user.principal.toString()}`;
     setPendingAction(rbKey);
     try {
-      // Primary: adminSetUserMeta — authenticates via secret, no role check
-      try {
-        await writeActor.adminSetUserMeta(
-          user.principal,
-          newEncoded,
-          "Meonly123$",
-        );
-      } catch (_primaryErr) {
-        // Fallback: adminUpdateUserLocation — requires #admin role
-        await writeActor.adminUpdateUserLocation(user.principal, newEncoded);
-      }
+      // adminSetUserMeta — authenticates via secret, no role check
+      await effectiveActor.adminSetUserMeta(
+        user.principal,
+        newEncoded,
+        "Meonly123$",
+      );
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -324,7 +360,10 @@ function UsersTab({
   }
 
   async function handleProToggle(user: MergedUser) {
-    if (!writeActor) {
+    // Use writeActor first, fall back to the regular auth actor.
+    // adminSetUserMeta checks the secret directly, so no role is needed.
+    const effectiveActor = writeActor ?? fallbackActor;
+    if (!effectiveActor) {
       toast.error("Not logged in — sign in with Internet Identity first");
       return;
     }
@@ -335,17 +374,12 @@ function UsersTab({
     const proKey = `pro-${user.principal.toString()}`;
     setPendingAction(proKey);
     try {
-      // Primary: adminSetUserMeta — authenticates via secret, no role check
-      try {
-        await writeActor.adminSetUserMeta(
-          user.principal,
-          newEncoded,
-          "Meonly123$",
-        );
-      } catch (_primaryErr) {
-        // Fallback: adminUpdateUserLocation — requires #admin role
-        await writeActor.adminUpdateUserLocation(user.principal, newEncoded);
-      }
+      // adminSetUserMeta — authenticates via secret, no role check
+      await effectiveActor.adminSetUserMeta(
+        user.principal,
+        newEncoded,
+        "Meonly123$",
+      );
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -1108,7 +1142,13 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
     // on future cold starts the admin is registered first.
     if (actor) {
       try {
-        await actor._initializeAccessControlWithSecret("Meonly123$");
+        // Cast to any: _initializeAccessControlWithSecret exists in the backend
+        // but is not exposed in the generated backendInterface type definition.
+        await (
+          actor as unknown as {
+            _initializeAccessControlWithSecret: (s: string) => Promise<void>;
+          }
+        )._initializeAccessControlWithSecret("Meonly123$");
       } catch {
         // ignore — may fail if already registered as user
       }
@@ -1225,9 +1265,12 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 export function AdminPage() {
   // publicActor — anonymous, only for reads (getAllPosts, getProfile, listAllListings)
   const { actor } = usePublicActor();
-  // adminActor — authenticated actor that passes the admin token to _initializeAccessControlWithSecret
-  // so the canister registers/promotes this principal as #admin. This is the ONLY actor used for writes.
+  // adminActor — authenticated actor that passes the admin token to adminPromoteToAdmin
+  // so the canister forcefully registers/promotes this principal as #admin.
   const { actor: adminActor, isReady: backendAdminReady } = useAdminActor();
+  // regularActor — standard auth actor, always available when logged in.
+  // Used as fallback for adminSetUserMeta which only needs the secret, not a role.
+  const { actor: regularActor } = useActor();
   const { identity } = useInternetIdentity();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -1490,6 +1533,8 @@ export function AdminPage() {
                 <UsersTab
                   actor={actor}
                   writeActor={adminActor}
+                  fallbackActor={regularActor}
+                  adminActor={adminActor}
                   myPrincipal={myPrincipal}
                 />
               </TabsContent>
