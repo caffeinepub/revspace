@@ -30,7 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { backendInterface } from "../backend";
 import type { Listing, PostView, Profile, UserRole } from "../backend.d";
-import { useActor } from "../hooks/useActor";
+import { useAdminActor } from "../hooks/useAdminActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePublicActor } from "../hooks/usePublicActor";
 import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
@@ -1226,9 +1226,9 @@ function AdminTokenGate({ actor, onSuccess }: AdminTokenGateProps) {
 export function AdminPage() {
   // publicActor — anonymous, only for reads (getAllPosts, getProfile, listAllListings)
   const { actor } = usePublicActor();
-  // authenticatedActor — uses your Internet Identity; this is what the canister sees
-  // as `caller` on all admin write functions. MUST be logged in for writes to work.
-  const { actor: authActor } = useActor();
+  // adminActor — authenticated actor that passes the admin token to _initializeAccessControlWithSecret
+  // so the canister registers/promotes this principal as #admin. This is the ONLY actor used for writes.
+  const { actor: adminActor, isReady: backendAdminReady } = useAdminActor();
   const { identity } = useInternetIdentity();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -1237,37 +1237,15 @@ export function AdminPage() {
 
   const myPrincipal = identity?.getPrincipal().toString();
 
-  const [backendAdminReady, setBackendAdminReady] = useState(false);
-
   // ── Check saved token immediately (no actor needed for UI gate) ──────────
   useEffect(() => {
     const savedToken = localStorage.getItem("rs_admin_unlocked");
     if (savedToken === "Meonly123$") {
-      // Grant UI access immediately — don't wait for actor
       setIsAdmin(true);
     } else {
-      // No saved token — show token gate immediately (no spinner)
       setIsAdmin(false);
     }
   }, []);
-
-  // ── Re-establish backend admin session once authenticated actor resolves ──
-  // Mark backend as ready immediately if we have an auth actor and the token is
-  // saved — the _initializeAccessControlWithSecret call is fire-and-forget because
-  // the canister already registered this principal; waiting for it just shows a
-  // "Connecting…" spinner for no benefit.
-  useEffect(() => {
-    if (!authActor || backendAdminReady) return;
-    const savedToken = localStorage.getItem("rs_admin_unlocked");
-    if (savedToken !== "Meonly123$") return;
-    // Mark ready immediately so write buttons unlock without waiting for the
-    // round-trip. Fire the init in the background so the canister still gets
-    // the token if this is a cold-start where principal isn't registered yet.
-    setBackendAdminReady(true);
-    authActor._initializeAccessControlWithSecret("Meonly123$").catch(() => {
-      // Already registered — ignore rejection
-    });
-  }, [authActor, backendAdminReady]);
 
   // Count badges — derive user count from unique post authors (public call)
   useEffect(() => {
@@ -1306,17 +1284,6 @@ export function AdminPage() {
         actor={actor}
         onSuccess={() => {
           setIsAdmin(true);
-          // Mark write actions as available immediately — the actor can already
-          // handle writes; the init call is just background registration.
-          setBackendAdminReady(true);
-          // Fire the backend init in the background so the canister registers
-          // the admin role on a cold-start without blocking the UI.
-          const actorToInit = authActor || actor;
-          if (actorToInit) {
-            actorToInit
-              ._initializeAccessControlWithSecret("Meonly123$")
-              .catch(() => {});
-          }
         }}
       />
     );
@@ -1523,16 +1490,16 @@ export function AdminPage() {
               <TabsContent value="users" className="mt-0">
                 <UsersTab
                   actor={actor}
-                  writeActor={authActor}
+                  writeActor={adminActor}
                   myPrincipal={myPrincipal}
                   backendAdminReady={backendAdminReady}
                 />
               </TabsContent>
               <TabsContent value="posts" className="mt-0">
-                <PostsTab actor={actor} writeActor={authActor} />
+                <PostsTab actor={actor} writeActor={adminActor} />
               </TabsContent>
               <TabsContent value="marketplace" className="mt-0">
-                <MarketplaceTab actor={actor} writeActor={authActor} />
+                <MarketplaceTab actor={actor} writeActor={adminActor} />
               </TabsContent>
             </div>
           </Tabs>
