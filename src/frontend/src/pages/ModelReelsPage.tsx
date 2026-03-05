@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useAuthorClubName,
   useGetAllPosts,
   useGetProfile,
   useLikePost,
@@ -41,6 +42,7 @@ function ModelReelAuthor({ author }: { author: Principal }) {
   const displayName =
     profile?.displayName ?? truncatePrincipal(author.toString());
   const avatarUrl = profile?.avatarUrl ?? "";
+  const clubName = useAuthorClubName(author.toString());
 
   return (
     <Link
@@ -57,20 +59,42 @@ function ModelReelAuthor({ author }: { author: Principal }) {
           {displayName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
-        {displayName}
-      </span>
-      {/* Purple MODEL badge */}
-      <span
-        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full tracking-wide"
-        style={{
-          background: "oklch(0.3 0.15 310 / 0.5)",
-          color: "oklch(0.82 0.2 310)",
-          border: "1px solid oklch(0.55 0.2 310 / 0.5)",
-        }}
-      >
-        MODEL
-      </span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
+            {displayName}
+          </span>
+          {/* Purple MODEL badge */}
+          <span
+            className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full tracking-wide"
+            style={{
+              background: "oklch(0.3 0.15 310 / 0.5)",
+              color: "oklch(0.82 0.2 310)",
+              border: "1px solid oklch(0.55 0.2 310 / 0.5)",
+            }}
+          >
+            MODEL
+          </span>
+        </div>
+        {clubName && (
+          <span
+            className="inline-flex items-center gap-0.5 font-bold italic tracking-widest uppercase leading-none"
+            style={{
+              fontSize: "9px",
+              background:
+                "linear-gradient(90deg, oklch(0.7 0.18 45), oklch(0.75 0.2 50))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            <span style={{ WebkitTextFillColor: "oklch(0.7 0.18 45)" }}>
+              ⚡
+            </span>
+            {clubName}
+          </span>
+        )}
+      </div>
     </Link>
   );
 }

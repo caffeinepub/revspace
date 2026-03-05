@@ -9,9 +9,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Principal } from "@icp-sdk/core/principal";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Car, CornerDownRight, Crown, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
 import { useActor } from "../hooks/useActor";
@@ -338,10 +339,20 @@ export function FeedPage() {
   const { data: livePosts, isLoading } = useGetAllPosts();
   const { actor: publicActor } = usePublicActor();
   const { actor: authActor } = useActor();
+  const qc = useQueryClient();
   // actorLoading is only true while BOTH actors are null (first load).
   // Once either resolves, we allow the feed to render.
   const actorLoading = !publicActor && !authActor;
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+
+  // When publicActor resolves, immediately refetch posts.
+  // This fixes the case where useGetAllPosts fired before publicActor was ready
+  // (returning [] from the "no actor" path) and never re-ran.
+  useEffect(() => {
+    if (publicActor) {
+      qc.invalidateQueries({ queryKey: ["posts"] });
+    }
+  }, [publicActor, qc]);
 
   // Use live posts if available, otherwise fall back to localStorage cache
   // so the feed is never blank while the actor is initializing after a deploy.

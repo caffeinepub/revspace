@@ -15,11 +15,23 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PostView } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useGetProfile, useLikePost, useUnlikePost } from "../hooks/useQueries";
+import {
+  useAuthorClubName,
+  useGetProfile,
+  useLikePost,
+  useUnlikePost,
+} from "../hooks/useQueries";
 import { hasReactionPack } from "../lib/customizations";
 import { awardLikeReceived } from "../lib/revbucks";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
 import { ProBadge } from "./ProBadge";
+
+// Safe unwrap for Motoko optional postType ([] | [string] or plain string)
+function safePostType(pt: unknown): string {
+  if (!pt) return "";
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
+  return String(pt);
+}
 
 const REACTION_EMOJIS = ["❤️", "🔥", "🏎️", "⚡", "🤙", "💨"] as const;
 type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
@@ -29,8 +41,8 @@ interface PostCardProps {
   onCommentClick?: (postId: string) => void;
 }
 
-function PostTypeBadge({ type }: { type: string }) {
-  const lower = type?.toLowerCase() ?? "";
+function PostTypeBadge({ type }: { type: unknown }) {
+  const lower = safePostType(type);
   if (lower === "photo") return null;
   const colors: Record<string, string> = {
     video: "bg-blue-500/20 text-blue-400 border-blue-500/30",
@@ -40,7 +52,7 @@ function PostTypeBadge({ type }: { type: string }) {
     <span
       className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colors[lower] ?? "badge-orange"}`}
     >
-      {type}
+      {lower}
     </span>
   );
 }
@@ -53,6 +65,12 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const { data: profile, isLoading: profileLoading } = useGetProfile(
     post.author,
   );
+
+  // useAuthorClubName is called at the top level (required by Rules of Hooks)
+  // It reads from the live clubs data in React Query, so it works for ANY user —
+  // not just the current user like getUserClub(localStorage) does.
+  const clubName = useAuthorClubName(authorKey);
+
   const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
   const avatarUrl = profile?.avatarUrl ?? "";
 
@@ -187,8 +205,8 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const handleLike = handleLikeButtonClick;
 
   const isVideoPost =
-    post.postType?.toLowerCase() === "video" ||
-    post.postType?.toLowerCase() === "reel";
+    safePostType(post.postType) === "video" ||
+    safePostType(post.postType) === "reel";
 
   const handleShare = async () => {
     const shareUrl = `https://revspace-2ah.caffeine.xyz/#post-${post.id}`;
@@ -198,7 +216,7 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
         : post.content
       : "Check this out on RevSpace";
 
-    const isPhoto = post.postType?.toLowerCase() === "photo";
+    const isPhoto = safePostType(post.postType) === "photo";
     const imageUrl = post.mediaUrls[0];
 
     if (navigator.share) {
@@ -277,13 +295,35 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
             )}
           </Avatar>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {profileLoading ? (
                 <Skeleton className="w-24 h-3" />
               ) : (
-                <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
-                  {displayName}
-                </span>
+                <>
+                  <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
+                    {displayName}
+                  </span>
+                  {clubName ? (
+                    <span
+                      className="inline-flex items-center gap-0.5 font-bold italic tracking-widest uppercase leading-none"
+                      style={{
+                        fontSize: "9px",
+                        background:
+                          "linear-gradient(90deg, oklch(0.7 0.18 45), oklch(0.75 0.2 50))",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}
+                    >
+                      <span
+                        style={{ WebkitTextFillColor: "oklch(0.7 0.18 45)" }}
+                      >
+                        ⚡
+                      </span>
+                      {clubName}
+                    </span>
+                  ) : null}
+                </>
               )}
               {!profileLoading && authorKey === myPrincipal && <ProBadge />}
               <PostTypeBadge type={post.postType} />

@@ -24,10 +24,59 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllClubs,
   useCreateClub,
+  useGetProfile,
   useJoinClub,
   useLeaveClub,
 } from "../hooks/useQueries";
 import { clearUserClub, setUserClub } from "../lib/customizations";
+import { truncatePrincipal } from "../utils/format";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Principal } from "@icp-sdk/core/principal";
+
+// ─── ClubMemberRow ────────────────────────────────────────────────────────────
+function ClubMemberRow({
+  member,
+  clubName,
+}: { member: Principal; clubName: string }) {
+  const { data: profile } = useGetProfile(member);
+  const displayName =
+    profile?.displayName ?? truncatePrincipal(member.toString());
+  const avatarUrl = profile?.avatarUrl ?? "";
+
+  return (
+    <div className="flex items-center gap-2 py-1.5">
+      <Avatar className="w-7 h-7 shrink-0">
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+        <AvatarFallback
+          className="text-[10px]"
+          style={{ background: "oklch(var(--surface-elevated))" }}
+        >
+          {displayName.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-xs font-semibold text-foreground truncate">
+          {displayName}
+        </span>
+        <span
+          className="inline-flex items-center gap-0.5 font-bold italic tracking-widest uppercase leading-none"
+          style={{
+            fontSize: "8px",
+            background:
+              "linear-gradient(90deg, oklch(0.7 0.18 45), oklch(0.75 0.2 50))",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          <span style={{ WebkitTextFillColor: "oklch(0.7 0.18 45)" }}>⚡</span>
+          {clubName}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 const CLUB_CATEGORIES = [
   "JDM",
@@ -156,6 +205,35 @@ function ClubDetailModal({
           <p className="text-sm text-foreground leading-relaxed">
             {club.description}
           </p>
+
+          {/* Members list with club tags */}
+          {club.members.length > 0 && (
+            <div
+              className="rounded-xl p-3 max-h-40 overflow-y-auto"
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                border: "1px solid oklch(var(--border))",
+              }}
+            >
+              <p className="text-[10px] font-semibold text-steel uppercase tracking-wider mb-2">
+                Members
+              </p>
+              <div className="divide-y divide-border/40">
+                {club.members.slice(0, 20).map((m) => (
+                  <ClubMemberRow
+                    key={m.toString()}
+                    member={m}
+                    clubName={club.name}
+                  />
+                ))}
+                {club.members.length > 20 && (
+                  <p className="text-[10px] text-steel pt-1.5">
+                    +{club.members.length - 20} more
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <Button

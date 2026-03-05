@@ -26,6 +26,7 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePublicActor } from "../hooks/usePublicActor";
 import {
   useAddComment,
+  useAuthorClubName,
   useDeletePost,
   useGetAllPosts,
   useGetComments,
@@ -34,6 +35,13 @@ import {
   useUnlikePost,
 } from "../hooks/useQueries";
 import { timeAgo, truncatePrincipal } from "../utils/format";
+
+// Safe unwrap for Motoko optional postType ([] | [string] or plain string)
+function safePostType(pt: unknown): string {
+  if (!pt) return "";
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
+  return String(pt);
+}
 
 // ─── CommentAuthorRow ─────────────────────────────────────────────────────────
 function CommentAuthorRow({ author }: { author: Principal }) {
@@ -222,6 +230,7 @@ interface ReelAuthorInfoProps {
 function ReelAuthorInfo({ authorPrincipal, myPrincipal }: ReelAuthorInfoProps) {
   const { data: profile, isLoading } = useGetProfile(authorPrincipal);
   const authorKey = authorPrincipal.toString();
+  const clubName = useAuthorClubName(authorKey);
 
   if (isLoading) {
     return (
@@ -259,10 +268,30 @@ function ReelAuthorInfo({ authorPrincipal, myPrincipal }: ReelAuthorInfoProps) {
           {displayName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <p className="text-white text-sm font-semibold flex items-center gap-1.5 group-hover:underline underline-offset-2">
-        {displayName}
-        {authorKey === myPrincipal && <ProBadge />}
-      </p>
+      <div className="flex flex-col gap-0.5">
+        <p className="text-white text-sm font-semibold flex items-center gap-1.5 group-hover:underline underline-offset-2">
+          {displayName}
+          {authorKey === myPrincipal && <ProBadge />}
+        </p>
+        {clubName && (
+          <span
+            className="inline-flex items-center gap-0.5 font-bold italic tracking-widest uppercase leading-none"
+            style={{
+              fontSize: "9px",
+              background:
+                "linear-gradient(90deg, oklch(0.7 0.18 45), oklch(0.75 0.2 50))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            <span style={{ WebkitTextFillColor: "oklch(0.7 0.18 45)" }}>
+              ⚡
+            </span>
+            {clubName}
+          </span>
+        )}
+      </div>
     </Link>
   );
 }
@@ -300,9 +329,9 @@ function ReelMedia({
     );
   }
 
-  // Case-insensitive check so backend lowercase "reel"/"video" values render as video
-  const isVideoType =
-    postType?.toLowerCase() === "reel" || postType?.toLowerCase() === "video";
+  // Use safePostType to handle Motoko optional array wrapping
+  const normalizedType = safePostType(postType);
+  const isVideoType = normalizedType === "reel" || normalizedType === "video";
 
   if (isVideoType) {
     if (videoError) {
@@ -404,13 +433,12 @@ export function ReelsPage() {
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
-  // Only show Reel and Video posts — not Photos — on the Reels page
-  // Use case-insensitive comparison since backend may return lowercase "reel"/"video"
-  const allPosts = (posts ?? []).filter(
-    (p) =>
-      p.postType?.toLowerCase() === "reel" ||
-      p.postType?.toLowerCase() === "video",
-  );
+  // Only show Reel and Video posts — not Photos — on the Reels page.
+  // Use safePostType to handle Motoko optional arrays ([] | [string]) correctly.
+  const allPosts = (posts ?? []).filter((p) => {
+    const t = safePostType(p.postType);
+    return t === "reel" || t === "video";
+  });
   const displayPosts =
     selectedTopic === "All"
       ? allPosts
@@ -543,7 +571,7 @@ export function ReelsPage() {
 
     // Reels/videos: skip file attachment (too large and often rejected by Web Share API)
     // Photos: attempt to attach the image so share sheets show a preview
-    const isPhoto = post.postType?.toLowerCase() === "photo";
+    const isPhoto = safePostType(post.postType) === "photo";
     const imageUrl = post.mediaUrls[0];
 
     if (navigator.share) {

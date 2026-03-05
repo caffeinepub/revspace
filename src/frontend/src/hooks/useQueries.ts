@@ -242,7 +242,8 @@ export function useGetAllPosts() {
     // When actor becomes available, refetch to get live data
     refetchInterval: !actor ? 2_000 : false,
     refetchIntervalInBackground: false,
-    retry: 3,
+    refetchOnWindowFocus: true,
+    retry: 5,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     // Pre-populate from localStorage cache so content shows instantly
     initialData: (): AllPostsResult | undefined => {
@@ -270,10 +271,15 @@ export function useGetPostsByUser(user: Principal | undefined) {
       if (!actor || !user) return [];
       return actor.getPostsByUser(user);
     },
-    enabled: !!actor && !!user,
+    // Always enabled so the query can be served from cache immediately.
+    // When actor isn't ready yet, refetchInterval kicks in and retries every 2s.
+    enabled: !!user,
     staleTime: 5_000,
     refetchOnMount: true,
-    retry: 3,
+    // Auto-retry until actor is available — same pattern as useGetAllPosts
+    refetchInterval: !actor ? 2_000 : false,
+    refetchIntervalInBackground: false,
+    retry: 5,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
@@ -436,15 +442,10 @@ export function useMyProfile() {
       // Try to fetch from backend — wrap in try/catch so any backend error
       // (e.g. "Unauthorized" during cold-start race) still falls back to cache
       try {
-        const raw = await actor.getMyProfile();
-        if (raw) {
-          backendProfile = {
-            displayName: (raw as any).displayName ?? "",
-            bio: (raw as any).bio ?? "",
-            avatarUrl: (raw as any).avatarUrl ?? "",
-            bannerUrl: (raw as any).bannerUrl ?? "",
-            location: (raw as any).location ?? "",
-          };
+        const rawMyProfile = await actor.getMyProfile();
+        const unwrapped = unwrapOptionalProfile(rawMyProfile);
+        if (unwrapped) {
+          backendProfile = unwrapped;
         }
       } catch {
         // Backend threw (cold-start / not-registered / network) — fall through to cache
@@ -551,6 +552,30 @@ export function useMyProfile() {
   });
 }
 
+// Safe unwrap for Motoko optional that comes back as [] | [Profile]
+// The ICP JS agent sometimes returns Motoko optionals as a 1-element array
+// instead of unwrapping them, which causes `profile.displayName` to render
+// as "[object Object]" when the entire object is array-wrapped.
+function unwrapOptionalProfile(raw: unknown): {
+  displayName: string;
+  bio: string;
+  avatarUrl: string;
+  bannerUrl: string;
+  location: string;
+} | null {
+  if (!raw) return null;
+  const item = Array.isArray(raw) ? raw[0] : raw;
+  if (!item || typeof item !== "object") return null;
+  const p = item as Record<string, unknown>;
+  return {
+    displayName: typeof p.displayName === "string" ? p.displayName : "",
+    bio: typeof p.bio === "string" ? p.bio : "",
+    avatarUrl: typeof p.avatarUrl === "string" ? p.avatarUrl : "",
+    bannerUrl: typeof p.bannerUrl === "string" ? p.bannerUrl : "",
+    location: typeof p.location === "string" ? p.location : "",
+  };
+}
+
 export function useGetProfile(user: Principal | undefined) {
   // getProfile is a public read — use publicActor as primary so it always fires
   // even if useActor's auth init throws after a fresh deploy.
@@ -561,7 +586,8 @@ export function useGetProfile(user: Principal | undefined) {
     queryKey: ["profile", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return null;
-      return actor.getProfile(user);
+      const raw = await actor.getProfile(user);
+      return unwrapOptionalProfile(raw);
     },
     enabled: !!actor && !!user,
     staleTime: 30_000,
@@ -977,6 +1003,25 @@ export function useCreateClub() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clubs"] }),
   });
+}
+
+/**
+ * Returns the name of the club that the given principal belongs to, or null.
+ * Derives membership by scanning all clubs for a member entry matching the principal.
+ * This works for any user (not just the viewing user), so it can be shown on
+ * reel author rows, club member lists, etc.
+ */
+export function useAuthorClubName(
+  principalStr: string | undefined,
+): string | null {
+  const { data: clubs } = useAllClubs();
+  if (!principalStr || !clubs) return null;
+  for (const club of clubs) {
+    if (club.members.some((m) => m.toString() === principalStr)) {
+      return club.name;
+    }
+  }
+  return null;
 }
 
 // ========================

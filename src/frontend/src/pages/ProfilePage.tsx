@@ -34,6 +34,15 @@ import { getGiftSummary } from "../lib/revbucks";
 import { getDisplayLocation } from "../lib/userMeta";
 import { getInitials, truncatePrincipal } from "../utils/format";
 
+// Safe helper: Motoko postType can come back as [] | [string] when the
+// backend returns an optional. Unwrap it to a plain string so .toLowerCase()
+// works reliably and videos/reels show in the profile grid.
+function safePostType(pt: unknown): string {
+  if (!pt) return "";
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
+  return String(pt);
+}
+
 export function ProfilePage() {
   const { identity, clear } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal();
@@ -361,8 +370,8 @@ export function ProfilePage() {
                       setSelectedMedia({
                         url: post.mediaUrls[0],
                         type:
-                          post.postType?.toLowerCase() === "video" ||
-                          post.postType?.toLowerCase() === "reel"
+                          safePostType(post.postType) === "video" ||
+                          safePostType(post.postType) === "reel"
                             ? "video"
                             : "image",
                       });
@@ -370,8 +379,8 @@ export function ProfilePage() {
                   }}
                 >
                   {post.mediaUrls[0] ? (
-                    post.postType?.toLowerCase() === "video" ||
-                    post.postType?.toLowerCase() === "reel" ? (
+                    safePostType(post.postType) === "video" ||
+                    safePostType(post.postType) === "reel" ? (
                       <video
                         src={post.mediaUrls[0]}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

@@ -23,6 +23,7 @@ import { FollowListModal } from "../components/FollowListModal";
 import { FriendBadge } from "../components/FriendBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useAuthorClubName,
   useFollowUser,
   useGarageByUser,
   useGetFollowers,
@@ -32,10 +33,17 @@ import {
   useIsFollowing,
   useUnfollowUser,
 } from "../hooks/useQueries";
-import { getUserClub, getUserFlair } from "../lib/customizations";
+import { getUserFlair } from "../lib/customizations";
 import { getGiftSummary } from "../lib/revbucks";
 import { getDisplayLocation } from "../lib/userMeta";
 import { getInitials, truncatePrincipal } from "../utils/format";
+
+// Safe unwrap for Motoko optional postType ([] | [string] or plain string)
+function safePostType(pt: unknown): string {
+  if (!pt) return "";
+  if (Array.isArray(pt)) return String((pt[0] as string) ?? "");
+  return String(pt);
+}
 
 interface UserProfilePageProps {
   userId: string;
@@ -81,7 +89,9 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
   const bio = profile?.bio ?? "";
   const location = getDisplayLocation(profile?.location ?? "");
   const userFlair = getUserFlair(userId);
-  const userClub = getUserClub(userId);
+  // useAuthorClubName reads from live backend data — works for any user, not
+  // just the logged-in user like getUserClub(localStorage) does.
+  const userClub = useAuthorClubName(userId);
 
   const displayPosts = posts ?? [];
   const displayGarage = garage ?? [];
@@ -406,8 +416,8 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
                   style={{ borderRadius: "4px" }}
                 >
                   {post.mediaUrls[0] ? (
-                    post.postType?.toLowerCase() === "video" ||
-                    post.postType?.toLowerCase() === "reel" ? (
+                    safePostType(post.postType) === "video" ||
+                    safePostType(post.postType) === "reel" ? (
                       <video
                         src={post.mediaUrls[0]}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
