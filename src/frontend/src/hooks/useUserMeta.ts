@@ -4,13 +4,20 @@
  *
  * This is the single source of truth for RevBucks balance, Pro status, and
  * Model account status after the on-chain persistence migration.
+ *
+ * Auto-restoration: whenever the on-chain profile is loaded, Pro status and
+ * RevBucks balance are written back to localStorage so that cache clears
+ * are healed automatically on the next login.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { setUserPro } from "../lib/pro";
+import { addBalance, getBalance } from "../lib/revbucks";
 import {
   type UserMetaData,
   decodeMetaFromLocation,
   encodeMetaToLocation,
 } from "../lib/userMeta";
+import { useInternetIdentity } from "./useInternetIdentity";
 import { useMyProfile, useUpdateProfile } from "./useQueries";
 
 const DEFAULT_META: UserMetaData = {
@@ -24,13 +31,51 @@ const DEFAULT_META: UserMetaData = {
   loc: "",
 };
 
+// Track which principals have already had their localStorage restored this session
+const restoredThisSession = new Set<string>();
+
 export function useUserMeta() {
   const { data: profile, isLoading } = useMyProfile();
   const updateProfile = useUpdateProfile();
+  const { identity } = useInternetIdentity();
+  const principalId = identity?.getPrincipal().toString() ?? "";
+  const restoredRef = useRef(false);
 
   const meta: UserMetaData = profile
     ? decodeMetaFromLocation(profile.location ?? "")
     : { ...DEFAULT_META };
+
+  // ── Auto-restore localStorage from on-chain data ─────────────────────────
+  // When profile loads, if the on-chain data has Pro=true or RB > localStorage,
+  // restore those values immediately. This heals cache clears on next login.
+  useEffect(() => {
+    if (!profile || !principalId || restoredRef.current) return;
+    if (restoredThisSession.has(principalId)) return;
+
+    restoredThisSession.add(principalId);
+    restoredRef.current = true;
+
+    try {
+      const onChainMeta = decodeMetaFromLocation(profile.location ?? "");
+
+      // Restore Pro status
+      if (onChainMeta.isPro) {
+        setUserPro();
+      }
+
+      // Restore RevBucks — always set to on-chain value if on-chain > local
+      // After a cache clear, local = 0, so this restores the full balance.
+      if (onChainMeta.rb > 0) {
+        const localBalance = getBalance(principalId);
+        if (onChainMeta.rb > localBalance) {
+          const diff = onChainMeta.rb - localBalance;
+          addBalance(principalId, diff);
+        }
+      }
+    } catch {
+      // best-effort — never block anything
+    }
+  }, [profile, principalId]);
 
   /**
    * Merge `updates` into the current meta and persist to on-chain profile.
@@ -60,7 +105,7 @@ export function useUserMeta() {
    * rejects after all attempts are exhausted.
    */
   const saveMetaWithRetry = useCallback(
-    async (updates: Partial<UserMetaData>, maxAttempts = 10): Promise<void> => {
+    async (updates: Partial<UserMetaData>, maxAttempts = 15): Promise<void> => {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           await saveMeta(updates);

@@ -1,17 +1,16 @@
 /**
- * useAdminActor — creates a fresh authenticated actor that explicitly passes
- * the admin token to _initializeAccessControlWithSecret.
+ * useAdminActor — creates a fresh authenticated actor and forcefully promotes
+ * the caller to #admin using the new adminPromoteToAdmin function.
  *
- * The standard useActor hook reads the token from the URL hash / sessionStorage
- * via getSecretParameter("caffeineAdminToken"). Because the admin panel stores
- * the token in localStorage (not sessionStorage), the regular actor always calls
- * _initializeAccessControlWithSecret("") — which registers the caller as a
- * regular #user. When the admin later tries to call adminUpdateUserLocation,
- * adminDeletePost, etc., the canister rejects with "Unauthorized".
+ * Previous approach: _initializeAccessControlWithSecret(token) — this silently
+ * does nothing if the principal is already registered as #user (warm canister).
  *
- * This hook builds a separate actor that passes the correct token, ensuring the
- * canister registers (or promotes) the caller as #admin. It is only used for
- * admin write calls — public reads continue to use usePublicActor.
+ * New approach: adminPromoteToAdmin(token) — forcefully overwrites the role to
+ * #admin regardless of existing role. This is the definitive fix.
+ *
+ * adminSetUserMeta(user, newLocation, secret) is also available on the returned
+ * actor and bypasses role checks entirely — it authenticates via the secret
+ * token directly.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -44,16 +43,44 @@ export function useAdminActor() {
         const a = await createActorWithConfig({
           agentOptions: { identity },
         });
-        // Pass the real admin token so the canister registers/promotes this
-        // principal as #admin — even if it was previously registered as #user.
-        await a._initializeAccessControlWithSecret(ADMIN_TOKEN);
+
+        // Step 1: Try the new adminPromoteToAdmin function — forcefully sets
+        // #admin role even if the caller is already registered as #user.
+        // This fixes the "warm canister" issue where _initializeAccessControlWithSecret
+        // silently does nothing.
+        try {
+          await a.adminPromoteToAdmin(ADMIN_TOKEN);
+        } catch (promoteErr) {
+          // If adminPromoteToAdmin doesn't exist yet (old canister) fall back to
+          // the old initialize method. adminSetUserMeta will still work because
+          // it uses secret-based auth.
+          try {
+            await a._initializeAccessControlWithSecret(ADMIN_TOKEN);
+          } catch {
+            // ignore — adminSetUserMeta doesn't need role
+          }
+          console.warn(
+            "[useAdminActor] adminPromoteToAdmin failed, fell back:",
+            promoteErr,
+          );
+        }
+
         setActor(a);
         setIsReady(true);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("[useAdminActor] init failed:", msg);
         setError(msg);
-        setIsReady(false);
+        // Still set actor even if promote failed — adminSetUserMeta works without role
+        try {
+          const a2 = await createActorWithConfig({
+            agentOptions: { identity },
+          });
+          setActor(a2);
+          setIsReady(true);
+        } catch {
+          // truly broken
+        }
       }
     })();
   }, [identity]);

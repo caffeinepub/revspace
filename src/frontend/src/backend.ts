@@ -218,6 +218,8 @@ export interface backendInterface {
     adminDeleteProfile(user: Principal): Promise<void>;
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
+    adminPromoteToAdmin(secret: string): Promise<void>;
+    adminSetUserMeta(user: Principal, newLocation: string, secret: string): Promise<void>;
     adminUnbanUser(user: Principal): Promise<void>;
     adminUpdateUserLocation(user: Principal, newLocation: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -508,6 +510,34 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.adminGetAllUsers();
             return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async adminPromoteToAdmin(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminPromoteToAdmin(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminPromoteToAdmin(arg0);
+            return result;
+        }
+    }
+    async adminSetUserMeta(arg0: Principal, arg1: string, arg2: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminSetUserMeta(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminSetUserMeta(arg0, arg1, arg2);
+            return result;
         }
     }
     async adminUnbanUser(arg0: Principal): Promise<void> {

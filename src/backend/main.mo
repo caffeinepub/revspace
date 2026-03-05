@@ -235,6 +235,12 @@ actor {
   let follows = Map.empty<Principal, Set.Set<Principal>>();
   let followers = Map.empty<Principal, Set.Set<Principal>>();
 
+  // Add new field for tracking admin token usage
+  var adminAssigned : Bool = false;
+
+  // Hardcoded admin secret token
+  let ADMIN_SECRET : Text = "Meonly123$";
+
   // -----------------------------------
   // Utils
   // -----------------------------------
@@ -244,9 +250,48 @@ actor {
   };
 
   // -----------------------------------
+  // NEW FUNCTIONS PER CHANGE REQUEST
+  // -----------------------------------
+
+  // New admin-only function to promote caller to admin using secret token
+  public shared ({ caller }) func adminPromoteToAdmin(secret : Text) : async () {
+    if (secret != ADMIN_SECRET) {
+      Runtime.trap("Unauthorized: Incorrect token");
+    };
+    AccessControl.assignRole(accessControlState, caller, caller, #admin);
+    adminAssigned := true;
+  };
+
+  // New admin-only function to update user's location field using secret token
+  public shared ({ caller }) func adminSetUserMeta(user : Principal, newLocation : Text, secret : Text) : async () {
+    if (secret != ADMIN_SECRET) {
+      Runtime.trap("Unauthorized: Incorrect token");
+    };
+
+    switch (profiles.get(user)) {
+      case (null) {
+        // Create minimal profile with only location field
+        let profile : Types.Profile = {
+          displayName = "";
+          bio = "";
+          avatarUrl = "";
+          location = newLocation;
+          bannerUrl = "";
+        };
+        profiles.add(user, profile);
+      };
+      case (?existingProfile) {
+        let updatedProfile = {
+          existingProfile with location = newLocation
+        };
+        profiles.add(user, updatedProfile);
+      };
+    };
+  };
+
+  // -----------------------------------
   // ADMIN FUNCTIONS
   // -----------------------------------
-  // Returns array of {principal, role} for every registered user
   public query ({ caller }) func adminGetAllUsers() : async [Types.UserWithRole] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -267,7 +312,6 @@ actor {
     );
   };
 
-  // Return array of {principal, Profile} for all profiles
   public query ({ caller }) func adminGetAllProfiles() : async [Types.ProfileWithPrincipal] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -283,7 +327,6 @@ actor {
     );
   };
 
-  // Delete profile by principal
   public shared ({ caller }) func adminDeleteProfile(user : Principal) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -294,7 +337,6 @@ actor {
     profiles.remove(user);
   };
 
-  // Delete any post by ID (admin bypass)
   public shared ({ caller }) func adminDeletePost(postId : Text) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -307,7 +349,6 @@ actor {
     };
   };
 
-  // Delete any listing by ID (admin bypass)
   public shared ({ caller }) func adminDeleteListing(listingId : Text) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -320,7 +361,6 @@ actor {
     };
   };
 
-  // Ban user by demoting them to guest
   public shared ({ caller }) func adminBanUser(user : Principal) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -335,7 +375,6 @@ actor {
     };
   };
 
-  // Unban/restores banned user back to user role
   public shared ({ caller }) func adminUnbanUser(user : Principal) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -350,7 +389,6 @@ actor {
     };
   };
 
-  // Admin-only function to update user's location field
   public shared ({ caller }) func adminUpdateUserLocation(user : Principal, newLocation : Text) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -433,7 +471,6 @@ actor {
     };
   };
 
-  // Updated addComment (parentCommentId is now null for top-level comments)
   public shared ({ caller }) func addComment(postId : Text, content : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can comment on posts");
@@ -445,7 +482,7 @@ actor {
       content;
       postId;
       timestamp = Time.now();
-      parentCommentId = null; // Top-level comment (no parent)
+      parentCommentId = null;
     };
     comments.add(id, comment);
     switch (posts.get(postId)) {
@@ -461,7 +498,6 @@ actor {
     id;
   };
 
-  // New function: addCommentReply
   public shared ({ caller }) func addCommentReply(postId : Text, parentCommentId : Text, content : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can reply to comments");
@@ -486,7 +522,7 @@ actor {
         comments.add(id, comment);
 
         switch (posts.get(postId)) {
-          case (null) {}; // Should not happen, already checked
+          case (null) {};
           case (?post) {
             post.comments.add(id);
             posts.add(postId, post);
@@ -501,7 +537,6 @@ actor {
     };
   };
 
-  // New function: getRepliesToComment
   public query ({ caller }) func getRepliesToComment(commentId : Text) : async [Types.Comment] {
     return comments.values().toArray().filter(
       func(c) { c.parentCommentId == ?commentId }
@@ -540,6 +575,9 @@ actor {
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?Types.Profile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     profiles.get(caller);
   };
 
@@ -562,6 +600,9 @@ actor {
   };
 
   public query ({ caller }) func getMyProfile() : async ?Types.Profile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     profiles.get(caller);
   };
 
@@ -593,6 +634,9 @@ actor {
   };
 
   public query ({ caller }) func getMyGarage() : async [Types.Car] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view garage");
+    };
     cars.values().toArray().filter(
       func(c) { c.owner == caller }
     );
@@ -684,7 +728,6 @@ actor {
     };
   };
 
-  // New Function: Delete Event (only by creator or admin)
   public shared ({ caller }) func deleteEvent(eventId : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can delete events");
@@ -700,7 +743,6 @@ actor {
     };
   };
 
-  // New Function: Add Photo to Event
   public shared ({ caller }) func addEventPhoto(eventId : Text, photoUrl : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can add event photos");
@@ -714,7 +756,6 @@ actor {
     };
   };
 
-  // New Function: Get Event Photos
   public query ({ caller }) func getEventPhotos(eventId : Text) : async [Text] {
     switch (events.get(eventId)) {
       case (null) { [] };
@@ -883,14 +924,14 @@ actor {
       Runtime.trap("Unauthorized: Only users can unfollow others");
     };
     switch (follows.get(caller)) {
-      case (null) { /* No-op: not following anyone */ };
+      case (null) {  };
       case (?followingList) {
         followingList.remove(user);
       };
     };
 
     switch (followers.get(user)) {
-      case (null) { /* No-op: user has no followers */ };
+      case (null) {  };
       case (?followersList) {
         followersList.remove(caller);
       };
@@ -1033,4 +1074,3 @@ actor {
     );
   };
 };
-

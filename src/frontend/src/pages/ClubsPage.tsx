@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Users } from "lucide-react";
+import { Link, Loader2, Plus, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { ClubView } from "../backend.d";
@@ -123,9 +123,35 @@ function ClubDetailModal({
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-steel">
-            <Users size={14} className="text-orange" />
-            <span>{club.members.length} members</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-steel">
+              <Users size={14} className="text-orange" />
+              <span>{club.members.length} members</span>
+            </div>
+            <button
+              type="button"
+              data-ocid="club_detail.invite.button"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors"
+              style={{
+                background: "oklch(var(--surface-elevated))",
+                border: "1px solid oklch(var(--border))",
+                color: "oklch(var(--foreground))",
+              }}
+              onClick={() => {
+                const url = `${window.location.origin}/?joinClub=${club.id}`;
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => {
+                    toast.success("Invite link copied!");
+                  })
+                  .catch(() => {
+                    toast.error("Could not copy link");
+                  });
+              }}
+            >
+              <Link size={12} />
+              Copy Invite Link
+            </button>
           </div>
           <p className="text-sm text-foreground leading-relaxed">
             {club.description}

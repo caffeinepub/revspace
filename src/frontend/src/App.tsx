@@ -15,6 +15,8 @@ import { BullBoostBanner, Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
 import { useDeployGuard } from "./hooks/useDeployGuard";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { useAllClubs, useJoinClub } from "./hooks/useQueries";
+import { setUserClub } from "./lib/customizations";
 import { setFriendOfCreator } from "./lib/friendBadge";
 import { setUserPro } from "./lib/pro";
 
@@ -654,6 +656,83 @@ function FriendBadgeActivator() {
   return null;
 }
 
+function ClubInviteHandler() {
+  const { identity } = useInternetIdentity();
+  const joinClub = useJoinClub();
+  const { data: clubs } = useAllClubs();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clubId = params.get("joinClub");
+    if (!clubId) return;
+
+    if (!identity) {
+      // Store for after login
+      sessionStorage.setItem("rs_pending_club", clubId);
+      return;
+    }
+
+    const myPrincipal = identity.getPrincipal().toString();
+    const club = clubs?.find((c) => c.id === clubId);
+    const alreadyMember = club?.members.some(
+      (m) => m.toString() === myPrincipal,
+    );
+
+    if (alreadyMember) {
+      toast.info(`You're already a member of ${club?.name ?? "this club"}`);
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState(null, "", cleanUrl);
+      return;
+    }
+
+    joinClub.mutate(clubId, {
+      onSuccess: () => {
+        const clubName =
+          clubs?.find((c) => c.id === clubId)?.name ?? "the club";
+        setUserClub(myPrincipal, clubName);
+        toast.success(`Joined ${clubName} via invite link! 🔥`, {
+          duration: 5000,
+        });
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState(null, "", cleanUrl);
+      },
+      onError: () => {
+        toast.error("Failed to join club via invite link");
+      },
+    });
+  }, [identity, clubs, joinClub.mutate]);
+
+  // Handle pending club join after login
+  useEffect(() => {
+    if (!identity || !clubs) return;
+    const pendingClubId = sessionStorage.getItem("rs_pending_club");
+    if (!pendingClubId) return;
+
+    const myPrincipal = identity.getPrincipal().toString();
+    const club = clubs.find((c) => c.id === pendingClubId);
+    const alreadyMember = club?.members.some(
+      (m) => m.toString() === myPrincipal,
+    );
+
+    if (!alreadyMember) {
+      joinClub.mutate(pendingClubId, {
+        onSuccess: () => {
+          const clubName =
+            clubs.find((c) => c.id === pendingClubId)?.name ?? "the club";
+          setUserClub(myPrincipal, clubName);
+          toast.success(`Joined ${clubName} via invite link! 🔥`, {
+            duration: 5000,
+          });
+        },
+      });
+    }
+
+    sessionStorage.removeItem("rs_pending_club");
+  }, [identity, clubs, joinClub.mutate]);
+
+  return null;
+}
+
 function DeployGuard() {
   useDeployGuard();
   return null;
@@ -665,6 +744,7 @@ export default function App() {
       <DeployGuard />
       <ProSuccessHandler />
       <FriendBadgeActivator />
+      <ClubInviteHandler />
       <RouterProvider router={router} />
       <Toaster position="top-center" theme="dark" />
       <BullBoostBanner />

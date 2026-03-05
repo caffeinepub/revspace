@@ -1,48 +1,143 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage / Feed — import car community, car enthusiast feed -->
   <url>
-    <loc>https://revspace.app/</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+  <!-- Explore — car enthusiast posts, automotive content platform -->
   <url>
-    <loc>https://revspace.app/explore</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/explore</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
+  <!-- Reels — car reels, car video sharing platform -->
   <url>
-    <loc>https://revspace.app/reels</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/reels</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
+  <!-- Marketplace — car enthusiast marketplace, tuner parts marketplace -->
   <url>
-    <loc>https://revspace.app/marketplace</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/marketplace</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
+  <!-- Events — car meet finder, import car meets, JDM meets -->
   <url>
-    <loc>https://revspace.app/events</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/events</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <!-- Car Clubs — tuner car clubs, local car clubs, JDM car community -->
   <url>
-    <loc>https://revspace.app/clubs</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/clubs</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Garage — car garage profile, vehicle build log, car build tracker -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/garage</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Forum — car enthusiast forum, car modification community -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/forum</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Build Battle — car build community, custom car builds -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/build-battle</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
+  <!-- Mechanics — car modification ideas, performance car upgrades -->
   <url>
-    <loc>https://revspace.app/leaderboard</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/mechanics</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Leaderboard — car enthusiast network, automotive social network -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/leaderboard</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
+  <!-- Featured Car — car build showcase platform -->
   <url>
-    <loc>https://revspace.app/garage</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/featured</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
+  <!-- Model Reels — automotive creator platform, car content creator platform -->
   <url>
-    <loc>https://revspace.app/shop</loc>
+    <loc>https://revspace-2ah.caffeine.xyz/model-reels</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Model Gallery — car photo sharing community -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/model-gallery</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- RevBucks — automotive creator monetization -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/revbucks</loc>
+    <lastmod>2026-03-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+  <!-- Pro — automotive influencer platform, car content creator platform -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/pro</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Guide — car enthusiast app, best social media for car enthusiasts -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/guide</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- Performance Shop — aftermarket car parts builds, turbo build cars -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/shop</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- DynoOS — automotive project tracker, tune version control -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/dyno-os</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- About — car culture community, automotive social network -->
+  <url>
+    <loc>https://revspace-2ah.caffeine.xyz/about</loc>
+    <lastmod>2026-03-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>

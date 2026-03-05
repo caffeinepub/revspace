@@ -98,6 +98,57 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </p>
         )}
       </div>
+
+      {/* SEO landmark — visually hidden, fully crawlable */}
+      <section aria-label="About RevSpace" className="sr-only">
+        <h2>
+          The #1 Import Car Community &amp; JDM Car Enthusiast Social Network
+        </h2>
+        <p>
+          RevSpace is the best car enthusiast app for sharing car builds,
+          connecting with the import car community, and joining tuner car clubs.
+          Whether you build JDM cars, stance cars, turbo builds, drag build
+          cars, or track build cars — RevSpace is your home.
+        </p>
+        <h2>JDM Car Community Online</h2>
+        <p>
+          Join thousands of JDM car enthusiasts. Share JDM car builds, Japanese
+          import cars, JDM build showcases, modified Honda builds, turbo Honda
+          builds, Nissan tuner community builds, Subaru tuner community builds,
+          Toyota tuner community builds, Mitsubishi tuner community builds, and
+          Acura enthusiast community content.
+        </p>
+        <h2>Car Build Sharing App</h2>
+        <p>
+          RevSpace is the #1 car build sharing app with a car enthusiast feed,
+          car build timeline, car build profiles, and a car build tracker. Log
+          your vehicle build log, track your car modification tracker, manage
+          your car garage profile, and showcase your automotive project tracker.
+        </p>
+        <h2>Car Meet Finder &amp; Local Car Clubs</h2>
+        <p>
+          Find import car meets, JDM meets near me, tuner car clubs, local car
+          clubs, and performance car clubs. Connect with your car enthusiast
+          network, car enthusiast groups, street car community, and car culture
+          community all in one place.
+        </p>
+        <h2>Automotive Creator Platform</h2>
+        <p>
+          RevSpace is a car content creator platform and automotive influencer
+          platform. Share car reels, car photo sharing community posts, and car
+          video sharing platform content. Earn through the car enthusiast
+          marketplace, sell car parts community listings, tuner parts
+          marketplace, and automotive creator monetization tools.
+        </p>
+        <h2>Best Social Media for Car Enthusiasts</h2>
+        <p>
+          Looking for the best social media for car enthusiasts? RevSpace is the
+          online car build community, the platform for tuner cars, and the
+          website to show car builds. Share performance car upgrades, engine
+          swap builds, custom car builds, aftermarket car parts builds, stance
+          builds, and street racing builds with the modified car community.
+        </p>
+      </section>
     </div>
   );
 }

@@ -492,6 +492,47 @@ export function FeedPage() {
         )}
       </div>
 
+      {/* SEO landmark — visually hidden, crawlable by search engines */}
+      <section aria-label="RevSpace Community" className="sr-only">
+        <h2>Import Car Community &amp; JDM Car Enthusiast Social Network</h2>
+        <p>
+          RevSpace is the premier import car community, car enthusiast social
+          network, and JDM car community online. Join the automotive social
+          network built for modified car community members who love car builds,
+          tuner car community content, and car culture community connections.
+        </p>
+        <h2>Share Car Builds — Car Build Sharing App</h2>
+        <p>
+          The best car build sharing app for car enthusiast posts, car build
+          profiles, car build timeline tracking, and the car enthusiast feed.
+          Use the car build tracker, vehicle build log, car modification
+          tracker, and automotive project tracker to document every stage of
+          your build.
+        </p>
+        <h2>JDM Car Builds &amp; Tuner Car Community</h2>
+        <p>
+          Explore JDM car builds, Japanese import cars, JDM build showcase
+          content, modified Honda builds, turbo Honda builds, stance car builds,
+          and street build cars. Connect with the Honda tuner community, Nissan
+          tuner community, Subaru tuner community, Toyota tuner community,
+          Mitsubishi tuner community, and Acura enthusiast community.
+        </p>
+        <h2>Car Meet Finder &amp; Tuner Car Clubs</h2>
+        <p>
+          Find car meets, import car meets, and JDM meets near you. Join local
+          car clubs, tuner car clubs, performance car clubs, and car enthusiast
+          groups. Grow your car enthusiast network and street car community.
+        </p>
+        <h2>Automotive Creator Platform &amp; Marketplace</h2>
+        <p>
+          RevSpace is the automotive content platform for car reels, car video
+          sharing platform content, and car photo sharing community posts. Sell
+          through the car enthusiast marketplace and tuner parts marketplace.
+          Monetize as an automotive creator with automotive creator monetization
+          and automotive influencer platform tools.
+        </p>
+      </section>
+
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © 2026. Built with ❤️ using{" "}

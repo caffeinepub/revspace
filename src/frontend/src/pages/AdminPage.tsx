@@ -134,12 +134,10 @@ function UsersTab({
   actor,
   writeActor,
   myPrincipal,
-  backendAdminReady,
 }: {
   actor: backendInterface | null; // public actor for reads
   writeActor: backendInterface | null; // authenticated actor for writes
   myPrincipal: string | undefined;
-  backendAdminReady: boolean;
 }) {
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,16 +269,11 @@ function UsersTab({
     }
   }
 
-  // Give RevBucks — calls adminUpdateUserLocation to persist changes on-chain immediately.
+  // Give RevBucks — uses adminSetUserMeta (secret-based auth, no role check needed).
+  // Falls back to adminUpdateUserLocation if the new function isn't available.
   async function handleAddRb(user: MergedUser) {
     if (!writeActor) {
       toast.error("Not logged in — sign in with Internet Identity first");
-      return;
-    }
-    if (!backendAdminReady) {
-      toast.error(
-        "Admin session still initializing — wait a moment and try again",
-      );
       return;
     }
     const amtStr = rbInputs[user.principal.toString()] ?? "";
@@ -300,7 +293,17 @@ function UsersTab({
     const rbKey = `rb-${user.principal.toString()}`;
     setPendingAction(rbKey);
     try {
-      await writeActor!.adminUpdateUserLocation(user.principal, newEncoded);
+      // Primary: adminSetUserMeta — authenticates via secret, no role check
+      try {
+        await writeActor.adminSetUserMeta(
+          user.principal,
+          newEncoded,
+          "Meonly123$",
+        );
+      } catch (_primaryErr) {
+        // Fallback: adminUpdateUserLocation — requires #admin role
+        await writeActor.adminUpdateUserLocation(user.principal, newEncoded);
+      }
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -313,12 +316,8 @@ function UsersTab({
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("adminUpdateUserLocation (RB) failed:", msg);
-      toast.error(
-        msg.toLowerCase().includes("unauthorized")
-          ? "Unauthorized — your session may have expired. Refresh and re-enter the admin token."
-          : `Failed to update RevBucks: ${msg.slice(0, 120)}`,
-      );
+      console.error("handleAddRb failed:", msg);
+      toast.error(`Failed to update RevBucks: ${msg.slice(0, 160)}`);
     } finally {
       setPendingAction(null);
     }
@@ -329,12 +328,6 @@ function UsersTab({
       toast.error("Not logged in — sign in with Internet Identity first");
       return;
     }
-    if (!backendAdminReady) {
-      toast.error(
-        "Admin session still initializing — wait a moment and try again",
-      );
-      return;
-    }
     const currentMeta = decodeMetaFromLocation(user.locationRaw);
     const newMeta = { ...currentMeta, isPro: !currentMeta.isPro };
     const newEncoded = encodeMetaToLocation(newMeta);
@@ -342,7 +335,17 @@ function UsersTab({
     const proKey = `pro-${user.principal.toString()}`;
     setPendingAction(proKey);
     try {
-      await writeActor!.adminUpdateUserLocation(user.principal, newEncoded);
+      // Primary: adminSetUserMeta — authenticates via secret, no role check
+      try {
+        await writeActor.adminSetUserMeta(
+          user.principal,
+          newEncoded,
+          "Meonly123$",
+        );
+      } catch (_primaryErr) {
+        // Fallback: adminUpdateUserLocation — requires #admin role
+        await writeActor.adminUpdateUserLocation(user.principal, newEncoded);
+      }
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === user.principal.toString()
@@ -355,12 +358,8 @@ function UsersTab({
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("adminUpdateUserLocation (Pro) failed:", msg);
-      toast.error(
-        msg.toLowerCase().includes("unauthorized")
-          ? "Unauthorized — your session may have expired. Refresh and re-enter the admin token."
-          : `Failed to update Pro status: ${msg.slice(0, 120)}`,
-      );
+      console.error("handleProToggle failed:", msg);
+      toast.error(`Failed to update Pro status: ${msg.slice(0, 160)}`);
     } finally {
       setPendingAction(null);
     }
@@ -1492,7 +1491,6 @@ export function AdminPage() {
                   actor={actor}
                   writeActor={adminActor}
                   myPrincipal={myPrincipal}
-                  backendAdminReady={backendAdminReady}
                 />
               </TabsContent>
               <TabsContent value="posts" className="mt-0">

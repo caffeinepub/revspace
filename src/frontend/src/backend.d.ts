@@ -118,6 +118,8 @@ export interface backendInterface {
     adminDeleteProfile(user: Principal): Promise<void>;
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
+    adminPromoteToAdmin(secret: string): Promise<void>;
+    adminSetUserMeta(user: Principal, newLocation: string, secret: string): Promise<void>;
     adminUnbanUser(user: Principal): Promise<void>;
     adminUpdateUserLocation(user: Principal, newLocation: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;

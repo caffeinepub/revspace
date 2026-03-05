@@ -146,6 +146,8 @@ export interface _SERVICE {
   'adminDeleteProfile' : ActorMethod<[Principal], undefined>,
   'adminGetAllProfiles' : ActorMethod<[], Array<ProfileWithPrincipal>>,
   'adminGetAllUsers' : ActorMethod<[], Array<UserWithRole>>,
+  'adminPromoteToAdmin' : ActorMethod<[string], undefined>,
+  'adminSetUserMeta' : ActorMethod<[Principal, string, string], undefined>,
   'adminUnbanUser' : ActorMethod<[Principal], undefined>,
   'adminUpdateUserLocation' : ActorMethod<[Principal, string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
