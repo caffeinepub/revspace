@@ -12,7 +12,7 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Car, CornerDownRight, Crown, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
 import { useActor } from "../hooks/useActor";
@@ -344,6 +344,9 @@ export function FeedPage() {
   // Once either resolves, we allow the feed to render.
   const actorLoading = !publicActor && !authActor;
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const feedContainerRef = useRef<HTMLDivElement>(null);
+  const [visibleIndex, setVisibleIndex] = useState(0);
+  const [postCount, setPostCount] = useState(0);
 
   // When publicActor resolves, immediately refetch posts.
   // This fixes the case where useGetAllPosts fired before publicActor was ready
@@ -368,16 +371,47 @@ export function FeedPage() {
     Number(b.timestamp - a.timestamp),
   );
 
+  // Sync postCount state when displayPosts length changes so the observer re-runs.
+  useEffect(() => {
+    setPostCount(displayPosts.length);
+  }, [displayPosts.length]);
+
+  // Track which post is currently visible using IntersectionObserver.
+  // postCount is intentionally used only to trigger re-observation when posts are added.
+  useEffect(() => {
+    const container = feedContainerRef.current;
+    if (!container) return;
+    // Use postCount to confirm items exist before observing (avoids lint "unused dep" by reading it)
+    if (postCount === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idx = Number((entry.target as HTMLElement).dataset.index);
+            if (!Number.isNaN(idx)) setVisibleIndex(idx);
+          }
+        }
+      },
+      { root: container, threshold: 0.6 },
+    );
+
+    const items = container.querySelectorAll("[data-index]");
+    for (const item of items) observer.observe(item);
+
+    return () => observer.disconnect();
+  }, [postCount]);
+
   const memberCount =
     displayPosts.length > 0
       ? new Set(displayPosts.map((p) => p.author.toString())).size
       : null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* Header Banner */}
       <div
-        className="relative w-full h-[260px] md:h-[360px] overflow-hidden"
+        className="relative w-full h-[260px] md:h-[360px] overflow-hidden shrink-0"
         style={{
           background:
             "linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0d0d0d 100%)",
@@ -462,100 +496,128 @@ export function FeedPage() {
         </div>
       </div>
 
-      {/* Feed */}
-      <div className="space-y-0.5 py-2">
-        {/* Show skeletons only when loading AND no cached posts to show */}
-        {(isLoading || actorLoading) && displayPosts.length === 0
-          ? ["s1", "s2", "s3"].map((k) => <PostCardSkeleton key={k} />)
-          : displayPosts.map((post) => (
+      {/* Snap-scroll feed — one post per screen, newest first */}
+      {(isLoading || actorLoading) && displayPosts.length === 0 ? (
+        /* Single skeleton while loading */
+        <div
+          className="snap-start snap-always"
+          style={{ height: "100dvh", overflowY: "auto" }}
+          data-ocid="feed.loading_state"
+        >
+          <PostCardSkeleton />
+        </div>
+      ) : !isLoading && !actorLoading && displayPosts.length === 0 ? (
+        /* Empty state */
+        <div
+          className="flex flex-col items-center justify-center py-24 px-6 text-center"
+          data-ocid="feed.empty_state"
+        >
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: "oklch(var(--surface))" }}
+          >
+            <Car size={28} className="text-steel" />
+          </div>
+          <h3 className="font-display text-xl font-bold mb-2">No posts yet</h3>
+          <p className="text-steel text-sm mb-6">
+            Be the first to share your build with the RevSpace community.
+          </p>
+          <Link to="/create">
+            <Button
+              data-ocid="feed.primary_button"
+              style={{
+                background: "oklch(var(--orange))",
+                color: "oklch(var(--carbon))",
+              }}
+            >
+              Create First Post
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div
+          ref={feedContainerRef}
+          className="flex-1 overflow-y-scroll snap-y snap-mandatory"
+          style={{ scrollbarWidth: "none", height: "100dvh" }}
+        >
+          {displayPosts.map((post, index) => (
+            <div
+              key={post.id}
+              data-index={index}
+              data-ocid={`feed.item.${index + 1}`}
+              className="snap-start snap-always"
+              style={{ height: "100dvh", overflowY: "auto" }}
+            >
               <PostCard
-                key={post.id}
                 post={post}
                 onCommentClick={(id) => setCommentPostId(id)}
+                isVisible={index === visibleIndex}
               />
-            ))}
-
-        {!isLoading && !actorLoading && displayPosts.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: "oklch(var(--surface))" }}
-            >
-              <Car size={28} className="text-steel" />
             </div>
-            <h3 className="font-display text-xl font-bold mb-2">
-              No posts yet
-            </h3>
-            <p className="text-steel text-sm mb-6">
-              Be the first to share your build with the RevSpace community.
-            </p>
-            <Link to="/create">
-              <Button
-                style={{
-                  background: "oklch(var(--orange))",
-                  color: "oklch(var(--carbon))",
-                }}
+          ))}
+
+          {/* Footer inside scroll container so it appears after last post */}
+          <div className="snap-start snap-always" style={{ minHeight: "40vh" }}>
+            {/* SEO landmark — visually hidden, crawlable by search engines */}
+            <section aria-label="RevSpace Community" className="sr-only">
+              <h2>
+                Import Car Community &amp; JDM Car Enthusiast Social Network
+              </h2>
+              <p>
+                RevSpace is the premier import car community, car enthusiast
+                social network, and JDM car community online. Join the
+                automotive social network built for modified car community
+                members who love car builds, tuner car community content, and
+                car culture community connections.
+              </p>
+              <h2>Share Car Builds — Car Build Sharing App</h2>
+              <p>
+                The best car build sharing app for car enthusiast posts, car
+                build profiles, car build timeline tracking, and the car
+                enthusiast feed. Use the car build tracker, vehicle build log,
+                car modification tracker, and automotive project tracker to
+                document every stage of your build.
+              </p>
+              <h2>JDM Car Builds &amp; Tuner Car Community</h2>
+              <p>
+                Explore JDM car builds, Japanese import cars, JDM build showcase
+                content, modified Honda builds, turbo Honda builds, stance car
+                builds, and street build cars. Connect with the Honda tuner
+                community, Nissan tuner community, Subaru tuner community,
+                Toyota tuner community, Mitsubishi tuner community, and Acura
+                enthusiast community.
+              </p>
+              <h2>Car Meet Finder &amp; Tuner Car Clubs</h2>
+              <p>
+                Find car meets, import car meets, and JDM meets near you. Join
+                local car clubs, tuner car clubs, performance car clubs, and car
+                enthusiast groups. Grow your car enthusiast network and street
+                car community.
+              </p>
+              <h2>Automotive Creator Platform &amp; Marketplace</h2>
+              <p>
+                RevSpace is the automotive content platform for car reels, car
+                video sharing platform content, and car photo sharing community
+                posts. Sell through the car enthusiast marketplace and tuner
+                parts marketplace. Monetize as an automotive creator with
+                automotive creator monetization and automotive influencer
+                platform tools.
+              </p>
+            </section>
+            <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
+              © {new Date().getFullYear()}. Built with ❤️ using{" "}
+              <a
+                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange hover:underline"
               >
-                Create First Post
-              </Button>
-            </Link>
+                caffeine.ai
+              </a>
+            </footer>
           </div>
-        )}
-      </div>
-
-      {/* SEO landmark — visually hidden, crawlable by search engines */}
-      <section aria-label="RevSpace Community" className="sr-only">
-        <h2>Import Car Community &amp; JDM Car Enthusiast Social Network</h2>
-        <p>
-          RevSpace is the premier import car community, car enthusiast social
-          network, and JDM car community online. Join the automotive social
-          network built for modified car community members who love car builds,
-          tuner car community content, and car culture community connections.
-        </p>
-        <h2>Share Car Builds — Car Build Sharing App</h2>
-        <p>
-          The best car build sharing app for car enthusiast posts, car build
-          profiles, car build timeline tracking, and the car enthusiast feed.
-          Use the car build tracker, vehicle build log, car modification
-          tracker, and automotive project tracker to document every stage of
-          your build.
-        </p>
-        <h2>JDM Car Builds &amp; Tuner Car Community</h2>
-        <p>
-          Explore JDM car builds, Japanese import cars, JDM build showcase
-          content, modified Honda builds, turbo Honda builds, stance car builds,
-          and street build cars. Connect with the Honda tuner community, Nissan
-          tuner community, Subaru tuner community, Toyota tuner community,
-          Mitsubishi tuner community, and Acura enthusiast community.
-        </p>
-        <h2>Car Meet Finder &amp; Tuner Car Clubs</h2>
-        <p>
-          Find car meets, import car meets, and JDM meets near you. Join local
-          car clubs, tuner car clubs, performance car clubs, and car enthusiast
-          groups. Grow your car enthusiast network and street car community.
-        </p>
-        <h2>Automotive Creator Platform &amp; Marketplace</h2>
-        <p>
-          RevSpace is the automotive content platform for car reels, car video
-          sharing platform content, and car photo sharing community posts. Sell
-          through the car enthusiast marketplace and tuner parts marketplace.
-          Monetize as an automotive creator with automotive creator monetization
-          and automotive influencer platform tools.
-        </p>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
-        © 2026. Built with ❤️ using{" "}
-        <a
-          href="https://caffeine.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-orange hover:underline"
-        >
-          caffeine.ai
-        </a>
-      </footer>
+        </div>
+      )}
 
       {commentPostId && (
         <CommentsDialog

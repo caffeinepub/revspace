@@ -1,43 +1,37 @@
-# RevSpace — SEO Keywords Integration
+# RevSpace
 
 ## Current State
-- `index.html` has basic SEO meta tags: title, description, keywords (short list), Open Graph, Twitter Card, and two JSON-LD blocks (WebSite + Organization)
-- `sitemap.xml` covers 8 URLs, no lastmod dates
-- `robots.txt` is minimal
-- LoginScreen has no keyword-rich visible/hidden text for SEO crawlers
-- FeedPage and other pages have no per-page meta or keyword-rich content sections
+The Feed page renders all posts at once in a vertical list using `PostCard` components. Videos use `autoPlay` with `preload="none"` but all cards mount simultaneously, causing browsers to compete for network resources. Broken media shows broken image icons. Posts are sorted newest-first but all load together. The `PostCard` component handles its own video playback with a ref.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Comprehensive `<meta name="keywords">` tag in `index.html` covering all provided keyword categories
-- Keyword-rich `<meta name="description">` that naturally incorporates primary SEO terms
-- Updated `<title>` to include top-priority keywords
-- Updated Open Graph and Twitter Card descriptions with primary keywords
-- Enhanced JSON-LD with keywords array, same-as social links, and richer Organization schema
-- `SoftwareApplication` JSON-LD schema block for app-store style SEO
-- Hidden SEO landmark `<section>` in LoginScreen with h2/p tags containing keyword-rich copy (visually hidden via sr-only, but crawlable)
-- Additional sitemap entries for all built pages: `/forum`, `/build-battle`, `/featured`, `/revbucks`, `/pro`, `/guide`, `/about`, `/model-reels`, `/model-gallery`, `/mechanics`, `/dyno-os`
-- `lastmod` dates on all sitemap entries
+- Full-screen snap-scroll feed layout: one post fills the viewport at a time, users swipe/scroll to move between posts (CSS `scroll-snap` on a full-height container)
+- IntersectionObserver on each post card so videos only play when the post is 80%+ visible in the viewport; video is paused and `src` cleared when off-screen to free memory
+- Skeleton/placeholder shown while the visible post's media is loading
+- Error fallback UI for broken images (placeholder car silhouette) and broken videos (error message with retry)
 
 ### Modify
-- `<meta name="keywords">` — replace short existing list with the full comprehensive keyword set
-- `<meta name="description">` — rewrite to incorporate primary keyword phrases naturally
-- `<title>` — update to: "RevSpace — Import Car Community & JDM Car Enthusiast Social Network"
-- Open Graph title/description to match
-- Twitter Card title/description to match
-- JSON-LD WebSite description to incorporate keywords naturally
+- `FeedPage.tsx`: Replace the current `space-y-0.5` list with a full-viewport snap-scroll container. Each post takes `100dvh` (dynamic viewport height). Only render media for the currently visible post (virtualisation via IntersectionObserver).
+- `PostCard.tsx`: Add IntersectionObserver hook — when the card exits the viewport, pause video and set `src=""` to release the network connection. When it enters, restore `src` and play. Add image/video error state with a styled fallback.
+- Posts remain sorted newest-first (no change to sort logic).
 
 ### Remove
-- Nothing removed
+- `autoPlay` attribute on videos in the feed — replaced by IntersectionObserver-driven play/pause to prevent all videos autoplaying on mount.
 
 ## Implementation Plan
-1. Rewrite `index.html` head section:
-   - New title: "RevSpace — Import Car Community & JDM Car Enthusiast Social Network"
-   - New meta description (~160 chars) with primary keywords
-   - New meta keywords with full list from all categories
-   - Updated OG/Twitter tags
-   - Enhanced JSON-LD with keywords property and SoftwareApplication type
-2. Update `sitemap.xml` with all 19+ pages and `lastmod` for each
-3. Add visually-hidden SEO content block in `LoginScreen.tsx` with h2/p tags covering keyword categories (car community, JDM, tuner, build sharing, meets, marketplace, etc.)
-4. Add visually-hidden SEO content block in `FeedPage.tsx` for the homepage feed text
+1. Update `PostCard.tsx`:
+   - Accept an `isVisible` prop (boolean) from the parent feed
+   - When `isVisible` becomes false: pause video, clear `src` to drop network connection
+   - When `isVisible` becomes true: restore `src` from `post.mediaUrls[0]`, call `video.play()`
+   - Add `onError` image fallback (styled dark card with car icon + "Media unavailable")
+   - Add `onError` video fallback (same styled card + "Video unavailable" text)
+   - Remove `autoPlay` from `<video>` — playback driven by visibility
+
+2. Update `FeedPage.tsx`:
+   - Wrap the feed in a `h-[100dvh] overflow-y-scroll snap-y snap-mandatory` container
+   - Each post item: `h-[100dvh] snap-start snap-always flex flex-col`
+   - Use `IntersectionObserver` (threshold 0.8) to track which post index is currently visible
+   - Pass `isVisible={index === visibleIndex}` to each `PostCard`
+   - Keep the header banner above the snap container (sticky/fixed or as first snap section)
+   - Keep newest-first sort

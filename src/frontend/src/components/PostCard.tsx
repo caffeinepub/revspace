@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import {
   Bookmark,
+  Car,
   Heart,
   MessageCircle,
   MoreHorizontal,
@@ -39,6 +40,7 @@ type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 interface PostCardProps {
   post: PostView;
   onCommentClick?: (postId: string) => void;
+  isVisible?: boolean;
 }
 
 function PostTypeBadge({ type }: { type: unknown }) {
@@ -57,7 +59,7 @@ function PostTypeBadge({ type }: { type: unknown }) {
   );
 }
 
-export function PostCard({ post, onCommentClick }: PostCardProps) {
+export function PostCard({ post, onCommentClick, isVisible }: PostCardProps) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
   const authorKey = post.author.toString();
@@ -96,6 +98,9 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
   const [showPlayPauseHint, setShowPlayPauseHint] = useState<
     "play" | "pause" | null
   >(null);
+  const [videoSrc, setVideoSrc] = useState<string>("");
+  const [imgError, setImgError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -105,6 +110,29 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       videoRef.current.muted = true;
     }
   }, []);
+
+  // Load / unload video source based on visibility to save bandwidth
+  useEffect(() => {
+    const mediaUrl = post.mediaUrls[0];
+    if (!isVideoPost || !mediaUrl) return;
+
+    if (isVisible) {
+      setVideoSrc(mediaUrl);
+      setVideoError(false);
+      // Slight delay so the src is set before play() is called
+      const t = setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play().catch(() => {});
+        }
+      }, 80);
+      return () => clearTimeout(t);
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+    setVideoSrc("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, post.mediaUrls]);
 
   // Close reaction picker when clicking outside
   useEffect(() => {
@@ -345,28 +373,53 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
       {post.mediaUrls.length > 0 && (
         <div className="relative">
           {isVideoPost ? (
-            // biome-ignore lint/a11y/useKeyWithClickEvents: video tap-to-play is standard UX
-            <video
-              key={post.mediaUrls[0]}
-              ref={videoRef}
-              src={post.mediaUrls[0]}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="none"
-              onClick={handleVideoClick}
-              className="feed-image aspect-[4/3] w-full object-cover cursor-pointer"
-              onError={() => setVideoPaused(true)}
+            videoError ? (
+              <div
+                className="feed-image aspect-[4/3] flex flex-col items-center justify-center gap-2"
+                style={{ background: "oklch(var(--surface))" }}
+              >
+                <Car size={32} className="opacity-40 text-steel" />
+                <span className="text-xs opacity-60 text-steel">
+                  Video unavailable
+                </span>
+              </div>
+            ) : (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: video tap-to-play is standard UX
+              <video
+                key={post.id}
+                ref={videoRef}
+                src={videoSrc || undefined}
+                muted
+                loop
+                playsInline
+                preload="none"
+                onClick={handleVideoClick}
+                className="feed-image aspect-[4/3] w-full object-cover cursor-pointer"
+                onError={() => {
+                  setVideoError(true);
+                  setVideoPaused(true);
+                }}
+              >
+                <track kind="captions" />
+              </video>
+            )
+          ) : imgError ? (
+            <div
+              className="feed-image aspect-[4/3] flex flex-col items-center justify-center gap-2"
+              style={{ background: "oklch(var(--surface))" }}
             >
-              <track kind="captions" />
-            </video>
+              <Car size={32} className="opacity-40 text-steel" />
+              <span className="text-xs opacity-60 text-steel">
+                Media unavailable
+              </span>
+            </div>
           ) : (
             <img
               src={post.mediaUrls[0]}
               alt="Post media"
               className="feed-image aspect-[4/3]"
               loading="lazy"
+              onError={() => setImgError(true)}
             />
           )}
           {isVideoPost && (
