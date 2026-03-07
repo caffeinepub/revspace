@@ -34,6 +34,11 @@ let _started = false;
 /**
  * Starts the singleton actor creation if not already started.
  * Safe to call multiple times — uses _started flag as guard.
+ *
+ * KEY CHANGE (v184): Infinite retry — the function never gives up.
+ * After each failure the delay grows (1.5s → 3s → 6s → 8s max) so we
+ * don't hammer the canister but we also never leave _publicActor as null
+ * forever just because the canister was cold-starting.
  */
 function startActorCreation(retryCount = 0) {
   if (_started && retryCount === 0) return;
@@ -44,14 +49,11 @@ function startActorCreation(retryCount = 0) {
       notifySubscribers(actor);
     })
     .catch(() => {
-      // Allow retries by resetting the flag
+      // Reset flag so next call can start a fresh attempt
       _started = false;
-      if (retryCount < 3) {
-        setTimeout(
-          () => startActorCreation(retryCount + 1),
-          1500 * (retryCount + 1),
-        );
-      }
+      // Exponential back-off capped at 8 s — retry indefinitely
+      const delay = Math.min(1500 * 1.5 ** retryCount, 8000);
+      setTimeout(() => startActorCreation(retryCount + 1), delay);
     });
 }
 

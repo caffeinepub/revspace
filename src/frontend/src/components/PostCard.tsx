@@ -25,6 +25,7 @@ import {
 import { hasReactionPack } from "../lib/customizations";
 import { awardLikeReceived } from "../lib/revbucks";
 import { getInitials, timeAgo, truncatePrincipal } from "../utils/format";
+import { MediaImage, prefetchImage } from "./MediaImage";
 import { ProBadge } from "./ProBadge";
 
 // Safe unwrap for Motoko optional postType ([] | [string] or plain string).
@@ -33,6 +34,40 @@ function safePostType(pt: unknown): string {
   if (!pt) return "";
   if (Array.isArray(pt)) return String((pt[0] as string) ?? "").toLowerCase();
   return String(pt).toLowerCase();
+}
+
+// Safe unwrap for a Principal that may come back from the ICP canister as
+// [] | [Principal] (Motoko optional) or as a plain Principal object.
+// Returns the unwrapped Principal or undefined so callers don't have to handle arrays.
+function unwrapPrincipal(
+  raw: unknown,
+): import("@icp-sdk/core/principal").Principal | undefined {
+  if (!raw) return undefined;
+  if (Array.isArray(raw)) {
+    const item = raw[0];
+    if (!item) return undefined;
+    return item as import("@icp-sdk/core/principal").Principal;
+  }
+  return raw as import("@icp-sdk/core/principal").Principal;
+}
+
+// Safe principal-to-string that handles arrays, objects with .toString(), etc.
+function principalToString(raw: unknown): string {
+  if (!raw) return "";
+  if (Array.isArray(raw)) {
+    const item = raw[0];
+    if (!item) return "";
+    return typeof (item as { toString?: () => string }).toString === "function"
+      ? (item as { toString: () => string }).toString()
+      : String(item);
+  }
+  if (typeof (raw as { toString?: () => string }).toString === "function") {
+    const s = (raw as { toString: () => string }).toString();
+    // Guard against "[object Object]" — if toString returns that, it's not a real Principal
+    if (s === "[object Object]") return "";
+    return s;
+  }
+  return String(raw);
 }
 
 const REACTION_EMOJIS = ["❤️", "🔥", "🏎️", "⚡", "🤙", "💨"] as const;
@@ -44,6 +79,8 @@ interface PostCardProps {
   isVisible?: boolean;
   /** Zero-based position in the feed. Used to set eager loading on the first posts. */
   index?: number;
+  /** URL of the next post's media — prefetched when this post becomes visible */
+  nextMediaUrl?: string;
 }
 
 function PostTypeBadge({ type }: { type: unknown }) {
@@ -67,25 +104,35 @@ export function PostCard({
   onCommentClick,
   isVisible,
   index = 0,
+  nextMediaUrl,
 }: PostCardProps) {
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
-  const authorKey = post.author.toString();
 
-  const { data: profile, isLoading: profileLoading } = useGetProfile(
-    post.author,
-  );
+  // Safely unwrap post.author — Motoko optionals can come back as [Principal] arrays
+  const authorPrincipal = unwrapPrincipal(post.author);
+  const authorKey = authorPrincipal
+    ? principalToString(authorPrincipal)
+    : principalToString(post.author);
+
+  const { data: profile, isLoading: profileLoading } =
+    useGetProfile(authorPrincipal);
 
   // useAuthorClubName is called at the top level (required by Rules of Hooks)
   // It reads from the live clubs data in React Query, so it works for ANY user —
   // not just the current user like getUserClub(localStorage) does.
-  const clubName = useAuthorClubName(authorKey);
+  const clubName = useAuthorClubName(authorKey || undefined);
 
-  const displayName = profile?.displayName ?? truncatePrincipal(authorKey);
+  const displayName =
+    profile?.displayName && profile.displayName !== "[object Object]"
+      ? profile.displayName
+      : authorKey
+        ? truncatePrincipal(authorKey)
+        : "Unknown";
   const avatarUrl = profile?.avatarUrl ?? "";
 
   const hasLiked = myPrincipal
-    ? post.likes.some((l) => l.toString() === myPrincipal)
+    ? post.likes.some((l) => principalToString(l) === myPrincipal)
     : false;
   const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
   const [likeCount, setLikeCount] = useState(post.likes.length);
@@ -101,6 +148,16 @@ export function PostCard({
 
   const liked = optimisticLiked !== null ? optimisticLiked : hasLiked;
 
+  // Determine post type early so it can be used in subsequent hooks
+  const _isVideoPostEarly =
+    safePostType(post.postType) === "video" ||
+    safePostType(post.postType) === "reel";
+  // Extract thumbnail from mediaUrls[1] if present (set during video upload)
+  // mediaUrls[0] = video URL, mediaUrls[1] = thumbnail URL (when generated on upload)
+  const thumbnailUrl = _isVideoPostEarly
+    ? (post.mediaUrls[1] ?? undefined)
+    : undefined;
+
   const [videoMuted, setVideoMuted] = useState(true);
   const [videoPaused, setVideoPaused] = useState(false);
   const [showPlayPauseHint, setShowPlayPauseHint] = useState<
@@ -109,6 +166,7 @@ export function PostCard({
   const [videoSrc, setVideoSrc] = useState<string>("");
   const [imgError, setImgError] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [videoCanPlay, setVideoCanPlay] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -119,18 +177,37 @@ export function PostCard({
     }
   }, []);
 
+  // When this post becomes visible, prefetch the NEXT post's image in the background
+  // so the user doesn't see a blank box when they scroll down.
+  useEffect(() => {
+    if (isVisible && nextMediaUrl) {
+      prefetchImage(nextMediaUrl);
+    }
+  }, [isVisible, nextMediaUrl]);
+
   // For the first 2 posts, treat them as always visible so videos load immediately
   // without waiting for IntersectionObserver to fire (which requires scrolling).
   const effectivelyVisible = isVisible || index < 2;
 
   // Load / unload video source based on visibility to save bandwidth
+  const clearSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const mediaUrl = post.mediaUrls[0];
     if (!isVideoPost || !mediaUrl) return;
 
+    // Cancel any pending src-clear timer
+    if (clearSrcTimerRef.current) {
+      clearTimeout(clearSrcTimerRef.current);
+      clearSrcTimerRef.current = null;
+    }
+
     if (effectivelyVisible) {
       setVideoSrc(mediaUrl);
       setVideoError(false);
+      // Set poster via DOM if thumbnail available (React's poster prop unreliable)
+      if (videoRef.current && thumbnailUrl) {
+        videoRef.current.poster = thumbnailUrl;
+      }
       // Slight delay so the src is set before play() is called
       const t = setTimeout(() => {
         if (videoRef.current) {
@@ -142,9 +219,16 @@ export function PostCard({
     if (videoRef.current) {
       videoRef.current.pause();
     }
-    setVideoSrc("");
+    setVideoCanPlay(false);
+    // Delay clearing src so the browser can finish current decode
+    clearSrcTimerRef.current = setTimeout(() => {
+      setVideoSrc("");
+    }, 1500);
+    return () => {
+      if (clearSrcTimerRef.current) clearTimeout(clearSrcTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectivelyVisible, post.mediaUrls]);
+  }, [effectivelyVisible, post.mediaUrls, thumbnailUrl]);
 
   // Close reaction picker when clicking outside
   useEffect(() => {
@@ -244,9 +328,7 @@ export function PostCard({
 
   const handleLike = handleLikeButtonClick;
 
-  const isVideoPost =
-    safePostType(post.postType) === "video" ||
-    safePostType(post.postType) === "reel";
+  const isVideoPost = _isVideoPostEarly;
 
   const handleShare = async () => {
     const shareUrl = `https://revspace-2ah.caffeine.xyz/#post-${post.id}`;
@@ -365,7 +447,9 @@ export function PostCard({
                   ) : null}
                 </>
               )}
-              {!profileLoading && authorKey === myPrincipal && <ProBadge />}
+              {!profileLoading && authorKey && authorKey === myPrincipal && (
+                <ProBadge />
+              )}
               <PostTypeBadge type={post.postType} />
             </div>
             <span className="text-xs text-steel">
@@ -396,24 +480,43 @@ export function PostCard({
                 </span>
               </div>
             ) : (
-              // biome-ignore lint/a11y/useKeyWithClickEvents: video tap-to-play is standard UX
-              <video
-                key={post.id}
-                ref={videoRef}
-                src={videoSrc || undefined}
-                muted
-                loop
-                playsInline
-                preload="none"
-                onClick={handleVideoClick}
-                className="feed-image aspect-[4/3] w-full object-cover cursor-pointer"
-                onError={() => {
-                  setVideoError(true);
-                  setVideoPaused(true);
-                }}
-              >
-                <track kind="captions" />
-              </video>
+              <div className="relative feed-image aspect-[4/3]">
+                {/* Thumbnail shown as static preview until video can play */}
+                {thumbnailUrl && !videoCanPlay && (
+                  <img
+                    src={thumbnailUrl}
+                    alt="Video thumbnail"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ zIndex: 1 }}
+                  />
+                )}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: video tap-to-play is standard UX */}
+                <video
+                  key={post.id}
+                  ref={videoRef}
+                  src={videoSrc || undefined}
+                  poster={thumbnailUrl}
+                  muted
+                  loop
+                  playsInline
+                  preload="none"
+                  data-ocid="post_card.canvas_target"
+                  onClick={handleVideoClick}
+                  className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                  style={{
+                    zIndex: 2,
+                    opacity: videoCanPlay ? 1 : 0,
+                    transition: "opacity 0.3s ease",
+                  }}
+                  onCanPlay={() => setVideoCanPlay(true)}
+                  onError={() => {
+                    setVideoError(true);
+                    setVideoPaused(true);
+                  }}
+                >
+                  <track kind="captions" />
+                </video>
+              </div>
             )
           ) : imgError ? (
             <div
@@ -426,12 +529,11 @@ export function PostCard({
               </span>
             </div>
           ) : (
-            <img
+            <MediaImage
               src={post.mediaUrls[0]}
               alt="Post media"
               className="feed-image aspect-[4/3]"
-              loading={index < 3 ? "eager" : "lazy"}
-              decoding="async"
+              highPriority={index < 2}
               onError={() => setImgError(true)}
             />
           )}

@@ -40,6 +40,18 @@
     <meta name="twitter:image" content="/assets/uploads/free-photo-of-rear-end-of-a-car-1.jpeg" />
     <meta name="twitter:image:alt" content="RevSpace — Import Car Community &amp; JDM Car Enthusiast Social Network" />
 
+    <!-- Preconnect to media CDN so TCP handshake is done before first image request -->
+    <link rel="preconnect" href="https://blob.caffeine.ai" crossorigin />
+    <link rel="dns-prefetch" href="https://blob.caffeine.ai" />
+    <!-- Preconnect to ICP boundary nodes -->
+    <link rel="preconnect" href="https://icp-api.io" crossorigin />
+    <link rel="dns-prefetch" href="https://icp-api.io" />
+    <!-- ICP edge gateways — preconnect for faster global video/asset delivery -->
+    <link rel="preconnect" href="https://icp0.io" crossorigin />
+    <link rel="dns-prefetch" href="https://icp0.io" />
+    <link rel="preconnect" href="https://raw.icp0.io" crossorigin />
+    <link rel="dns-prefetch" href="https://raw.icp0.io" />
+
     <!-- Google Fonts — preconnect first (non-blocking), then load async via media trick -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

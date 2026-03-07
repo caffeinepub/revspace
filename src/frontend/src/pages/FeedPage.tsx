@@ -545,22 +545,43 @@ export function FeedPage() {
           className="flex-1 overflow-y-scroll snap-y snap-mandatory"
           style={{ scrollbarWidth: "none", height: "100dvh" }}
         >
-          {displayPosts.map((post, index) => (
-            <div
-              key={post.id}
-              data-index={index}
-              data-ocid={`feed.item.${index + 1}`}
-              className="snap-start snap-always"
-              style={{ height: "100dvh", overflowY: "auto" }}
-            >
-              <PostCard
-                post={post}
-                onCommentClick={(id) => setCommentPostId(id)}
-                isVisible={index === visibleIndex}
-                index={index}
-              />
-            </div>
-          ))}
+          {displayPosts.map((post, index) => {
+            // Virtual windowing: only render the actual post card for posts
+            // within 2 positions of the currently visible post. All others
+            // render as cheap spacer divs that maintain scroll position without
+            // keeping DOM nodes, images, or video elements alive in memory.
+            const isNearVisible = Math.abs(index - visibleIndex) <= 2;
+            const nextPost = displayPosts[index + 1];
+            const nextMediaUrl = nextPost?.mediaUrls?.[0];
+
+            return (
+              <div
+                key={post.id}
+                data-index={index}
+                data-ocid={`feed.item.${index + 1}`}
+                className="snap-start snap-always"
+                style={{ height: "100dvh", overflowY: "auto" }}
+              >
+                {isNearVisible ? (
+                  <PostCard
+                    post={post}
+                    onCommentClick={(id) => setCommentPostId(id)}
+                    isVisible={index === visibleIndex}
+                    index={index}
+                    nextMediaUrl={nextMediaUrl}
+                  />
+                ) : (
+                  /* Lightweight placeholder keeps snap targets intact */
+                  <div
+                    style={{
+                      height: "100dvh",
+                      background: "oklch(var(--carbon))",
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           {/* Footer inside scroll container so it appears after last post */}
           <div className="snap-start snap-always" style={{ minHeight: "40vh" }}>

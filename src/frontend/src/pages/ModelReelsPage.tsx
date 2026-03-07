@@ -9,11 +9,10 @@ import {
   MessageCircle,
   Settings,
   Share2,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { VideoPlayer } from "../components/VideoPlayer";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAuthorClubName,
@@ -28,10 +27,14 @@ import { timeAgo, truncatePrincipal } from "../utils/format";
 
 const MODEL_SPECIALTIES = ["All", "JDM", "Euro", "Stance", "Muscle", "Other"];
 
+// Number of cards to keep rendered (VideoPlayer active/adjacent/etc.)
+// Cards outside this window render as poster-only img elements.
+const RENDER_WINDOW = 2;
+
 // ─── Hook: check if a profile's location encodes isModel: true ────────────────
 function useIsModelAuthor(author: Principal | undefined) {
   const { data: profile } = useGetProfile(author);
-  if (!profile) return null; // null = still loading
+  if (!profile) return null;
   const meta = decodeMetaFromLocation(profile.location ?? "");
   return meta.isModel;
 }
@@ -64,7 +67,6 @@ function ModelReelAuthor({ author }: { author: Principal }) {
           <span className="text-sm font-semibold text-foreground group-hover:underline underline-offset-2">
             {displayName}
           </span>
-          {/* Purple MODEL badge */}
           <span
             className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full tracking-wide"
             style={{
@@ -99,22 +101,29 @@ function ModelReelAuthor({ author }: { author: Principal }) {
   );
 }
 
-// ─── Video card ───────────────────────────────────────────────────────────────
+// ─── Post type definition ─────────────────────────────────────────────────────
+interface ModelPost {
+  id: string;
+  postType: string;
+  topic: string;
+  content: string;
+  author: Principal;
+  likes: Principal[];
+  timestamp: bigint;
+  mediaUrls: string[];
+  comments: string[];
+}
+
+// ─── Video card with lazy VideoPlayer ────────────────────────────────────────
 interface ModelVideoCardProps {
-  post: {
-    id: string;
-    postType: string;
-    topic: string;
-    content: string;
-    author: Principal;
-    likes: Principal[];
-    timestamp: bigint;
-    mediaUrls: string[];
-    comments: string[];
-  };
+  post: ModelPost;
   isMuted: boolean;
   onToggleMute: () => void;
   myPrincipal?: string;
+  isActive: boolean;
+  isAdjacent: boolean;
+  cardRef?: (el: HTMLDivElement | null) => void;
+  index: number;
 }
 
 function ModelVideoCard({
@@ -122,10 +131,12 @@ function ModelVideoCard({
   isMuted,
   onToggleMute,
   myPrincipal,
+  isActive,
+  isAdjacent,
+  cardRef,
+  index,
 }: ModelVideoCardProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
-  const [videoError, setVideoError] = useState(false);
   const [liked, setLiked] = useState(false);
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
@@ -134,13 +145,6 @@ function ModelVideoCard({
     ? post.likes.some((l) => l.toString() === myPrincipal)
     : false;
   const isLiked = liked || serverLiked;
-
-  // Sync muted on videoRef when isMuted changes
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = isMuted;
-    }
-  }, [isMuted]);
 
   const handleLike = () => {
     if (!myPrincipal) {
@@ -159,10 +163,17 @@ function ModelVideoCard({
   const isVideo =
     post.postType?.toLowerCase() === "reel" ||
     post.postType?.toLowerCase() === "video";
-  const mediaUrl = post.mediaUrls[0];
+
+  // thumbnail = mediaUrls[1], video = mediaUrls[0]
+  const videoUrl = post.mediaUrls[0] ?? "";
+  const thumbnailUrl = post.mediaUrls[1] ?? undefined;
+  const inRenderWindow =
+    isActive || isAdjacent || Math.abs(index) <= RENDER_WINDOW;
 
   return (
     <div
+      ref={cardRef}
+      data-post-id={post.id}
       className="rounded-2xl overflow-hidden relative"
       style={{
         background: "oklch(var(--surface))",
@@ -172,34 +183,41 @@ function ModelVideoCard({
     >
       {/* Media area */}
       <div className="relative aspect-[9/16] max-h-[520px] bg-black overflow-hidden">
-        {mediaUrl && !videoError ? (
-          isVideo ? (
-            <video
-              ref={videoRef}
-              src={mediaUrl}
-              autoPlay
+        {isVideo && videoUrl ? (
+          inRenderWindow ? (
+            <VideoPlayer
+              src={videoUrl}
+              poster={thumbnailUrl}
+              isActive={isActive}
+              isAdjacent={isAdjacent}
               muted={isMuted}
               loop
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-cover"
-              onTimeUpdate={(e) => {
-                const v = e.currentTarget;
-                if (v.duration > 0) {
-                  setProgress((v.currentTime / v.duration) * 100);
+              onTimeUpdate={(currentTime, duration) => {
+                if (duration > 0) {
+                  setProgress((currentTime / duration) * 100);
                 }
               }}
-              onError={() => setVideoError(true)}
-            >
-              <track kind="captions" />
-            </video>
-          ) : (
+              className="w-full h-full"
+            />
+          ) : thumbnailUrl ? (
             <img
-              src={mediaUrl}
-              alt={post.content}
+              src={thumbnailUrl}
+              alt=""
+              aria-hidden="true"
               className="w-full h-full object-cover"
             />
+          ) : (
+            <div
+              className="w-full h-full"
+              style={{ background: "oklch(0.1 0.005 310)" }}
+            />
           )
+        ) : post.mediaUrls[0] ? (
+          <img
+            src={post.mediaUrls[0]}
+            alt={post.content}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Film size={40} style={{ color: "oklch(0.5 0.1 310)" }} />
@@ -241,9 +259,33 @@ function ModelVideoCard({
             aria-label={isMuted ? "Unmute" : "Mute"}
           >
             {isMuted ? (
-              <VolumeX size={16} color="white" />
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+              >
+                <title>Muted</title>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
             ) : (
-              <Volume2 size={16} color="white" />
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+              >
+                <title>Sound on</title>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
             )}
           </button>
         )}
@@ -313,19 +355,27 @@ function ModelVideoCard({
   );
 }
 
-// ─── Model-gated wrapper: only renders if author is a model account ────────────
+// ─── Model-gated wrapper ──────────────────────────────────────────────────────
 function ModelReelCardGated({
   post,
   isMuted,
   onToggleMute,
   myPrincipal,
+  isActive,
+  isAdjacent,
   onConfirmModel,
+  cardRef,
+  index,
 }: {
-  post: ModelVideoCardProps["post"];
+  post: ModelPost;
   isMuted: boolean;
   onToggleMute: () => void;
   myPrincipal?: string;
+  isActive: boolean;
+  isAdjacent: boolean;
   onConfirmModel: (authorId: string, isModel: boolean) => void;
+  cardRef?: (el: HTMLDivElement | null) => void;
+  index: number;
 }) {
   const isModelAuthor = useIsModelAuthor(post.author);
 
@@ -335,7 +385,6 @@ function ModelReelCardGated({
     }
   }, [isModelAuthor, post.author, onConfirmModel]);
 
-  // Show card while still loading (optimistic), hide once confirmed non-model
   if (isModelAuthor === false) return null;
 
   return (
@@ -344,6 +393,10 @@ function ModelReelCardGated({
       isMuted={isMuted}
       onToggleMute={onToggleMute}
       myPrincipal={myPrincipal}
+      isActive={isActive}
+      isAdjacent={isAdjacent}
+      cardRef={cardRef}
+      index={index}
     />
   );
 }
@@ -357,20 +410,25 @@ export function ModelReelsPage() {
   const [isMuted, setIsMuted] = useState(true);
   const { meta } = useUserMeta();
   const isMyAccountModel = meta.isModel;
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  // Track which authors we've confirmed as model or non-model
   const [authorModelStatus, setAuthorModelStatus] = useState<
     Record<string, boolean>
   >({});
 
-  const handleConfirmModel = (authorId: string, isModel: boolean) => {
-    setAuthorModelStatus((prev) => {
-      if (prev[authorId] === isModel) return prev; // no change
-      return { ...prev, [authorId]: isModel };
-    });
-  };
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Filter to video/reel posts only — case-insensitive since backend may return lowercase
+  const handleConfirmModel = useCallback(
+    (authorId: string, isModel: boolean) => {
+      setAuthorModelStatus((prev) => {
+        if (prev[authorId] === isModel) return prev;
+        return { ...prev, [authorId]: isModel };
+      });
+    },
+    [],
+  );
+
   const videoPosts = useMemo(
     () =>
       (posts ?? []).filter(
@@ -381,7 +439,6 @@ export function ModelReelsPage() {
     [posts],
   );
 
-  // Filter by specialty/topic
   const topicFilteredPosts = useMemo(
     () =>
       selectedSpecialty === "All"
@@ -392,16 +449,46 @@ export function ModelReelsPage() {
     [videoPosts, selectedSpecialty],
   );
 
-  // The posts that we know are from model accounts (exclude confirmed non-models)
   const displayPosts = useMemo(
     () =>
       topicFilteredPosts.filter((p) => {
         const status = authorModelStatus[p.author.toString()];
-        // Show if: confirmed model, OR not yet checked (optimistic display)
         return status !== false;
       }),
     [topicFilteredPosts, authorModelStatus],
   );
+
+  // IntersectionObserver for the grid layout
+  const registerCard = useCallback(
+    (postId: string, el: HTMLDivElement | null) => {
+      if (el) cardRefs.current.set(postId, el);
+      else cardRefs.current.delete(postId);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.5) continue;
+          const postId = (entry.target as HTMLElement).dataset.postId;
+          if (!postId) continue;
+          const idx = displayPosts.findIndex((p) => p.id === postId);
+          if (idx >= 0) setActiveIndex(idx);
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    for (const [, el] of cardRefs.current.entries()) {
+      if (el) observerRef.current.observe(el);
+    }
+
+    return () => observerRef.current?.disconnect();
+  }, [displayPosts]);
 
   return (
     <div className="min-h-screen">
@@ -506,7 +593,10 @@ export function ModelReelsPage() {
             <button
               key={s}
               type="button"
-              onClick={() => setSelectedSpecialty(s)}
+              onClick={() => {
+                setSelectedSpecialty(s);
+                setActiveIndex(0);
+              }}
               className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
               style={
                 selectedSpecialty === s
@@ -555,7 +645,7 @@ export function ModelReelsPage() {
           </div>
         )}
 
-        {/* Empty state — only show when posts have loaded AND we've checked authors */}
+        {/* Empty state */}
         {!isLoading && displayPosts.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div
@@ -589,17 +679,21 @@ export function ModelReelsPage() {
           </div>
         )}
 
-        {/* Reel grid */}
+        {/* Reel grid with lazy loading */}
         {!isLoading && topicFilteredPosts.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {topicFilteredPosts.map((post) => (
+            {topicFilteredPosts.map((post, idx) => (
               <ModelReelCardGated
                 key={post.id}
                 post={post}
                 isMuted={isMuted}
                 onToggleMute={() => setIsMuted((m) => !m)}
                 myPrincipal={myPrincipal}
+                isActive={idx === activeIndex}
+                isAdjacent={Math.abs(idx - activeIndex) === 1}
                 onConfirmModel={handleConfirmModel}
+                cardRef={(el) => registerCard(post.id, el)}
+                index={idx}
               />
             ))}
           </div>

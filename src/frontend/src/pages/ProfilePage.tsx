@@ -13,15 +13,18 @@ import {
   Loader2,
   MapPin,
   Settings,
+  Trash2,
   Wrench,
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { FollowListModal } from "../components/FollowListModal";
 import { FriendBadge } from "../components/FriendBadge";
 import { ProBadge } from "../components/ProBadge";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useDeletePost,
   useGetFollowers,
   useGetFollowing,
   useGetPostsByUser,
@@ -54,6 +57,8 @@ export function ProfilePage() {
     url: string;
     type: "image" | "video";
   } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const deletePost = useDeletePost();
 
   const {
     data: profile,
@@ -359,61 +364,147 @@ export function ProfilePage() {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1">
-              {displayPosts.map((post) => (
-                <button
-                  key={post.id}
-                  type="button"
-                  className="relative aspect-square overflow-hidden group cursor-pointer"
-                  style={{ borderRadius: "4px" }}
-                  onClick={() => {
-                    if (post.mediaUrls[0]) {
-                      setSelectedMedia({
-                        url: post.mediaUrls[0],
-                        type:
-                          safePostType(post.postType) === "video" ||
-                          safePostType(post.postType) === "reel"
-                            ? "video"
-                            : "image",
-                      });
-                    }
-                  }}
-                >
-                  {post.mediaUrls[0] ? (
-                    safePostType(post.postType) === "video" ||
-                    safePostType(post.postType) === "reel" ? (
-                      <video
-                        src={post.mediaUrls[0]}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <img
-                        src={post.mediaUrls[0]}
-                        alt=""
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    )
-                  ) : (
-                    <div
-                      className="w-full h-full flex items-center justify-center p-2"
-                      style={{ background: "oklch(var(--surface))" }}
-                    >
-                      <p className="text-xs text-steel text-center line-clamp-3">
-                        {post.content}
-                      </p>
-                    </div>
-                  )}
+              {displayPosts.map((post) => {
+                const isVideo =
+                  safePostType(post.postType) === "video" ||
+                  safePostType(post.postType) === "reel";
+                const mediaUrl = post.mediaUrls[0];
+                const isConfirmingDelete = deleteConfirmId === post.id;
+
+                return (
                   <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={{ background: "oklch(0 0 0 / 0.5)" }}
+                    key={post.id}
+                    className="relative aspect-square overflow-hidden group"
+                    style={{ borderRadius: "4px" }}
                   >
-                    <span className="text-white text-xs">
-                      ♥ {post.likes.length}
-                    </span>
+                    {/* Media thumbnail — tappable to open lightbox */}
+                    <button
+                      type="button"
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => {
+                        if (!isConfirmingDelete && mediaUrl) {
+                          setSelectedMedia({
+                            url: mediaUrl,
+                            type: isVideo ? "video" : "image",
+                          });
+                        }
+                      }}
+                    >
+                      {mediaUrl ? (
+                        isVideo ? (
+                          <video
+                            src={mediaUrl}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            src={mediaUrl}
+                            alt=""
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        )
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center p-2"
+                          style={{ background: "oklch(var(--surface))" }}
+                        >
+                          <p className="text-xs text-steel text-center line-clamp-3">
+                            {post.content}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Hover overlay — shows likes + delete trigger */}
+                    {!isConfirmingDelete && (
+                      <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between px-1.5 pb-1.5 pointer-events-none group-hover:pointer-events-auto"
+                        style={{ background: "oklch(0 0 0 / 0.45)" }}
+                      >
+                        <span className="text-white text-[10px] font-semibold">
+                          ♥ {post.likes.length}
+                        </span>
+                        {/* Video/reel badge */}
+                        {isVideo && (
+                          <span
+                            className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                            style={{
+                              background: "oklch(0.55 0.18 290 / 0.85)",
+                              color: "white",
+                            }}
+                          >
+                            {safePostType(post.postType)}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          data-ocid={`profile.post.delete_button.${post.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmId(post.id);
+                          }}
+                          className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                          style={{ background: "oklch(0.55 0.2 25 / 0.9)" }}
+                          aria-label="Delete post"
+                        >
+                          <Trash2 size={13} color="white" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Delete confirmation overlay */}
+                    {isConfirmingDelete && (
+                      <div
+                        className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10"
+                        style={{ background: "oklch(0 0 0 / 0.82)" }}
+                      >
+                        <p className="text-white text-[11px] font-semibold text-center px-2">
+                          Delete this post?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            data-ocid={`profile.post.confirm_button.${post.id}`}
+                            onClick={() => {
+                              deletePost.mutate(post.id, {
+                                onSuccess: () => {
+                                  toast.success("Post deleted");
+                                  setDeleteConfirmId(null);
+                                },
+                                onError: () => {
+                                  toast.error("Failed to delete post");
+                                  setDeleteConfirmId(null);
+                                },
+                              });
+                            }}
+                            disabled={deletePost.isPending}
+                            className="px-3 py-1 rounded-md text-[11px] font-bold text-white"
+                            style={{ background: "oklch(0.55 0.2 25)" }}
+                          >
+                            {deletePost.isPending ? "..." : "Delete"}
+                          </button>
+                          <button
+                            type="button"
+                            data-ocid={`profile.post.cancel_button.${post.id}`}
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="px-3 py-1 rounded-md text-[11px] font-semibold"
+                            style={{
+                              background: "oklch(var(--surface-elevated))",
+                              color: "oklch(var(--foreground))",
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>

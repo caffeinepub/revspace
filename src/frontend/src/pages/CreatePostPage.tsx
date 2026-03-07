@@ -36,6 +36,11 @@ import {
   type FileValidationOptions,
   validateFile,
 } from "../lib/uploadValidator";
+import { uploadVideoInChunks } from "../lib/videoChunker";
+import {
+  compressVideoIfNeeded,
+  generateVideoThumbnail,
+} from "../lib/videoProcessor";
 
 // Explicit extensions alongside the MIME wildcard so iOS Safari and Android
 // WebView both show video files in the native picker correctly.
@@ -66,11 +71,18 @@ const REEL_TOPICS = [
 ];
 
 // ── Upload stages ────────────────────────────────────────────────────────────
-type UploadStage = "idle" | "validating" | "uploading" | "publishing";
+// Added "compressing" stage between validating and uploading
+type UploadStage =
+  | "idle"
+  | "validating"
+  | "compressing"
+  | "thumbnail"
+  | "uploading"
+  | "publishing";
 
 interface StagePill {
   label: string;
-  progress?: number; // 0-100, only shown in "uploading" stage
+  progress?: number;
 }
 
 function getStageInfo(
@@ -79,6 +91,12 @@ function getStageInfo(
 ): StagePill | null {
   if (stage === "idle") return null;
   if (stage === "validating") return { label: "Validating..." };
+  if (stage === "compressing")
+    return {
+      label: `Compressing... ${Math.round(progress ?? 0)}%`,
+      progress: progress ?? 0,
+    };
+  if (stage === "thumbnail") return { label: "Generating thumbnail..." };
   if (stage === "uploading")
     return {
       label: `Uploading... ${Math.round(progress ?? 0)}%`,
@@ -132,7 +150,6 @@ export function CreatePostPage() {
   const principalId = identity?.getPrincipal().toText() ?? "";
   const { meta, isLoading: metaLoading } = useUserMeta();
 
-  // Check if this page was opened from a model-only section
   const isModelOnlySection =
     new URLSearchParams(window.location.search).get("modelOnly") === "1";
 
@@ -141,10 +158,10 @@ export function CreatePostPage() {
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [stage, setStage] = useState<UploadStage>("idle");
 
-  // Draft state
   const [draftBannerVisible, setDraftBannerVisible] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const draftAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,7 +181,7 @@ export function CreatePostPage() {
     }
   }, [principalId]);
 
-  // ── Draft autosave — debounced 1500ms on content/topic change ──────────────
+  // ── Draft autosave ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!principalId || !content.trim()) return;
 
@@ -175,7 +192,6 @@ export function CreatePostPage() {
     draftAutosaveTimer.current = setTimeout(() => {
       saveDraft(principalId, { content, postType, topic });
       setDraftSavedAt(Date.now());
-      // Fade out the indicator after 2.5 seconds
       setTimeout(() => setDraftSavedAt(null), 2500);
     }, 1500);
 
@@ -202,13 +218,13 @@ export function CreatePostPage() {
     if (principalId) clearDraft(principalId);
   };
 
-  // ── File change handler ─────────────────────────────────────────────────────
+  // ── File change handler — now also generates thumbnail for videos ───────────
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       let selected = e.target.files?.[0];
       if (!selected) return;
 
-      // Step 1: Convert HEIC/HEIF/WebP to JPEG
+      // Convert HEIC/HEIF/WebP to JPEG for images
       if (!selected.type.startsWith("video/")) {
         selected = await convertToJpegIfNeeded(selected);
       }
@@ -217,11 +233,12 @@ export function CreatePostPage() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
 
       setFile(selected);
+      setThumbnailDataUrl(null);
       const objectUrl = URL.createObjectURL(selected);
       setPreviewUrl(objectUrl);
       setUploadProgress(null);
 
-      // Step 2: Run pre-selection validation (warnings only — no blocking here)
+      // Pre-selection validation
       const opts: FileValidationOptions = {
         postType: postType as "Photo" | "Video" | "Reel",
       };
@@ -230,12 +247,22 @@ export function CreatePostPage() {
         toast.warning(result.warning, { duration: 6000 });
       }
       if (!result.valid && result.error) {
-        // Validation failed — show error and clear the file
         toast.error(result.error, { duration: 8000 });
         URL.revokeObjectURL(objectUrl);
         setFile(null);
         setPreviewUrl(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      // Auto-generate thumbnail for video uploads so the feed loads faster
+      if (selected.type.startsWith("video/")) {
+        try {
+          const thumbDataUrl = await generateVideoThumbnail(selected);
+          setThumbnailDataUrl(thumbDataUrl);
+        } catch {
+          // Thumbnail generation failed — continue without it
+        }
       }
     },
     [previewUrl, postType],
@@ -245,6 +272,7 @@ export function CreatePostPage() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
+    setThumbnailDataUrl(null);
     setUploadProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -259,7 +287,7 @@ export function CreatePostPage() {
     let mediaUrls: string[] = [];
 
     if (file) {
-      // ── Stage 1: Validate ────────────────────────────────────────────────
+      // ── Stage 1: Validate ──────────────────────────────────────────────────
       setStage("validating");
       const opts: FileValidationOptions = {
         postType: postType as "Photo" | "Video" | "Reel",
@@ -277,26 +305,103 @@ export function CreatePostPage() {
         toast.warning(validation.warning, { duration: 6000 });
       }
 
-      // ── Stage 2: Upload ──────────────────────────────────────────────────
+      // ── Stage 2: Compress video (if needed) ───────────────────────────────
+      let fileToUpload = file;
+      if (isVideo) {
+        setStage("compressing");
+        setUploadProgress(0);
+        try {
+          fileToUpload = await compressVideoIfNeeded(file, {
+            maxHeightPx: 720,
+            onProgress: setUploadProgress,
+          });
+        } catch {
+          // Compression failed — fall back to original file silently
+          fileToUpload = file;
+        }
+        setUploadProgress(null);
+      }
+
+      // ── Stage 3: Generate / upload thumbnail for videos ───────────────────
+      let thumbnailUploadUrl: string | null = null;
+      if (isVideo) {
+        setStage("thumbnail");
+        try {
+          // Use already-generated thumbnailDataUrl or generate fresh
+          let thumbDataUrl = thumbnailDataUrl;
+          if (!thumbDataUrl) {
+            thumbDataUrl = await generateVideoThumbnail(fileToUpload);
+          }
+
+          // Convert data URL to Blob
+          const fetchedBlob = await fetch(thumbDataUrl).then((r) => r.blob());
+          const thumbFile = new File([fetchedBlob], "thumbnail.jpg", {
+            type: "image/jpeg",
+          });
+
+          // Upload thumbnail using uploadFile hook
+          const uploadStart = Date.now();
+          try {
+            thumbnailUploadUrl = await uploadFile(thumbFile);
+            recordUploadAttempt({
+              timestamp: uploadStart,
+              success: true,
+              fileSizeMB: thumbFile.size / (1024 * 1024),
+            });
+          } catch {
+            // Thumbnail upload failed — proceed without it
+            thumbnailUploadUrl = null;
+          }
+        } catch {
+          // Thumbnail gen/upload failed — continue without thumbnail
+          thumbnailUploadUrl = null;
+        }
+      }
+
+      // ── Stage 4: Upload main file ─────────────────────────────────────────
       setStage("uploading");
       setUploadProgress(0);
 
       const uploadStart = Date.now();
       try {
-        const url = await uploadFile(file, (pct) => setUploadProgress(pct));
-        mediaUrls = [url];
+        let videoUrl: string;
 
-        // Record successful upload
+        if (isVideo) {
+          // Use chunked upload for videos (provides granular progress)
+          videoUrl = await uploadVideoInChunks(
+            fileToUpload,
+            (blob, filename, mimeType) =>
+              uploadFile(
+                blob instanceof File
+                  ? blob
+                  : new File([blob], filename ?? "video.mp4", {
+                      type: mimeType ?? fileToUpload.type,
+                    }),
+              ),
+            setUploadProgress,
+          );
+        } else {
+          videoUrl = await uploadFile(fileToUpload, (pct) =>
+            setUploadProgress(pct),
+          );
+        }
+
+        // Build mediaUrls: [videoUrl, thumbnailUrl] or just [imageUrl]
+        if (isVideo && thumbnailUploadUrl) {
+          mediaUrls = [videoUrl, thumbnailUploadUrl];
+        } else {
+          mediaUrls = [videoUrl];
+        }
+
         recordUploadAttempt({
-          timestamp: Date.now(),
+          timestamp: uploadStart,
           success: true,
-          fileSizeMB: file.size / (1024 * 1024),
+          fileSizeMB: fileToUpload.size / (1024 * 1024),
         });
       } catch (err) {
         const errorType = err instanceof Error ? err.message : String(err);
         const friendlyMessage = mapErrorMessage(err);
 
-        // Record failed upload
         recordUploadAttempt({
           timestamp: uploadStart,
           success: false,
@@ -312,7 +417,7 @@ export function CreatePostPage() {
       setUploadProgress(null);
     }
 
-    // ── Stage 3: Publish ───────────────────────────────────────────────────
+    // ── Stage 5: Publish ───────────────────────────────────────────────────
     setStage("publishing");
     const isReelOrVideo = postType === "Reel" || postType === "Video";
 
@@ -327,13 +432,11 @@ export function CreatePostPage() {
         onSuccess: () => {
           toast.success("Post published! 🔥");
 
-          // Award RevBucks for creating a post
           if (principalId) {
             awardPostCreation(principalId);
             toast.success("+10 RevBucks earned! ⚡", { duration: 3000 });
           }
 
-          // Clear draft on successful publish
           if (principalId) clearDraft(principalId);
 
           clearFile();
@@ -353,7 +456,6 @@ export function CreatePostPage() {
   const isBusy = stage !== "idle" || createPost.isPending;
   const stageInfo = getStageInfo(stage, uploadProgress);
 
-  // Model-only gate: if opened from model section and user is not a model account
   const showModelGate = isModelOnlySection && !metaLoading && !meta.isModel;
 
   return (
@@ -562,7 +664,6 @@ export function CreatePostPage() {
               Media {postType === "Photo" ? "(Image)" : "(Video)"}
             </Label>
 
-            {/* Upload health warning banner */}
             <UploadHealthBanner />
 
             <input
@@ -584,14 +685,49 @@ export function CreatePostPage() {
               {previewUrl ? (
                 <div className="relative">
                   {isVideo ? (
-                    <video
-                      src={previewUrl}
-                      className="w-full h-52 object-cover"
-                      controls
-                      playsInline
-                    >
-                      <track kind="captions" />
-                    </video>
+                    <>
+                      {/* Show thumbnail as preview if available, else show video */}
+                      {thumbnailDataUrl ? (
+                        <div className="relative">
+                          <img
+                            src={thumbnailDataUrl}
+                            alt="Video thumbnail preview"
+                            className="w-full h-52 object-cover"
+                          />
+                          <div
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{ background: "oklch(0 0 0 / 0.3)" }}
+                          >
+                            <div
+                              className="w-12 h-12 rounded-full flex items-center justify-center"
+                              style={{ background: "oklch(0 0 0 / 0.6)" }}
+                            >
+                              <Film size={22} className="text-white" />
+                            </div>
+                          </div>
+                          <div
+                            className="absolute bottom-0 left-0 right-0 px-2 py-1"
+                            style={{ background: "oklch(var(--orange) / 0.9)" }}
+                          >
+                            <p
+                              className="text-[10px] font-semibold text-center"
+                              style={{ color: "oklch(var(--carbon))" }}
+                            >
+                              Thumbnail generated ✓
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <video
+                          src={previewUrl}
+                          className="w-full h-52 object-cover"
+                          controls
+                          playsInline
+                        >
+                          <track kind="captions" />
+                        </video>
+                      )}
+                    </>
                   ) : (
                     <img
                       src={previewUrl}
@@ -610,7 +746,11 @@ export function CreatePostPage() {
                   {file && (
                     <div
                       className="absolute bottom-0 left-0 right-0 px-3 py-2"
-                      style={{ background: "oklch(0 0 0 / 0.5)" }}
+                      style={{
+                        background: "oklch(0 0 0 / 0.5)",
+                        // Only show file info overlay when no thumbnail banner is showing
+                        display: thumbnailDataUrl && isVideo ? "none" : "block",
+                      }}
                     >
                       <p className="text-white text-xs truncate">{file.name}</p>
                       <p className="text-white/60 text-[10px]">
@@ -622,6 +762,7 @@ export function CreatePostPage() {
               ) : (
                 <button
                   type="button"
+                  data-ocid="create_post.upload_button"
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex flex-col items-center justify-center py-10 gap-3 hover:opacity-80 transition-opacity"
                 >
@@ -643,7 +784,7 @@ export function CreatePostPage() {
                     </p>
                     <p className="text-xs text-steel mt-0.5">
                       {postType === "Reel"
-                        ? "Up to 10 minutes · MP4/MOV recommended"
+                        ? "Up to 10 minutes · MP4/MOV recommended · Thumbnail auto-generated"
                         : `Tap to browse ${isVideo ? "videos" : "images"} from your device`}
                     </p>
                   </div>
@@ -653,49 +794,62 @@ export function CreatePostPage() {
 
             {/* Multi-stage upload progress indicator */}
             {stageInfo && (
-              <div className="mt-2 space-y-1.5">
-                {/* Stage pill */}
+              <div
+                data-ocid="create_post.loading_state"
+                className="mt-2 space-y-1.5"
+              >
                 <div className="flex items-center justify-between">
                   <span
                     className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
                     style={{
-                      background: "oklch(var(--orange))",
+                      background:
+                        stage === "compressing"
+                          ? "oklch(0.6 0.18 260)"
+                          : "oklch(var(--orange))",
                       color: "oklch(var(--carbon))",
                     }}
                   >
                     {stage === "publishing" && (
                       <CheckCircle2 size={11} className="opacity-80" />
                     )}
-                    {(stage === "uploading" || stage === "validating") && (
+                    {(stage === "uploading" ||
+                      stage === "validating" ||
+                      stage === "compressing" ||
+                      stage === "thumbnail") && (
                       <Loader2 size={11} className="animate-spin opacity-80" />
                     )}
                     {stageInfo.label}
                   </span>
-                  {stage === "uploading" && uploadProgress !== null && (
-                    <span
-                      className="text-xs font-semibold"
-                      style={{ color: "oklch(var(--orange))" }}
-                    >
-                      {Math.round(uploadProgress)}%
-                    </span>
-                  )}
+                  {(stage === "uploading" || stage === "compressing") &&
+                    uploadProgress !== null && (
+                      <span
+                        className="text-xs font-semibold"
+                        style={{ color: "oklch(var(--orange))" }}
+                      >
+                        {Math.round(uploadProgress)}%
+                      </span>
+                    )}
                 </div>
 
-                {/* Progress bar — only during upload */}
-                {stage === "uploading" && uploadProgress !== null && (
-                  <div
-                    className="h-1.5 rounded-full overflow-hidden"
-                    style={{ background: "oklch(var(--surface-elevated))" }}
-                  >
+                {/* Progress bar — during upload and compression */}
+                {(stage === "uploading" || stage === "compressing") &&
+                  uploadProgress !== null && (
                     <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${uploadProgress}%`,
-                        background: "oklch(var(--orange))",
-                      }}
-                    />
-                  </div>
-                )}
+                      className="h-1.5 rounded-full overflow-hidden"
+                      style={{ background: "oklch(var(--surface-elevated))" }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${uploadProgress}%`,
+                          background:
+                            stage === "compressing"
+                              ? "oklch(0.6 0.18 260)"
+                              : "oklch(var(--orange))",
+                        }}
+                      />
+                    </div>
+                  )}
               </div>
             )}
 
@@ -703,6 +857,7 @@ export function CreatePostPage() {
             {previewUrl && !isBusy && (
               <button
                 type="button"
+                data-ocid="create_post.upload_button"
                 onClick={() => fileInputRef.current?.click()}
                 className="mt-2 flex items-center gap-1.5 text-xs text-steel hover:text-foreground transition-colors"
               >
@@ -718,7 +873,6 @@ export function CreatePostPage() {
               <Label className="text-xs text-steel uppercase tracking-wider font-semibold">
                 Caption *
               </Label>
-              {/* Draft saved indicator */}
               {draftSavedAt && (
                 <span
                   className="text-[10px] flex items-center gap-1 transition-opacity"
@@ -748,6 +902,7 @@ export function CreatePostPage() {
           {/* Submit */}
           <Button
             type="submit"
+            data-ocid="create_post.submit_button"
             disabled={isBusy || !content.trim()}
             className="w-full h-12 text-base font-bold rounded-xl"
             style={{
@@ -770,6 +925,16 @@ export function CreatePostPage() {
                 <Loader2 size={16} className="animate-spin" />
                 Validating...
               </div>
+            ) : stage === "compressing" ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Compressing video...
+              </div>
+            ) : stage === "thumbnail" ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Generating thumbnail...
+              </div>
             ) : stage === "uploading" ? (
               <div className="flex items-center gap-2">
                 <Loader2 size={16} className="animate-spin" />
@@ -787,7 +952,6 @@ export function CreatePostPage() {
         </form>
       )}
 
-      {/* Footer */}
       <footer className="py-8 text-center text-xs text-steel border-t border-border mt-4">
         © {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a

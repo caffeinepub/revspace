@@ -21,6 +21,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProBadge } from "../components/ProBadge";
+import { VideoPlayer } from "../components/VideoPlayer";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePublicActor } from "../hooks/usePublicActor";
@@ -297,99 +298,6 @@ function ReelAuthorInfo({ authorPrincipal, myPrincipal }: ReelAuthorInfoProps) {
   );
 }
 
-// ─── ReelMedia ────────────────────────────────────────────────────────────────
-interface ReelMediaProps {
-  mediaUrl: string | undefined;
-  postId: string;
-  postType: string;
-  isMuted?: boolean;
-  isVisible?: boolean; // only play when this reel is in the viewport
-  videoRef?: (el: HTMLVideoElement | null) => void;
-  onTimeUpdate?: (postId: string, progress: number) => void;
-}
-
-function ReelMedia({
-  mediaUrl,
-  postId,
-  postType,
-  isMuted = true,
-  isVisible = false,
-  videoRef,
-  onTimeUpdate,
-}: ReelMediaProps) {
-  const [videoError, setVideoError] = useState(false);
-
-  if (!mediaUrl) {
-    return (
-      <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ background: "#111" }}
-      >
-        <Film size={48} className="text-white/30" />
-      </div>
-    );
-  }
-
-  // safePostType already returns lowercase — no need for additional .toLowerCase()
-  const normalizedType = safePostType(postType);
-  const isVideoType = normalizedType === "reel" || normalizedType === "video";
-
-  if (isVideoType) {
-    if (videoError) {
-      return (
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center gap-3"
-          style={{ background: "#111" }}
-        >
-          <Film size={40} className="text-white/20" />
-          <p className="text-white/40 text-sm font-medium">Video unavailable</p>
-        </div>
-      );
-    }
-
-    return (
-      <video
-        key={mediaUrl}
-        ref={(el) => {
-          if (el) {
-            el.muted = isMuted;
-            // Only preload metadata for off-screen reels; preload full data for
-            // the visible one so it plays instantly without buffering freeze.
-            el.preload = isVisible ? "auto" : "none";
-          }
-          if (typeof videoRef === "function") videoRef(el);
-        }}
-        src={mediaUrl}
-        // Do NOT use autoPlay — visibility is controlled via play()/pause() in
-        // the parent's IntersectionObserver so only one video loads at a time.
-        muted={isMuted}
-        loop
-        playsInline
-        // preload is set via the ref above based on visibility
-        className="absolute inset-0 w-full h-full object-cover"
-        onTimeUpdate={(e) => {
-          const video = e.currentTarget;
-          if (video.duration > 0) {
-            const pct = (video.currentTime / video.duration) * 100;
-            onTimeUpdate?.(postId, pct);
-          }
-        }}
-        onError={() => setVideoError(true)}
-      >
-        <track kind="captions" />
-      </video>
-    );
-  }
-
-  return (
-    <img
-      src={mediaUrl}
-      alt=""
-      className="absolute inset-0 w-full h-full object-cover"
-    />
-  );
-}
-
 const REEL_TOPICS = [
   "All",
   "Street Drift",
@@ -404,56 +312,68 @@ const REEL_TOPICS = [
   "Other",
 ];
 
+// Number of reel cards to keep rendered on either side of the active index.
+// Cards outside this window render as poster-only placeholders to save memory.
+const RENDER_WINDOW = 2;
+
 // ─── ReelsPage ────────────────────────────────────────────────────────────────
 export function ReelsPage() {
   const { data: posts, isLoading } = useGetAllPosts();
-  // We call usePublicActor and useActor so their side-effects run (invalidation
-  // after login), but we no longer block reel rendering on the actor state.
-  // The queryFn in useGetAllPosts awaits getPublicActor() internally, so posts
-  // will arrive as soon as the actor singleton resolves — no need for a separate
-  // actorLoading gate here.
+  // Run side-effects only — don't gate rendering on actor state
   usePublicActor();
   useActor();
-  // Only show the loading screen if posts haven't arrived yet AND the query is
-  // still in-flight. Once we have any posts (even cached ones) we skip straight
-  // to rendering them.
+
   const postsArray = posts as { id: string }[] | undefined;
   const actorLoading = isLoading && (!postsArray || postsArray.length === 0);
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
+
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
-  // Start muted so autoplay works on mobile (browsers block autoplay with sound).
-  // Users can unmute by tapping the sound button.
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [selectedTopic, setSelectedTopic] = useState("All");
-  // Track which single reel is currently visible in the viewport
-  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
-  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  // Map postId → reel container DOM element for IntersectionObserver
+  // Index of the currently active (visible) reel
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Refs for IntersectionObserver
   const reelContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observerRef = useRef<IntersectionObserver | null>(null);
+
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
   const deletePostMutation = useDeletePost();
 
-  // Only show Reel and Video posts — not Photos — on the Reels page.
-  // safePostType always returns lowercase so comparisons are safe.
+  // Filter: only reel/video posts, newest first
   const allPosts = (posts ?? []).filter((p) => {
     const t = safePostType(p.postType);
     return t === "reel" || t === "video";
   });
+  // Sort newest first (descending by timestamp)
+  const sortedPosts = [...allPosts].sort((a, b) => {
+    const ta =
+      typeof a.timestamp === "bigint"
+        ? Number(a.timestamp)
+        : Number(a.timestamp);
+    const tb =
+      typeof b.timestamp === "bigint"
+        ? Number(b.timestamp)
+        : Number(b.timestamp);
+    return tb - ta;
+  });
   const displayPosts =
     selectedTopic === "All"
-      ? allPosts
-      : allPosts.filter((p) => p.topic === selectedTopic);
+      ? sortedPosts
+      : sortedPosts.filter((p) => p.topic === selectedTopic);
 
-  // ── IntersectionObserver: play only the visible reel, pause all others ──────
-  // This is the primary fix for reels freezing. Without it every mounted video
-  // tries to decode and play simultaneously, starving bandwidth and locking the
-  // main thread. With it only one video is active at a time.
+  // Reset active index when topic filter changes
+  const handleTopicChange = (topic: string) => {
+    setSelectedTopic(topic);
+    setActiveIndex(0);
+  };
+
+  // ── Register reel container refs ──────────────────────────────────────────
   const registerReelContainer = useCallback(
     (postId: string, el: HTMLDivElement | null) => {
       if (el) {
@@ -465,8 +385,8 @@ export function ReelsPage() {
     [],
   );
 
+  // ── IntersectionObserver: track which reel is in viewport ─────────────────
   useEffect(() => {
-    // Tear down any previous observer
     if (observerRef.current) {
       observerRef.current.disconnect();
     }
@@ -474,60 +394,29 @@ export function ReelsPage() {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.6) continue;
           const postId = (entry.target as HTMLElement).dataset.postId;
           if (!postId) continue;
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            setVisiblePostId(postId);
+          const idx = displayPosts.findIndex((p) => p.id === postId);
+          if (idx >= 0) {
+            setActiveIndex(idx);
           }
         }
       },
-      {
-        // Fire when 60% of the reel card is visible — avoids flickering at edges
-        threshold: 0.6,
-      },
+      { threshold: 0.6 },
     );
 
-    for (const [_postId, el] of reelContainerRefs.current.entries()) {
+    for (const [, el] of reelContainerRefs.current.entries()) {
       observerRef.current.observe(el);
     }
 
     return () => {
       observerRef.current?.disconnect();
     };
-    // Empty deps — the observer reads from refs (reelContainerRefs) which are
-    // mutated directly and don't need to be in the dependency array. The observer
-    // callback only calls setVisiblePostId so it is always current via closure.
-  }, []);
+    // Rebuild observer when displayPosts changes (topic filter or new posts)
+  }, [displayPosts]);
 
-  // ── Play/pause based on visibility ──────────────────────────────────────────
-  useEffect(() => {
-    for (const [postId, video] of videoRefs.current.entries()) {
-      video.muted = isMuted;
-      if (postId === visiblePostId) {
-        // Ensure preload is set to auto for the visible video so it buffers
-        video.preload = "auto";
-        video.play().catch(() => {
-          // Autoplay blocked (uncommon since muted) — silently ignore
-        });
-      } else {
-        video.pause();
-        // Release memory for off-screen videos: remove preload hint
-        video.preload = "none";
-      }
-    }
-  }, [visiblePostId, isMuted]);
-
-  // Sync muted state directly on video DOM elements (React prop alone isn't always reliable)
-  useEffect(() => {
-    for (const video of videoRefs.current.values()) {
-      video.muted = isMuted;
-    }
-  }, [isMuted]);
-
-  const handleTimeUpdate = (postId: string, pct: number) => {
-    setProgress((prev) => ({ ...prev, [postId]: pct }));
-  };
-
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleLike = (postId: string, currentlyLiked: boolean) => {
     if (!myPrincipal) {
       toast.error("Sign in to like posts");
@@ -575,35 +464,34 @@ export function ReelsPage() {
         : post.content
       : "Check this out on RevSpace";
 
-    // Reels/videos: skip file attachment (too large and often rejected by Web Share API)
-    // Photos: attempt to attach the image so share sheets show a preview
-    const isPhoto = safePostType(post.postType).toLowerCase() === "photo";
-    const imageUrl = post.mediaUrls[0];
+    // For reels with a thumbnail, attempt to share the thumbnail image
+    const thumbnailUrl = post.mediaUrls[1] ?? post.mediaUrls[0];
 
     if (navigator.share) {
       try {
-        if (isPhoto && imageUrl) {
+        if (thumbnailUrl) {
           try {
-            const res = await fetch(imageUrl);
+            const res = await fetch(thumbnailUrl);
             const blob = await res.blob();
-            const ext = blob.type.includes("png") ? "png" : "jpg";
-            const file = new File([blob], `revspace-post.${ext}`, {
-              type: blob.type,
-            });
-            if (navigator.canShare?.({ files: [file] })) {
-              await navigator.share({
-                title: "Check this out on RevSpace",
-                text: shareText,
-                url: shareUrl,
-                files: [file],
+            if (blob.type.startsWith("image/")) {
+              const ext = blob.type.includes("png") ? "png" : "jpg";
+              const file = new File([blob], `revspace-reel.${ext}`, {
+                type: blob.type,
               });
-              return;
+              if (navigator.canShare?.({ files: [file] })) {
+                await navigator.share({
+                  title: "Check this out on RevSpace",
+                  text: shareText,
+                  url: shareUrl,
+                  files: [file],
+                });
+                return;
+              }
             }
           } catch {
-            // Image attach failed — fall through to URL-only share
+            // Thumbnail fetch failed — fall through to URL-only share
           }
         }
-
         await navigator.share({
           title: "Check this out on RevSpace",
           text: shareText,
@@ -625,6 +513,7 @@ export function ReelsPage() {
 
   return (
     <div
+      data-ocid="reels.page"
       className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
       style={{ background: "#000" }}
     >
@@ -651,7 +540,8 @@ export function ReelsPage() {
           <button
             key={t}
             type="button"
-            onClick={() => setSelectedTopic(t)}
+            data-ocid="reels.filter.tab"
+            onClick={() => handleTopicChange(t)}
             className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
             style={
               selectedTopic === t
@@ -673,6 +563,7 @@ export function ReelsPage() {
         ))}
       </div>
 
+      {/* Comments panel */}
       {commentPostId && (
         <ReelsCommentsPanel
           postId={commentPostId}
@@ -680,8 +571,12 @@ export function ReelsPage() {
         />
       )}
 
+      {/* Loading */}
       {(isLoading || actorLoading) && (
-        <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+        <div
+          data-ocid="reels.loading_state"
+          className="h-screen flex flex-col items-center justify-center text-center px-6"
+        >
           <Loader2
             size={36}
             className="animate-spin mb-4"
@@ -691,8 +586,12 @@ export function ReelsPage() {
         </div>
       )}
 
+      {/* Empty state */}
       {!isLoading && !actorLoading && displayPosts.length === 0 && (
-        <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+        <div
+          data-ocid="reels.empty_state"
+          className="h-screen flex flex-col items-center justify-center text-center px-6"
+        >
           <Film size={48} className="text-white/30 mb-4" />
           <h3 className="text-white font-display text-xl font-bold mb-2">
             {selectedTopic === "All"
@@ -717,42 +616,70 @@ export function ReelsPage() {
         </div>
       )}
 
-      {displayPosts.map((post) => {
+      {/* Reel cards */}
+      {displayPosts.map((post, idx) => {
         const serverLiked = myPrincipal
           ? post.likes.some((l) => l.toString() === myPrincipal)
           : false;
         const liked = likedPosts.has(post.id) || serverLiked;
         const postProgress = progress[post.id] ?? 0;
 
-        const isVisible = visiblePostId === post.id;
+        const isActive = idx === activeIndex;
+        // Adjacent = within 1 slot of active (preload metadata)
+        const isAdjacent = !isActive && Math.abs(idx - activeIndex) === 1;
+        // Within render window = show VideoPlayer; outside = poster only
+        const inRenderWindow = Math.abs(idx - activeIndex) <= RENDER_WINDOW;
+
+        // Extract thumbnail from mediaUrls[1] if present
+        const thumbnailUrl = post.mediaUrls[1] ?? undefined;
+        const videoUrl = post.mediaUrls[0] ?? "";
 
         return (
           <div
             key={post.id}
+            data-ocid={`reels.item.${idx + 1}`}
             className="reel-card shrink-0"
             data-post-id={post.id}
             ref={(el) => registerReelContainer(post.id, el)}
           >
-            {/* Background media */}
+            {/* Background media — VideoPlayer or poster-only */}
             <div className="absolute inset-0">
-              <ReelMedia
-                mediaUrl={post.mediaUrls[0]}
-                postId={post.id}
-                postType={post.postType}
-                isMuted={isMuted}
-                isVisible={isVisible}
-                videoRef={(el) => {
-                  if (el) {
-                    el.muted = isMuted;
-                    videoRefs.current.set(post.id, el);
-                  } else {
-                    videoRefs.current.delete(post.id);
-                  }
-                }}
-                onTimeUpdate={handleTimeUpdate}
-              />
+              {inRenderWindow ? (
+                <VideoPlayer
+                  src={videoUrl}
+                  poster={thumbnailUrl}
+                  isActive={isActive}
+                  isAdjacent={isAdjacent}
+                  muted={isMuted}
+                  loop
+                  onTimeUpdate={(currentTime, duration) => {
+                    if (duration > 0) {
+                      setProgress((prev) => ({
+                        ...prev,
+                        [post.id]: (currentTime / duration) * 100,
+                      }));
+                    }
+                  }}
+                  className="absolute inset-0"
+                />
+              ) : // Poster-only placeholder for far-away reels to save memory
+              thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className="absolute inset-0"
+                  style={{ background: "oklch(0.1 0.005 240)" }}
+                />
+              )}
+
+              {/* Gradient overlay */}
               <div
-                className="absolute inset-0"
+                className="absolute inset-0 pointer-events-none"
                 style={{
                   background:
                     "linear-gradient(to top, oklch(0 0 0 / 0.8) 0%, transparent 40%, oklch(0 0 0 / 0.2) 100%)",
@@ -792,6 +719,7 @@ export function ReelsPage() {
               {/* Sound toggle */}
               <button
                 type="button"
+                data-ocid="reel.mute_button"
                 onClick={() => setIsMuted((m) => !m)}
                 className="flex flex-col items-center gap-1"
                 aria-label={isMuted ? "Unmute" : "Mute"}
@@ -813,6 +741,7 @@ export function ReelsPage() {
 
               <button
                 type="button"
+                data-ocid="reel.like_button"
                 onClick={() => handleLike(post.id, liked)}
                 className="flex flex-col items-center gap-1"
               >
@@ -831,6 +760,7 @@ export function ReelsPage() {
 
               <button
                 type="button"
+                data-ocid="reel.comment_button"
                 onClick={() => setCommentPostId(post.id)}
                 className="flex flex-col items-center gap-1"
                 aria-label="Open comments"
@@ -848,9 +778,9 @@ export function ReelsPage() {
 
               <button
                 type="button"
+                data-ocid="reel.share_button"
                 className="flex flex-col items-center gap-1"
                 onClick={() => handleShare(post)}
-                data-ocid="reel.share_button"
               >
                 <div
                   className="w-11 h-11 rounded-full flex items-center justify-center"
@@ -878,6 +808,7 @@ export function ReelsPage() {
               {myPrincipal && post.author.toString() === myPrincipal && (
                 <button
                   type="button"
+                  data-ocid="reel.delete_button"
                   onClick={() => handleDelete(post.id)}
                   disabled={deletePostMutation.isPending}
                   className="flex flex-col items-center gap-1"

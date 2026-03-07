@@ -234,18 +234,28 @@ export function useGetAllPosts() {
     },
     // Always enabled — initialData serves the cache while actor is loading
     enabled: true,
-    // Keep posts fresh for 60s to reduce redundant fetches
-    staleTime: 60_000,
+    // Keep posts fresh for 30 s — quick enough that a recovering canister
+    // will be re-queried soon after it wakes up.
+    staleTime: 30_000,
+    // Keep in React Query memory cache for 10 minutes across page navigations
+    gcTime: 10 * 60_000,
     refetchOnMount: true,
-    // No polling interval — we rely on refetchOnMount + refetchOnWindowFocus
-    // The old 1s polling when actor==null was hammering the canister constantly
-    refetchInterval: false,
+    // Backstop polling: if the canister was down and the query returned empty,
+    // this ensures we re-try every 8 s until real data arrives.
+    // Once posts are in cache the staleTime prevents redundant re-fetches.
+    refetchInterval: (query) => {
+      // Stop polling once we have live data
+      const hasData =
+        Array.isArray(query.state.data) &&
+        (query.state.data as unknown[]).length > 0;
+      return hasData ? false : 8_000;
+    },
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    // Only retry a few times — the singleton approach means the actor will be
-    // ready quickly; excessive retries just slow everything down
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 4000),
+    // Don't refetch just because the window regains focus — reduces canister load
+    refetchOnWindowFocus: false,
+    // Retry aggressively — the canister may just be cold-starting
+    retry: 10,
+    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 6000),
     // Pre-populate from localStorage cache so content shows instantly on mount
     initialData: (): AllPostsResult | undefined => {
       const cached = getCachedPosts();
@@ -590,10 +600,14 @@ export function useGetProfile(user: Principal | undefined) {
       return unwrapOptionalProfile(raw);
     },
     enabled: !!actor && !!user,
-    staleTime: 30_000,
-    gcTime: 5 * 60 * 1000,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    // Profile data is stable — keep it fresh for 5 minutes and in cache for 15
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
+    // Only retry once for profiles — missing profiles are usually genuinely missing
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    // Don't refetch profiles just because the window refocuses
+    refetchOnWindowFocus: false,
   });
 }
 
