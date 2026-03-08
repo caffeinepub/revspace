@@ -9,14 +9,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Principal } from "@icp-sdk/core/principal";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Car, CornerDownRight, Crown, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PostCard, PostCardSkeleton } from "../components/PostCard";
 import { useActor } from "../hooks/useActor";
-import { usePublicActor } from "../hooks/usePublicActor";
 import {
   useAddComment,
   useAddCommentReply,
@@ -336,25 +334,20 @@ function CommentsDialog({
 }
 
 export function FeedPage() {
-  const { data: livePosts, isLoading: postsLoading } = useGetAllPosts();
-  const { actor: publicActor } = usePublicActor();
-  // useActor side-effect: invalidates dependent queries after login
+  const {
+    data: livePosts,
+    isLoading: postsLoading,
+    isFetching: postsFetching,
+    failureCount,
+  } = useGetAllPosts();
+  // useActor side-effect: invalidates auth-dependent queries (profile, garage, etc.)
+  // after login. Posts are NOT invalidated here — useGetAllPosts uses getPublicActor()
+  // directly so it is immune to useActor's re-render cycles.
   useActor();
-  const qc = useQueryClient();
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [postCount, setPostCount] = useState(0);
-
-  // When publicActor resolves for the first time, refetch posts to get live data.
-  // Use a ref to avoid refetching on every render after the actor is set.
-  const publicActorRefetchedRef = useRef(false);
-  useEffect(() => {
-    if (publicActor && !publicActorRefetchedRef.current) {
-      publicActorRefetchedRef.current = true;
-      qc.invalidateQueries({ queryKey: ["posts"] });
-    }
-  }, [publicActor, qc]);
 
   // Show live posts if available, otherwise fall back to localStorage cache.
   // The feed should NEVER be blank if there are cached posts.
@@ -366,11 +359,16 @@ export function FeedPage() {
         ? cachedFallback
         : livePosts;
 
-  // actorLoading: only show skeleton when truly nothing is available —
-  // no cached posts, no live posts, and the query is still in-flight.
-  // The singleton actor approach means the actor resolves almost immediately,
-  // so this state should be very brief (< 500ms) on any normal connection.
-  const actorLoading = postsLoading && (!posts || posts.length === 0);
+  // Only show skeleton when we have absolutely no data to show —
+  // not during background refetches (postsLoading is true during ANY refetch).
+  // If cached posts are already visible, never flash a skeleton.
+  const hasAnyPosts = (posts?.length ?? 0) > 0;
+  const actorLoading = !hasAnyPosts && (postsLoading || postsFetching);
+
+  // Only show "no posts" empty state after at least 3 failures or if we've
+  // genuinely loaded and there's nothing — never show it on first load.
+  const showEmptyState =
+    !actorLoading && !hasAnyPosts && !postsFetching && failureCount >= 3;
 
   const displayPosts = [...(posts ?? [])].sort((a, b) =>
     Number(b.timestamp - a.timestamp),
@@ -502,8 +500,9 @@ export function FeedPage() {
       </div>
 
       {/* Snap-scroll feed — one post per screen, newest first */}
-      {actorLoading && displayPosts.length === 0 ? (
-        /* Single skeleton while actors are initializing */
+      {(actorLoading || (!hasAnyPosts && postsFetching)) &&
+      displayPosts.length === 0 ? (
+        /* Single skeleton while actors are initializing or retrying */
         <div
           className="snap-start snap-always"
           style={{ height: "100dvh", overflowY: "auto" }}
@@ -511,8 +510,8 @@ export function FeedPage() {
         >
           <PostCardSkeleton />
         </div>
-      ) : !actorLoading && displayPosts.length === 0 ? (
-        /* Empty state */
+      ) : showEmptyState ? (
+        /* Empty state — only shown after retries exhausted and truly no posts */
         <div
           className="flex flex-col items-center justify-center py-24 px-6 text-center"
           data-ocid="feed.empty_state"

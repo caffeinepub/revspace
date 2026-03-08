@@ -202,37 +202,50 @@ export function useUploadFile() {
 // getAllPosts, getPostsByUser, and getCommentsForPost are public read endpoints —
 // they do NOT require the user to be registered in the canister's userRoles map.
 //
-// IMPORTANT: We use usePublicActor (not useActor) as the PRIMARY actor source for
-// public reads. useActor awaits _initializeAccessControlWithSecret in its queryFn —
-// if that call throws after a fresh deploy/cold-start, useActor.actor stays null
-// forever and every public page stays blank. usePublicActor builds an anonymous
-// actor WITHOUT any auth init call, so it is always available for public reads.
-//
-// We fall back to useActor's actor if it happens to be available (e.g. the user
-// is authenticated and the actor built successfully), so authenticated reads still
-// benefit from the user's identity where needed.
+// IMPORTANT: useGetAllPosts uses getPublicActor() (the module-level singleton promise)
+// directly inside its queryFn instead of reading React state. This eliminates the
+// race condition where useActor's invalidateQueries storm fires while the actor
+// closure inside the queryFn still holds null, causing the query to return [] and
+// overwrite cached/live data. getPublicActor() resolves as soon as the canister
+// responds and retries indefinitely — it is always safe to await inside queryFn.
 type AllPostsResult = Awaited<ReturnType<backendInterface["getAllPosts"]>>;
 
 export function useGetAllPosts() {
-  const { actor: publicActor } = usePublicActor();
-  const { actor: authActor } = useActor();
-  // Prefer auth actor (has identity) but always fall back to anonymous actor
-  const actor = authActor ?? publicActor;
+  // Use ONLY the getPublicActor() singleton promise inside the queryFn.
+  // This avoids the race with useActor's invalidateQueries storm:
+  //   1. useActor resolves and calls invalidateQueries for ALL queries
+  //   2. At that exact moment, an actor-dependent queryFn may capture actor=null
+  //   3. The query returns [] and overwrites real cached/live post data
+  //
+  // getPublicActor() is a module-level singleton that retries indefinitely —
+  // it is ALWAYS available once the module loads, independent of React state.
   const query = useQuery({
     queryKey: ["posts"],
     queryFn: async (): Promise<AllPostsResult> => {
-      // If neither actor is ready yet, use getPublicActor() which awaits the
-      // module singleton — this avoids throwing and forcing React Query retries
-      // which hammer the canister.
-      const activeActor = actor ?? (await getPublicActor());
-      const posts = await activeActor.getAllPosts();
+      // Always await the singleton — never depends on React state so there is
+      // no closure-capture race. The singleton resolves as soon as the canister
+      // responds (with indefinite retries), so this blocks only briefly.
+      const actor = await getPublicActor();
+      const posts = await actor.getAllPosts();
+      // If the canister returns empty during a cold-start or warm-up window,
+      // throw so React Query retries rather than "succeeding" with [].
+      // This prevents the feed from flashing "No posts" when real data exists.
+      // We only do this when there's cached data — if there's truly no data,
+      // we should show the empty state after exhausting retries.
+      const hasCachedData =
+        Array.isArray(getCachedPosts()) && (getCachedPosts()?.length ?? 0) > 0;
+      if (Array.isArray(posts) && posts.length === 0 && hasCachedData) {
+        throw new Error(
+          "Posts returned empty — canister may be warming up. Retrying...",
+        );
+      }
       // Persist to localStorage backup so next load has content immediately
       if (Array.isArray(posts) && posts.length > 0) {
         setCachedPosts(posts);
       }
       return posts;
     },
-    // Always enabled — initialData serves the cache while actor is loading
+    // Always enabled — initialData serves the cache while the singleton resolves
     enabled: true,
     // Keep posts fresh for 30 s — quick enough that a recovering canister
     // will be re-queried soon after it wakes up.
@@ -240,15 +253,13 @@ export function useGetAllPosts() {
     // Keep in React Query memory cache for 10 minutes across page navigations
     gcTime: 10 * 60_000,
     refetchOnMount: true,
-    // Backstop polling: if the canister was down and the query returned empty,
-    // this ensures we re-try every 8 s until real data arrives.
-    // Once posts are in cache the staleTime prevents redundant re-fetches.
+    // Poll every 5s when we have no data (canister cold-starting with no cache).
+    // Once we have posts, polling stops automatically.
     refetchInterval: (query) => {
-      // Stop polling once we have live data
       const hasData =
         Array.isArray(query.state.data) &&
         (query.state.data as unknown[]).length > 0;
-      return hasData ? false : 8_000;
+      return hasData ? false : 5_000;
     },
     refetchIntervalInBackground: false,
     // Don't refetch just because the window regains focus — reduces canister load
