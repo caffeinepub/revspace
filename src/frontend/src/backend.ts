@@ -217,6 +217,7 @@ export interface backendInterface {
     adminDeletePost(postId: string): Promise<void>;
     adminDeleteProfile(user: Principal): Promise<void>;
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
+    adminGetAllProfilesPublic(secret: string): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
     adminPromoteToAdmin(secret: string): Promise<void>;
     adminSetUserMeta(user: Principal, newLocation: string, secret: string): Promise<void>;
@@ -495,6 +496,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.adminGetAllProfiles();
+            return result;
+        }
+    }
+    async adminGetAllProfilesPublic(arg0: string): Promise<Array<ProfileWithPrincipal>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminGetAllProfilesPublic(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminGetAllProfilesPublic(arg0);
             return result;
         }
     }

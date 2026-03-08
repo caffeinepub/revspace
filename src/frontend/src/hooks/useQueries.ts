@@ -597,20 +597,55 @@ function unwrapOptionalProfile(raw: unknown): {
   };
 }
 
-export function useGetProfile(user: Principal | undefined) {
+export function useGetProfile(
+  user: Principal | undefined,
+  fallbackPrincipalStr?: string,
+) {
   // getProfile is a public read — use publicActor as primary so it always fires
   // even if useActor's auth init throws after a fresh deploy.
   const { actor: publicActor } = usePublicActor();
   const { actor: authActor } = useActor();
   const actor = authActor ?? publicActor;
+
+  // Derive the canonical principal string for cache lookups and query keys.
+  const principalStr = user?.toString() ?? fallbackPrincipalStr ?? "";
+
   return useQuery({
-    queryKey: ["profile", user?.toString()],
+    queryKey: ["profile", principalStr],
     queryFn: async () => {
+      // Fast path: check localStorage cache first so names appear instantly
+      // even if the canister actor hasn't resolved yet.
+      if (principalStr) {
+        const cached = getCachedProfile(principalStr);
+        if (cached?.displayName) {
+          // Fire the backend fetch in the background but return cache immediately
+          if (actor && user) {
+            actor
+              .getProfile(user)
+              .then((raw) => {
+                const fresh = unwrapOptionalProfile(raw);
+                if (fresh?.displayName) {
+                  setCachedProfile(principalStr, fresh);
+                }
+              })
+              .catch(() => {
+                /* best-effort */
+              });
+          }
+          return cached;
+        }
+      }
+
       if (!actor || !user) return null;
       const raw = await actor.getProfile(user);
-      return unwrapOptionalProfile(raw);
+      const result = unwrapOptionalProfile(raw);
+      // Cache the result for future fast-path hits
+      if (result?.displayName && principalStr) {
+        setCachedProfile(principalStr, result);
+      }
+      return result;
     },
-    enabled: !!actor && !!user,
+    enabled: !!principalStr,
     // Profile data is stable — keep it fresh for 5 minutes and in cache for 15
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,

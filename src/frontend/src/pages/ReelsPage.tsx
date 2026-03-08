@@ -323,8 +323,6 @@ export function ReelsPage() {
   usePublicActor();
   useActor();
 
-  const postsArray = posts as { id: string }[] | undefined;
-  const actorLoading = isLoading && (!postsArray || postsArray.length === 0);
   const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal().toString();
 
@@ -571,8 +569,8 @@ export function ReelsPage() {
         />
       )}
 
-      {/* Loading */}
-      {(isLoading || actorLoading) && (
+      {/* Loading — only show when truly loading with no data yet */}
+      {isLoading && displayPosts.length === 0 && (
         <div
           data-ocid="reels.loading_state"
           className="h-screen flex flex-col items-center justify-center text-center px-6"
@@ -587,7 +585,7 @@ export function ReelsPage() {
       )}
 
       {/* Empty state */}
-      {!isLoading && !actorLoading && displayPosts.length === 0 && (
+      {!isLoading && displayPosts.length === 0 && (
         <div
           data-ocid="reels.empty_state"
           className="h-screen flex flex-col items-center justify-center text-center px-6"

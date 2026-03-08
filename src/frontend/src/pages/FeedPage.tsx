@@ -333,6 +333,74 @@ function CommentsDialog({
   );
 }
 
+// Per-post lazy mount: each feed item manages its own visibility via a ref callback.
+function FeedItem({
+  post,
+  index,
+  onCommentClick,
+  nextMediaUrl,
+}: {
+  post: ReturnType<typeof useGetAllPosts>["data"] extends
+    | Array<infer T>
+    | undefined
+    ? T
+    : never;
+  index: number;
+  onCommentClick: (id: string) => void;
+  nextMediaUrl: string | undefined;
+}) {
+  const [isVisible, setIsVisible] = useState(index === 0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isVisible) return; // Once visible, always stays mounted — no need to observe further
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio >= 0.4) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: [0, 0.4, 1.0] },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  return (
+    <div
+      ref={containerRef}
+      data-index={index}
+      data-ocid={`feed.item.${index + 1}`}
+      className="snap-start snap-always"
+      style={{ height: "100dvh", overflow: "hidden" }}
+    >
+      {isVisible ? (
+        <div style={{ height: "100%", overflowY: "auto" }}>
+          <PostCard
+            post={post}
+            onCommentClick={onCommentClick}
+            isVisible={true}
+            index={index}
+            nextMediaUrl={nextMediaUrl}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            height: "100dvh",
+            background: "oklch(var(--carbon))",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function FeedPage() {
   const {
     data: livePosts,
@@ -345,9 +413,6 @@ export function FeedPage() {
   // directly so it is immune to useActor's re-render cycles.
   useActor();
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
-  const feedContainerRef = useRef<HTMLDivElement>(null);
-  const [visibleIndex, setVisibleIndex] = useState(0);
-  const [postCount, setPostCount] = useState(0);
 
   // Show live posts if available, otherwise fall back to localStorage cache.
   // The feed should NEVER be blank if there are cached posts.
@@ -373,37 +438,6 @@ export function FeedPage() {
   const displayPosts = [...(posts ?? [])].sort((a, b) =>
     Number(b.timestamp - a.timestamp),
   );
-
-  // Sync postCount state when displayPosts length changes so the observer re-runs.
-  useEffect(() => {
-    setPostCount(displayPosts.length);
-  }, [displayPosts.length]);
-
-  // Track which post is currently visible using IntersectionObserver.
-  // postCount is intentionally used only to trigger re-observation when posts are added.
-  useEffect(() => {
-    const container = feedContainerRef.current;
-    if (!container) return;
-    // Use postCount to confirm items exist before observing (avoids lint "unused dep" by reading it)
-    if (postCount === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const idx = Number((entry.target as HTMLElement).dataset.index);
-            if (!Number.isNaN(idx)) setVisibleIndex(idx);
-          }
-        }
-      },
-      { root: container, threshold: 0.6 },
-    );
-
-    const items = container.querySelectorAll("[data-index]");
-    for (const item of items) observer.observe(item);
-
-    return () => observer.disconnect();
-  }, [postCount]);
 
   const memberCount =
     displayPosts.length > 0
@@ -540,45 +574,21 @@ export function FeedPage() {
         </div>
       ) : (
         <div
-          ref={feedContainerRef}
           className="flex-1 overflow-y-scroll snap-y snap-mandatory"
           style={{ scrollbarWidth: "none", height: "100dvh" }}
         >
           {displayPosts.map((post, index) => {
-            // Virtual windowing: only render the actual post card for posts
-            // within 2 positions of the currently visible post. All others
-            // render as cheap spacer divs that maintain scroll position without
-            // keeping DOM nodes, images, or video elements alive in memory.
-            const isNearVisible = Math.abs(index - visibleIndex) <= 2;
             const nextPost = displayPosts[index + 1];
             const nextMediaUrl = nextPost?.mediaUrls?.[0];
 
             return (
-              <div
+              <FeedItem
                 key={post.id}
-                data-index={index}
-                data-ocid={`feed.item.${index + 1}`}
-                className="snap-start snap-always"
-                style={{ height: "100dvh", overflowY: "auto" }}
-              >
-                {isNearVisible ? (
-                  <PostCard
-                    post={post}
-                    onCommentClick={(id) => setCommentPostId(id)}
-                    isVisible={index === visibleIndex}
-                    index={index}
-                    nextMediaUrl={nextMediaUrl}
-                  />
-                ) : (
-                  /* Lightweight placeholder keeps snap targets intact */
-                  <div
-                    style={{
-                      height: "100dvh",
-                      background: "oklch(var(--carbon))",
-                    }}
-                  />
-                )}
-              </div>
+                post={post}
+                index={index}
+                onCommentClick={(id) => setCommentPostId(id)}
+                nextMediaUrl={nextMediaUrl}
+              />
             );
           })}
 

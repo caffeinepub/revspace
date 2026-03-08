@@ -145,6 +145,10 @@ export interface _SERVICE {
   'adminDeletePost' : ActorMethod<[string], undefined>,
   'adminDeleteProfile' : ActorMethod<[Principal], undefined>,
   'adminGetAllProfiles' : ActorMethod<[], Array<ProfileWithPrincipal>>,
+  'adminGetAllProfilesPublic' : ActorMethod<
+    [string],
+    Array<ProfileWithPrincipal>
+  >,
   'adminGetAllUsers' : ActorMethod<[], Array<UserWithRole>>,
   'adminPromoteToAdmin' : ActorMethod<[string], undefined>,
   'adminSetUserMeta' : ActorMethod<[Principal, string, string], undefined>,

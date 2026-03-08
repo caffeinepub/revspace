@@ -13,8 +13,6 @@ import MixinStorage "blob-storage/Mixin";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 
-
-
 actor {
   //-----------------------------
   // Types
@@ -59,6 +57,10 @@ actor {
       avatarUrl : Text;
       location : Text;
       bannerUrl : Text;
+    };
+    public type ProfileWithPrincipal = {
+      principal : Principal;
+      profile : Profile;
     };
 
     public type Car = {
@@ -167,11 +169,6 @@ actor {
       principal : Principal;
       role : UserRole;
     };
-
-    public type ProfileWithPrincipal = {
-      principal : Principal;
-      profile : Profile;
-    };
   };
 
   // Helper functions for converting to View objects
@@ -250,27 +247,28 @@ actor {
   };
 
   // -----------------------------------
-  // NEW FUNCTIONS PER CHANGE REQUEST
+  // ADMIN FUNCTIONS WITH SECRET TOKEN
   // -----------------------------------
+  // WARNING: These functions use hardcoded secrets which is a security anti-pattern
+  // They are kept only for backward compatibility as requested
+  // In production, these should be replaced with proper role-based authorization
 
-  // New admin-only function to promote caller to admin using secret token
   public shared ({ caller }) func adminPromoteToAdmin(secret : Text) : async () {
     if (secret != ADMIN_SECRET) {
       Runtime.trap("Unauthorized: Incorrect token");
     };
+    // This bypasses proper authorization - security risk
     AccessControl.assignRole(accessControlState, caller, caller, #admin);
     adminAssigned := true;
   };
 
-  // New admin-only function to update user's location field using secret token
   public shared ({ caller }) func adminSetUserMeta(user : Principal, newLocation : Text, secret : Text) : async () {
     if (secret != ADMIN_SECRET) {
       Runtime.trap("Unauthorized: Incorrect token");
     };
-
+    // This bypasses proper authorization - security risk
     switch (profiles.get(user)) {
       case (null) {
-        // Create minimal profile with only location field
         let profile : Types.Profile = {
           displayName = "";
           bio = "";
@@ -289,9 +287,22 @@ actor {
     };
   };
 
-  // -----------------------------------
-  // ADMIN FUNCTIONS
-  // -----------------------------------
+  public query ({ caller }) func adminGetAllProfilesPublic(secret : Text) : async [Types.ProfileWithPrincipal] {
+    if (secret != ADMIN_SECRET) {
+      Runtime.trap("Unauthorized: Invalid token");
+    };
+    // This bypasses proper authorization - security risk
+    // Exposes all user data to anyone with the hardcoded secret
+    profiles.entries().toArray().map(
+      func((principal, profile)) {
+        {
+          principal;
+          profile;
+        };
+      }
+    );
+  };
+
   public query ({ caller }) func adminGetAllUsers() : async [Types.UserWithRole] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Admins only");
@@ -407,7 +418,6 @@ actor {
     };
   };
 
-  // --- EXISTING API (unchanged) ---
   // -----------------------------------
   // POSTS
   // -----------------------------------
@@ -538,13 +548,13 @@ actor {
   };
 
   public query ({ caller }) func getRepliesToComment(commentId : Text) : async [Types.Comment] {
-    return comments.values().toArray().filter(
+    comments.values().toArray().filter(
       func(c) { c.parentCommentId == ?commentId }
     );
   };
 
   public query ({ caller }) func getCommentsForPost(postId : Text) : async [Types.Comment] {
-    return comments.values().toArray().filter(
+    comments.values().toArray().filter(
       func(c) { c.postId == postId }
     );
   };
@@ -585,9 +595,11 @@ actor {
     profiles.get(user);
   };
 
+  // Auto-registration functions - security note: allows unrestricted self-registration
   public shared ({ caller }) func updateProfile(displayName : Text, bio : Text, avatarUrl : Text, location : Text, bannerUrl : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can update profiles");
+    // Auto-register as #user if no role yet
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      AccessControl.assignRole(accessControlState, caller, caller, #user);
     };
     let profile : Types.Profile = {
       displayName;
@@ -599,9 +611,10 @@ actor {
     profiles.add(caller, profile);
   };
 
-  public query ({ caller }) func getMyProfile() : async ?Types.Profile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view profiles");
+  public shared ({ caller }) func getMyProfile() : async ?Types.Profile {
+    // Auto-register as #user if no role yet
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      AccessControl.assignRole(accessControlState, caller, caller, #user);
     };
     profiles.get(caller);
   };

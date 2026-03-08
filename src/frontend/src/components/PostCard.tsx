@@ -115,8 +115,10 @@ export function PostCard({
     ? principalToString(authorPrincipal)
     : principalToString(post.author);
 
-  const { data: profile, isLoading: profileLoading } =
-    useGetProfile(authorPrincipal);
+  const { data: profile, isLoading: profileLoading } = useGetProfile(
+    authorPrincipal,
+    authorKey || undefined,
+  );
 
   // useAuthorClubName is called at the top level (required by Rules of Hooks)
   // It reads from the live clubs data in React Query, so it works for ANY user —
@@ -128,7 +130,7 @@ export function PostCard({
       ? profile.displayName
       : authorKey
         ? truncatePrincipal(authorKey)
-        : "Unknown";
+        : "...";
   const avatarUrl = profile?.avatarUrl ?? "";
 
   const hasLiked = myPrincipal
@@ -148,13 +150,14 @@ export function PostCard({
 
   const liked = optimisticLiked !== null ? optimisticLiked : hasLiked;
 
-  // Determine post type early so it can be used in subsequent hooks
-  const _isVideoPostEarly =
+  // Determine post type — must be declared before any hooks that depend on it
+  const isVideoPost =
     safePostType(post.postType) === "video" ||
     safePostType(post.postType) === "reel";
+
   // Extract thumbnail from mediaUrls[1] if present (set during video upload)
   // mediaUrls[0] = video URL, mediaUrls[1] = thumbnail URL (when generated on upload)
-  const thumbnailUrl = _isVideoPostEarly
+  const thumbnailUrl = isVideoPost
     ? (post.mediaUrls[1] ?? undefined)
     : undefined;
 
@@ -185,11 +188,12 @@ export function PostCard({
     }
   }, [isVisible, nextMediaUrl]);
 
-  // For the first 2 posts, treat them as always visible so videos load immediately
-  // without waiting for IntersectionObserver to fire (which requires scrolling).
-  const effectivelyVisible = isVisible || index < 2;
+  // Only load/play when this exact post is visible in the feed.
+  const effectivelyVisible = !!isVisible;
 
-  // Load / unload video source based on visibility to save bandwidth
+  // Load / unload video source based on visibility to save bandwidth.
+  // isVideoPost is included in deps so the effect re-runs if postType changes,
+  // and so the closure captures the correct value at every render.
   const clearSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const mediaUrl = post.mediaUrls[0];
@@ -227,8 +231,7 @@ export function PostCard({
     return () => {
       if (clearSrcTimerRef.current) clearTimeout(clearSrcTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectivelyVisible, post.mediaUrls, thumbnailUrl]);
+  }, [effectivelyVisible, isVideoPost, post.mediaUrls, thumbnailUrl]);
 
   // Close reaction picker when clicking outside
   useEffect(() => {
@@ -327,8 +330,6 @@ export function PostCard({
   };
 
   const handleLike = handleLikeButtonClick;
-
-  const isVideoPost = _isVideoPostEarly;
 
   const handleShare = async () => {
     const shareUrl = `https://revspace-2ah.caffeine.xyz/#post-${post.id}`;

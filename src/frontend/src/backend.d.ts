@@ -117,6 +117,7 @@ export interface backendInterface {
     adminDeletePost(postId: string): Promise<void>;
     adminDeleteProfile(user: Principal): Promise<void>;
     adminGetAllProfiles(): Promise<Array<ProfileWithPrincipal>>;
+    adminGetAllProfilesPublic(secret: string): Promise<Array<ProfileWithPrincipal>>;
     adminGetAllUsers(): Promise<Array<UserWithRole>>;
     adminPromoteToAdmin(secret: string): Promise<void>;
     adminSetUserMeta(user: Principal, newLocation: string, secret: string): Promise<void>;

@@ -131,113 +131,153 @@ function RowSkeleton() {
 
 // ── Users tab ─────────────────────────────────────────────────────────────────
 
+// Wrap a promise with a timeout so slow/missing backend calls don't hang forever
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 function UsersTab({
   actor,
   writeActor,
   fallbackActor,
-  adminActor,
   myPrincipal,
 }: {
-  actor: backendInterface | null; // public actor for reads
+  actor: backendInterface | null; // public actor for reads (also used for adminGetAllProfilesPublic)
   writeActor: backendInterface | null; // adminActor for role-gated writes (ban/delete)
   fallbackActor: backendInterface | null; // regular auth actor for secret-based writes
-  adminActor: backendInterface | null; // admin-promoted actor for adminGetAllProfiles
   myPrincipal: string | undefined;
 }) {
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadErrorMsg, setLoadErrorMsg] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   // Per-user RB input values
   const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
   const loadUsers = useCallback(async () => {
-    if (!actor) return;
+    if (!actor) {
+      // Actor not ready yet — will retry via useEffect when it becomes available
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
+    setLoadErrorMsg("");
 
     try {
       const seen = new Set<string>();
-      const principals: Principal[] = [];
+      const merged: MergedUser[] = [];
 
-      // Strategy 1: Use adminGetAllProfiles if admin actor is available — most
-      // complete list, includes registered users even if they haven't posted.
-      if (adminActor) {
-        try {
-          const allProfiles = await adminActor.adminGetAllProfiles();
-          for (const pp of allProfiles) {
-            const key = pp.principal.toString();
-            if (!seen.has(key)) {
-              seen.add(key);
-              principals.push(pp.principal);
-            }
+      // Strategy 1: adminGetAllProfilesPublic — no role check needed, just the
+      // secret token. Returns ALL registered users even if they have no posts.
+      // Wrapped in a 10-second timeout so it fails fast if the function doesn't exist.
+      try {
+        const allProfiles = await withTimeout(
+          actor.adminGetAllProfilesPublic("Meonly123$"),
+          10000,
+        );
+        for (const pp of allProfiles) {
+          const key = pp.principal.toString();
+          if (!seen.has(key)) {
+            seen.add(key);
+            const meta = decodeMetaFromLocation(pp.profile.location ?? "");
+            merged.push({
+              principal: pp.principal,
+              role: "user" as UserRole,
+              displayName:
+                pp.profile.displayName || truncPrincipal(pp.principal),
+              avatarUrl: pp.profile.avatarUrl || "",
+              revBucks: meta.rb,
+              isPro: meta.isPro,
+              isModel: meta.isModel,
+              locationRaw: pp.profile.location ?? "",
+            });
           }
-        } catch {
-          // adminGetAllProfiles may fail if role not yet promoted — fall through
-          // to Strategy 2 which uses the public API.
         }
+      } catch (e) {
+        console.warn("[Admin] adminGetAllProfilesPublic failed:", e);
+        // Fall through to Strategy 2 if the public admin call fails
       }
 
-      // Strategy 2: Use getAllPosts() (public, no auth needed) to discover
-      // post authors. Always runs so we catch users the admin call may miss.
+      // Strategy 2: getAllPosts() — catches any users who have posts but
+      // somehow aren't in the profiles list (edge case). Always runs.
+      const extraPrincipals: Principal[] = [];
       try {
-        const posts = await actor.getAllPosts();
+        const posts = await withTimeout(actor.getAllPosts(), 10000);
         for (const p of posts) {
           const key = p.author.toString();
           if (!seen.has(key)) {
             seen.add(key);
-            principals.push(p.author);
+            extraPrincipals.push(p.author);
           }
         }
-      } catch {
-        // posts call failed — OK if Strategy 1 already gave us users
+      } catch (e) {
+        console.warn("[Admin] getAllPosts failed:", e);
+        // Posts call failed — OK if Strategy 1 already gave us users
       }
 
-      if (principals.length === 0) {
+      // Fetch profiles for any additional principals found via posts
+      if (extraPrincipals.length > 0) {
+        const extraResults = await Promise.allSettled(
+          extraPrincipals.map((pr) => actor.getProfile(pr)),
+        );
+        for (let i = 0; i < extraPrincipals.length; i++) {
+          const result = extraResults[i];
+          if (result.status === "rejected" || result.value === null) continue;
+          const profile = result.value as Profile;
+          const meta = decodeMetaFromLocation(profile.location ?? "");
+          merged.push({
+            principal: extraPrincipals[i],
+            role: "user" as UserRole,
+            displayName:
+              profile.displayName || truncPrincipal(extraPrincipals[i]),
+            avatarUrl: profile.avatarUrl || "",
+            revBucks: meta.rb,
+            isPro: meta.isPro,
+            isModel: meta.isModel,
+            locationRaw: profile.location ?? "",
+          });
+        }
+      }
+
+      if (merged.length === 0) {
+        // Both strategies returned nothing — could be a real empty state or a failure
         setUsers([]);
         setLoading(false);
         return;
-      }
-
-      // Fetch all profiles in parallel
-      const profileResults = await Promise.allSettled(
-        principals.map((pr) => actor.getProfile(pr)),
-      );
-
-      const merged: MergedUser[] = [];
-      for (let i = 0; i < principals.length; i++) {
-        const result = profileResults[i];
-        if (result.status === "rejected" || result.value === null) continue;
-        const profile = result.value as Profile;
-        const meta = decodeMetaFromLocation(profile.location ?? "");
-        merged.push({
-          principal: principals[i],
-          role: "user" as UserRole,
-          displayName: profile.displayName || truncPrincipal(principals[i]),
-          avatarUrl: profile.avatarUrl || "",
-          revBucks: meta.rb,
-          isPro: meta.isPro,
-          isModel: meta.isModel,
-          locationRaw: profile.location ?? "",
-        });
       }
 
       // Sort alphabetically by display name
       merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
       setUsers(merged);
       setLoadError(false);
+      setLoadErrorMsg("");
     } catch (err) {
-      console.error("loadUsers error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Admin] loadUsers error:", msg);
       toast.error("Failed to load users — tap Retry to try again");
       setLoadError(true);
+      setLoadErrorMsg(msg);
     } finally {
       setLoading(false);
     }
-  }, [actor, adminActor]);
+  }, [actor]);
 
   useEffect(() => {
-    if (!actor) return;
-    loadUsers();
+    if (!actor) {
+      // Actor not ready yet — schedule a retry in 2 seconds
+      const timer = setTimeout(() => {
+        if (actor) void loadUsers();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    void loadUsers();
   }, [actor, loadUsers]);
 
   async function handleDeleteProfile(principal: Principal) {
@@ -423,9 +463,15 @@ function UsersTab({
         <p className="text-sm text-muted-foreground">
           Could not load users. The canister may still be warming up.
         </p>
+        {loadErrorMsg ? (
+          <p className="text-xs font-mono text-muted-foreground mt-1 max-w-xs break-all">
+            {loadErrorMsg.slice(0, 200)}
+          </p>
+        ) : null}
         <Button
           size="sm"
-          onClick={loadUsers}
+          onClick={() => void loadUsers()}
+          data-ocid="admin.users.secondary_button"
           style={{
             background: "oklch(var(--orange) / 0.2)",
             border: "1px solid oklch(var(--orange) / 0.4)",
@@ -1534,7 +1580,6 @@ export function AdminPage() {
                   actor={actor}
                   writeActor={adminActor}
                   fallbackActor={regularActor}
-                  adminActor={adminActor}
                   myPrincipal={myPrincipal}
                 />
               </TabsContent>
