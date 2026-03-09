@@ -27,11 +27,19 @@ import { getCachedPosts } from "../lib/postCache";
 import { timeAgo, truncatePrincipal } from "../utils/format";
 
 function CommentAuthor({ author }: { author: Principal }) {
-  const { data: profile } = useGetProfile(author);
+  // Safely unwrap — author can come back as [Principal] from Motoko optional
+  const unwrapped = Array.isArray(author)
+    ? (author[0] as Principal | undefined)
+    : author;
+  const authorKey = (() => {
+    if (!unwrapped) return "";
+    const s = unwrapped.toString();
+    return s === "[object Object]" ? "" : s;
+  })();
+  const { data: profile } = useGetProfile(unwrapped);
   const displayName =
-    profile?.displayName ?? truncatePrincipal(author.toString());
+    profile?.displayName ?? (authorKey ? truncatePrincipal(authorKey) : "...");
   const avatarUrl = profile?.avatarUrl ?? "";
-  const authorKey = author.toString();
 
   return (
     <div className="flex gap-2">

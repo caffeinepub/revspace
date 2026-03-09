@@ -47,11 +47,19 @@ function safePostType(pt: unknown): string {
 
 // ─── CommentAuthorRow ─────────────────────────────────────────────────────────
 function CommentAuthorRow({ author }: { author: Principal }) {
-  const { data: profile } = useGetProfile(author);
+  // Safely unwrap — author can come back as [Principal] from Motoko optional
+  const unwrapped = Array.isArray(author)
+    ? (author[0] as Principal | undefined)
+    : author;
+  const authorKey = (() => {
+    if (!unwrapped) return "";
+    const s = unwrapped.toString();
+    return s === "[object Object]" ? "" : s;
+  })();
+  const { data: profile } = useGetProfile(unwrapped);
   const displayName =
-    profile?.displayName ?? truncatePrincipal(author.toString());
+    profile?.displayName ?? (authorKey ? truncatePrincipal(authorKey) : "...");
   const avatarUrl = profile?.avatarUrl ?? "";
-  const authorKey = author.toString();
 
   return (
     <div className="flex gap-2 items-start">
@@ -230,9 +238,17 @@ interface ReelAuthorInfoProps {
 }
 
 function ReelAuthorInfo({ authorPrincipal, myPrincipal }: ReelAuthorInfoProps) {
-  const { data: profile, isLoading } = useGetProfile(authorPrincipal);
-  const authorKey = authorPrincipal.toString();
-  const clubName = useAuthorClubName(authorKey);
+  // Safely unwrap — post.author can come back as [Principal] from Motoko optional
+  const unwrappedPrincipal = Array.isArray(authorPrincipal)
+    ? (authorPrincipal[0] as Principal | undefined)
+    : authorPrincipal;
+  const authorKey = (() => {
+    if (!unwrappedPrincipal) return "";
+    const s = unwrappedPrincipal.toString();
+    return s === "[object Object]" ? "" : s;
+  })();
+  const { data: profile, isLoading } = useGetProfile(unwrappedPrincipal);
+  const clubName = useAuthorClubName(authorKey || undefined);
 
   if (isLoading) {
     return (

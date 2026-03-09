@@ -196,6 +196,45 @@ export function useUploadFile() {
 }
 
 // ========================
+// Principal helpers
+// ========================
+
+// Safely unwrap a Principal that may come back from ICP as [] | [Principal] or
+// as a plain Principal. Returns a canonical string or "" if not resolvable.
+function safePrincipalToString(raw: unknown): string {
+  if (!raw) return "";
+  if (Array.isArray(raw)) {
+    const item = raw[0];
+    if (!item) return "";
+    if (typeof (item as { toString?: () => string }).toString === "function") {
+      const s = (item as { toString: () => string }).toString();
+      return s === "[object Object]" ? "" : s;
+    }
+    return String(item);
+  }
+  if (typeof (raw as { toString?: () => string }).toString === "function") {
+    const s = (raw as { toString: () => string }).toString();
+    return s === "[object Object]" ? "" : s;
+  }
+  return String(raw);
+}
+
+// Safely unwrap a Principal value — returns the actual Principal or undefined
+function safePrincipalUnwrap(raw: unknown): Principal | undefined {
+  if (!raw) return undefined;
+  if (Array.isArray(raw)) {
+    const item = raw[0];
+    if (!item) return undefined;
+    return item as Principal;
+  }
+  if (typeof raw === "object") {
+    const s = String((raw as { toString?: () => string }).toString?.() ?? "");
+    if (s === "[object Object]" || s === "") return undefined;
+  }
+  return raw as Principal;
+}
+
+// ========================
 // Posts
 // ========================
 
@@ -287,17 +326,19 @@ export function useGetPostsByUser(user: Principal | undefined) {
   const { actor: publicActor } = usePublicActor();
   const { actor: authActor } = useActor();
   const actor = authActor ?? publicActor;
+  // Safely unwrap the user principal
+  const unwrappedUser = user ? safePrincipalUnwrap(user) : undefined;
+  const userStr = unwrappedUser ? safePrincipalToString(unwrappedUser) : "";
   return useQuery({
-    queryKey: ["posts", "user", user?.toString()],
+    queryKey: ["posts", "user", userStr],
     queryFn: async () => {
-      if (!user) return [];
+      if (!unwrappedUser) return [];
       const activeActor = actor ?? (await getPublicActor());
-      return activeActor.getPostsByUser(user);
+      return activeActor.getPostsByUser(unwrappedUser);
     },
-    enabled: !!user,
+    enabled: !!unwrappedUser && !!userStr,
     staleTime: 30_000,
     refetchOnMount: true,
-    // No polling — the singleton actor is available almost immediately
     refetchInterval: false,
     refetchIntervalInBackground: false,
     retry: 3,
@@ -607,8 +648,14 @@ export function useGetProfile(
   const { actor: authActor } = useActor();
   const actor = authActor ?? publicActor;
 
+  // Safely unwrap the principal — it may arrive array-wrapped from ICP
+  const unwrappedUser = safePrincipalUnwrap(user);
+
   // Derive the canonical principal string for cache lookups and query keys.
-  const principalStr = user?.toString() ?? fallbackPrincipalStr ?? "";
+  // Never use a raw toString() that might return "[object Object]".
+  const principalStr = unwrappedUser
+    ? safePrincipalToString(unwrappedUser)
+    : (fallbackPrincipalStr ?? "");
 
   return useQuery({
     queryKey: ["profile", principalStr],
@@ -619,9 +666,9 @@ export function useGetProfile(
         const cached = getCachedProfile(principalStr);
         if (cached?.displayName) {
           // Fire the backend fetch in the background but return cache immediately
-          if (actor && user) {
+          if (actor && unwrappedUser) {
             actor
-              .getProfile(user)
+              .getProfile(unwrappedUser)
               .then((raw) => {
                 const fresh = unwrapOptionalProfile(raw);
                 if (fresh?.displayName) {
@@ -636,8 +683,8 @@ export function useGetProfile(
         }
       }
 
-      if (!actor || !user) return null;
-      const raw = await actor.getProfile(user);
+      if (!actor || !unwrappedUser) return null;
+      const raw = await actor.getProfile(unwrappedUser);
       const result = unwrapOptionalProfile(raw);
       // Cache the result for future fast-path hits
       if (result?.displayName && principalStr) {

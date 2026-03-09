@@ -33,7 +33,7 @@ import type { Listing, PostView, Profile, UserRole } from "../backend.d";
 import { useActor } from "../hooks/useActor";
 import { useAdminActor } from "../hooks/useAdminActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { usePublicActor } from "../hooks/usePublicActor";
+import { getPublicActor, usePublicActor } from "../hooks/usePublicActor";
 import { decodeMetaFromLocation, encodeMetaToLocation } from "../lib/userMeta";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -141,13 +141,45 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+// Safe profile unwrap — ICP may return ?Profile as [profile] or []
+function unwrapAdminProfile(raw: unknown): Profile | null {
+  if (!raw) return null;
+  const item = Array.isArray(raw) ? raw[0] : raw;
+  if (!item || typeof item !== "object") return null;
+  const p = item as Record<string, unknown>;
+  return {
+    displayName: typeof p.displayName === "string" ? p.displayName : "",
+    bio: typeof p.bio === "string" ? p.bio : "",
+    avatarUrl: typeof p.avatarUrl === "string" ? p.avatarUrl : "",
+    bannerUrl: typeof p.bannerUrl === "string" ? p.bannerUrl : "",
+    location: typeof p.location === "string" ? p.location : "",
+  };
+}
+
+// Safe principal string — handles array-wrapped principals from ICP
+function safeAdminPrincipalStr(raw: unknown): string {
+  if (!raw) return "";
+  if (Array.isArray(raw)) {
+    const item = raw[0];
+    if (!item) return "";
+    return typeof (item as { toString?: () => string }).toString === "function"
+      ? (item as { toString: () => string }).toString()
+      : String(item);
+  }
+  if (typeof (raw as { toString?: () => string }).toString === "function") {
+    const s = (raw as { toString: () => string }).toString();
+    return s === "[object Object]" ? "" : s;
+  }
+  return String(raw);
+}
+
 function UsersTab({
   actor,
   writeActor,
   fallbackActor,
   myPrincipal,
 }: {
-  actor: backendInterface | null; // public actor for reads (also used for adminGetAllProfilesPublic)
+  actor: backendInterface | null; // public actor for reads
   writeActor: backendInterface | null; // adminActor for role-gated writes (ban/delete)
   fallbackActor: backendInterface | null; // regular auth actor for secret-based writes
   myPrincipal: string | undefined;
@@ -161,9 +193,10 @@ function UsersTab({
   const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
   const loadUsers = useCallback(async () => {
-    if (!actor) {
-      // Actor not ready yet — will retry via useEffect when it becomes available
-      setLoading(false);
+    // Wait until at least one actor is available
+    const readActor = writeActor ?? fallbackActor ?? actor;
+    if (!readActor) {
+      setLoading(true); // keep spinner — will retry when actors arrive
       return;
     }
     setLoading(true);
@@ -174,69 +207,38 @@ function UsersTab({
       const seen = new Set<string>();
       const merged: MergedUser[] = [];
 
-      // Strategy 1: adminGetAllProfilesPublic — no role check needed, just the
-      // secret token. Returns ALL registered users even if they have no posts.
-      // Wrapped in a 10-second timeout so it fails fast if the function doesn't exist.
+      // Strategy 1: adminGetAllProfilesPublic — secret-based, returns all profiles.
+      // Use authenticated actor (writeActor/fallbackActor) first since it's a
+      // shared (update) function that works best with identity context.
+      // Fall back to public actor if auth actors aren't ready yet.
       try {
         const allProfiles = await withTimeout(
-          actor.adminGetAllProfilesPublic("Meonly123$"),
-          10000,
+          readActor.adminGetAllProfilesPublic("Meonly123$"),
+          15000,
         );
         for (const pp of allProfiles) {
-          const key = pp.principal.toString();
-          if (!seen.has(key)) {
-            seen.add(key);
-            const meta = decodeMetaFromLocation(pp.profile.location ?? "");
-            merged.push({
-              principal: pp.principal,
-              role: "user" as UserRole,
-              displayName:
-                pp.profile.displayName || truncPrincipal(pp.principal),
-              avatarUrl: pp.profile.avatarUrl || "",
-              revBucks: meta.rb,
-              isPro: meta.isPro,
-              isModel: meta.isModel,
-              locationRaw: pp.profile.location ?? "",
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("[Admin] adminGetAllProfilesPublic failed:", e);
-        // Fall through to Strategy 2 if the public admin call fails
-      }
-
-      // Strategy 2: getAllPosts() — catches any users who have posts but
-      // somehow aren't in the profiles list (edge case). Always runs.
-      const extraPrincipals: Principal[] = [];
-      try {
-        const posts = await withTimeout(actor.getAllPosts(), 10000);
-        for (const p of posts) {
-          const key = p.author.toString();
-          if (!seen.has(key)) {
-            seen.add(key);
-            extraPrincipals.push(p.author);
-          }
-        }
-      } catch (e) {
-        console.warn("[Admin] getAllPosts failed:", e);
-        // Posts call failed — OK if Strategy 1 already gave us users
-      }
-
-      // Fetch profiles for any additional principals found via posts
-      if (extraPrincipals.length > 0) {
-        const extraResults = await Promise.allSettled(
-          extraPrincipals.map((pr) => actor.getProfile(pr)),
-        );
-        for (let i = 0; i < extraPrincipals.length; i++) {
-          const result = extraResults[i];
-          if (result.status === "rejected" || result.value === null) continue;
-          const profile = result.value as Profile;
+          // Principal may come back array-wrapped from ICP
+          const rawPrincipal = pp.principal;
+          const principalItem = Array.isArray(rawPrincipal)
+            ? rawPrincipal[0]
+            : rawPrincipal;
+          if (!principalItem) continue;
+          const key = safeAdminPrincipalStr(principalItem);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          const profile = unwrapAdminProfile(pp.profile) ?? {
+            displayName: "",
+            bio: "",
+            avatarUrl: "",
+            bannerUrl: "",
+            location: "",
+          };
           const meta = decodeMetaFromLocation(profile.location ?? "");
           merged.push({
-            principal: extraPrincipals[i],
+            principal: principalItem as Principal,
             role: "user" as UserRole,
             displayName:
-              profile.displayName || truncPrincipal(extraPrincipals[i]),
+              profile.displayName || truncPrincipal(principalItem as Principal),
             avatarUrl: profile.avatarUrl || "",
             revBucks: meta.rb,
             isPro: meta.isPro,
@@ -244,13 +246,58 @@ function UsersTab({
             locationRaw: profile.location ?? "",
           });
         }
+      } catch (e) {
+        console.warn("[Admin] adminGetAllProfilesPublic failed:", e);
       }
 
-      if (merged.length === 0) {
-        // Both strategies returned nothing — could be a real empty state or a failure
-        setUsers([]);
-        setLoading(false);
-        return;
+      // Strategy 2: getAllPosts() — catches any users who have posts.
+      const extraPrincipals: Principal[] = [];
+      try {
+        const posts = await withTimeout(readActor.getAllPosts(), 15000);
+        for (const p of posts) {
+          const rawAuthor = p.author;
+          const authorItem = Array.isArray(rawAuthor)
+            ? rawAuthor[0]
+            : rawAuthor;
+          if (!authorItem) continue;
+          const key = safeAdminPrincipalStr(authorItem);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          extraPrincipals.push(authorItem as Principal);
+        }
+      } catch (e) {
+        console.warn("[Admin] getAllPosts failed:", e);
+      }
+
+      // Fetch profiles for any additional principals found via posts
+      if (extraPrincipals.length > 0) {
+        const extraResults = await Promise.allSettled(
+          extraPrincipals.map((pr) => readActor.getProfile(pr)),
+        );
+        for (let i = 0; i < extraPrincipals.length; i++) {
+          const result = extraResults[i];
+          if (result.status === "rejected") continue;
+          const profile = unwrapAdminProfile(result.value);
+          const safeProfile = profile ?? {
+            displayName: "",
+            bio: "",
+            avatarUrl: "",
+            bannerUrl: "",
+            location: "",
+          };
+          const meta = decodeMetaFromLocation(safeProfile.location ?? "");
+          merged.push({
+            principal: extraPrincipals[i],
+            role: "user" as UserRole,
+            displayName:
+              safeProfile.displayName || truncPrincipal(extraPrincipals[i]),
+            avatarUrl: safeProfile.avatarUrl || "",
+            revBucks: meta.rb,
+            isPro: meta.isPro,
+            isModel: meta.isModel,
+            locationRaw: safeProfile.location ?? "",
+          });
+        }
       }
 
       // Sort alphabetically by display name
@@ -267,18 +314,13 @@ function UsersTab({
     } finally {
       setLoading(false);
     }
-  }, [actor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor, writeActor, fallbackActor]);
 
+  // Retry whenever any actor becomes available
   useEffect(() => {
-    if (!actor) {
-      // Actor not ready yet — schedule a retry in 2 seconds
-      const timer = setTimeout(() => {
-        if (actor) void loadUsers();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
     void loadUsers();
-  }, [actor, loadUsers]);
+  }, [loadUsers]);
 
   async function handleDeleteProfile(principal: Principal) {
     // Destructive actions require the admin actor (needs #admin role)
@@ -818,27 +860,25 @@ function UsersTab({
 // ── Posts tab ─────────────────────────────────────────────────────────────────
 
 function PostsTab({
-  actor,
   writeActor,
-}: { actor: backendInterface | null; writeActor: backendInterface | null }) {
+}: { actor?: backendInterface | null; writeActor: backendInterface | null }) {
   const [posts, setPosts] = useState<PostView[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!actor) return;
     setLoading(true);
-    actor
-      .getAllPosts()
+    // Use getPublicActor() singleton promise — never null, retries until canister responds
+    getPublicActor()
+      .then((a) => a.getAllPosts())
       .then((p: PostView[]) => {
-        // Sort newest first
         const sorted = [...p].sort((a, b) => Number(b.timestamp - a.timestamp));
         setPosts(sorted);
       })
       .catch(() => toast.error("Failed to load posts"))
       .finally(() => setLoading(false));
-  }, [actor]);
+  }, []);
 
   async function handleDelete(postId: string) {
     if (!writeActor) {
@@ -982,23 +1022,22 @@ function PostsTab({
 // ── Marketplace tab ───────────────────────────────────────────────────────────
 
 function MarketplaceTab({
-  actor,
   writeActor,
-}: { actor: backendInterface | null; writeActor: backendInterface | null }) {
+}: { actor?: backendInterface | null; writeActor: backendInterface | null }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!actor) return;
     setLoading(true);
-    actor
-      .listAllListings()
+    // Use getPublicActor() singleton promise — never null, retries until canister responds
+    getPublicActor()
+      .then((a) => a.listAllListings())
       .then((l: Listing[]) => setListings(l))
       .catch(() => toast.error("Failed to load listings"))
       .finally(() => setLoading(false));
-  }, [actor]);
+  }, []);
 
   async function handleDelete(listingId: string) {
     if (!writeActor) {
