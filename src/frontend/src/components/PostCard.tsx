@@ -57,13 +57,20 @@ function principalToString(raw: unknown): string {
   if (Array.isArray(raw)) {
     const item = raw[0];
     if (!item) return "";
-    return typeof (item as { toString?: () => string }).toString === "function"
-      ? (item as { toString: () => string }).toString()
-      : String(item);
+    if (typeof (item as { toText?: () => string }).toText === "function") {
+      return (item as { toText: () => string }).toText();
+    }
+    if (typeof (item as { toString?: () => string }).toString === "function") {
+      const s = (item as { toString: () => string }).toString();
+      return s === "[object Object]" ? "" : s;
+    }
+    return String(item);
+  }
+  if (typeof (raw as { toText?: () => string }).toText === "function") {
+    return (raw as { toText: () => string }).toText();
   }
   if (typeof (raw as { toString?: () => string }).toString === "function") {
     const s = (raw as { toString: () => string }).toString();
-    // Guard against "[object Object]" — if toString returns that, it's not a real Principal
     if (s === "[object Object]") return "";
     return s;
   }

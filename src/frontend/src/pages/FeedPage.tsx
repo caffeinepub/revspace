@@ -33,6 +33,9 @@ function CommentAuthor({ author }: { author: Principal }) {
     : author;
   const authorKey = (() => {
     if (!unwrapped) return "";
+    if (typeof (unwrapped as { toText?: () => string }).toText === "function") {
+      return (unwrapped as { toText: () => string }).toText();
+    }
     const s = unwrapped.toString();
     return s === "[object Object]" ? "" : s;
   })();

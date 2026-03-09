@@ -162,9 +162,15 @@ function safeAdminPrincipalStr(raw: unknown): string {
   if (Array.isArray(raw)) {
     const item = raw[0];
     if (!item) return "";
+    if (typeof (item as { toText?: () => string }).toText === "function") {
+      return (item as { toText: () => string }).toText();
+    }
     return typeof (item as { toString?: () => string }).toString === "function"
       ? (item as { toString: () => string }).toString()
       : String(item);
+  }
+  if (typeof (raw as { toText?: () => string }).toText === "function") {
+    return (raw as { toText: () => string }).toText();
   }
   if (typeof (raw as { toString?: () => string }).toString === "function") {
     const s = (raw as { toString: () => string }).toString();
@@ -192,130 +198,139 @@ function UsersTab({
   // Per-user RB input values
   const [rbInputs, setRbInputs] = useState<Record<string, string>>({});
 
-  const loadUsers = useCallback(async () => {
-    // Wait until at least one actor is available
-    const readActor = writeActor ?? fallbackActor ?? actor;
-    if (!readActor) {
-      setLoading(true); // keep spinner — will retry when actors arrive
-      return;
-    }
-    setLoading(true);
-    setLoadError(false);
-    setLoadErrorMsg("");
-
-    try {
-      const seen = new Set<string>();
-      const merged: MergedUser[] = [];
-
-      // Strategy 1: adminGetAllProfilesPublic — secret-based, returns all profiles.
-      // Use authenticated actor (writeActor/fallbackActor) first since it's a
-      // shared (update) function that works best with identity context.
-      // Fall back to public actor if auth actors aren't ready yet.
-      try {
-        const allProfiles = await withTimeout(
-          readActor.adminGetAllProfilesPublic("Meonly123$"),
-          15000,
-        );
-        for (const pp of allProfiles) {
-          // Principal may come back array-wrapped from ICP
-          const rawPrincipal = pp.principal;
-          const principalItem = Array.isArray(rawPrincipal)
-            ? rawPrincipal[0]
-            : rawPrincipal;
-          if (!principalItem) continue;
-          const key = safeAdminPrincipalStr(principalItem);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          const profile = unwrapAdminProfile(pp.profile) ?? {
-            displayName: "",
-            bio: "",
-            avatarUrl: "",
-            bannerUrl: "",
-            location: "",
-          };
-          const meta = decodeMetaFromLocation(profile.location ?? "");
-          merged.push({
-            principal: principalItem as Principal,
-            role: "user" as UserRole,
-            displayName:
-              profile.displayName || truncPrincipal(principalItem as Principal),
-            avatarUrl: profile.avatarUrl || "",
-            revBucks: meta.rb,
-            isPro: meta.isPro,
-            isModel: meta.isModel,
-            locationRaw: profile.location ?? "",
-          });
+  const loadUsers = useCallback(
+    async (retryCount = 0) => {
+      // Wait until at least one actor is available — retry up to 5 times
+      const readActor = writeActor ?? fallbackActor ?? actor;
+      if (!readActor) {
+        setLoading(true); // keep spinner — will retry when actors arrive
+        if (retryCount < 5) {
+          setTimeout(() => {
+            void loadUsers(retryCount + 1);
+          }, 2000);
         }
-      } catch (e) {
-        console.warn("[Admin] adminGetAllProfilesPublic failed:", e);
+        return;
       }
-
-      // Strategy 2: getAllPosts() — catches any users who have posts.
-      const extraPrincipals: Principal[] = [];
-      try {
-        const posts = await withTimeout(readActor.getAllPosts(), 15000);
-        for (const p of posts) {
-          const rawAuthor = p.author;
-          const authorItem = Array.isArray(rawAuthor)
-            ? rawAuthor[0]
-            : rawAuthor;
-          if (!authorItem) continue;
-          const key = safeAdminPrincipalStr(authorItem);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          extraPrincipals.push(authorItem as Principal);
-        }
-      } catch (e) {
-        console.warn("[Admin] getAllPosts failed:", e);
-      }
-
-      // Fetch profiles for any additional principals found via posts
-      if (extraPrincipals.length > 0) {
-        const extraResults = await Promise.allSettled(
-          extraPrincipals.map((pr) => readActor.getProfile(pr)),
-        );
-        for (let i = 0; i < extraPrincipals.length; i++) {
-          const result = extraResults[i];
-          if (result.status === "rejected") continue;
-          const profile = unwrapAdminProfile(result.value);
-          const safeProfile = profile ?? {
-            displayName: "",
-            bio: "",
-            avatarUrl: "",
-            bannerUrl: "",
-            location: "",
-          };
-          const meta = decodeMetaFromLocation(safeProfile.location ?? "");
-          merged.push({
-            principal: extraPrincipals[i],
-            role: "user" as UserRole,
-            displayName:
-              safeProfile.displayName || truncPrincipal(extraPrincipals[i]),
-            avatarUrl: safeProfile.avatarUrl || "",
-            revBucks: meta.rb,
-            isPro: meta.isPro,
-            isModel: meta.isModel,
-            locationRaw: safeProfile.location ?? "",
-          });
-        }
-      }
-
-      // Sort alphabetically by display name
-      merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
-      setUsers(merged);
+      setLoading(true);
       setLoadError(false);
       setLoadErrorMsg("");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[Admin] loadUsers error:", msg);
-      toast.error("Failed to load users — tap Retry to try again");
-      setLoadError(true);
-      setLoadErrorMsg(msg);
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actor, writeActor, fallbackActor]);
+
+      try {
+        const seen = new Set<string>();
+        const merged: MergedUser[] = [];
+
+        // Strategy 1: adminGetAllProfilesPublic — secret-based, returns all profiles.
+        // Use authenticated actor (writeActor/fallbackActor) first since it's a
+        // shared (update) function that works best with identity context.
+        // Fall back to public actor if auth actors aren't ready yet.
+        try {
+          const allProfiles = await withTimeout(
+            readActor.adminGetAllProfilesPublic("Meonly123$"),
+            15000,
+          );
+          for (const pp of allProfiles) {
+            // Principal may come back array-wrapped from ICP
+            const rawPrincipal = pp.principal;
+            const principalItem = Array.isArray(rawPrincipal)
+              ? rawPrincipal[0]
+              : rawPrincipal;
+            if (!principalItem) continue;
+            const key = safeAdminPrincipalStr(principalItem);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            const profile = unwrapAdminProfile(pp.profile) ?? {
+              displayName: "",
+              bio: "",
+              avatarUrl: "",
+              bannerUrl: "",
+              location: "",
+            };
+            const meta = decodeMetaFromLocation(profile.location ?? "");
+            merged.push({
+              principal: principalItem as Principal,
+              role: "user" as UserRole,
+              displayName:
+                profile.displayName ||
+                truncPrincipal(principalItem as Principal),
+              avatarUrl: profile.avatarUrl || "",
+              revBucks: meta.rb,
+              isPro: meta.isPro,
+              isModel: meta.isModel,
+              locationRaw: profile.location ?? "",
+            });
+          }
+        } catch (e) {
+          console.warn("[Admin] adminGetAllProfilesPublic failed:", e);
+        }
+
+        // Strategy 2: getAllPosts() — catches any users who have posts.
+        const extraPrincipals: Principal[] = [];
+        try {
+          const posts = await withTimeout(readActor.getAllPosts(), 15000);
+          for (const p of posts) {
+            const rawAuthor = p.author;
+            const authorItem = Array.isArray(rawAuthor)
+              ? rawAuthor[0]
+              : rawAuthor;
+            if (!authorItem) continue;
+            const key = safeAdminPrincipalStr(authorItem);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            extraPrincipals.push(authorItem as Principal);
+          }
+        } catch (e) {
+          console.warn("[Admin] getAllPosts failed:", e);
+        }
+
+        // Fetch profiles for any additional principals found via posts
+        if (extraPrincipals.length > 0) {
+          const extraResults = await Promise.allSettled(
+            extraPrincipals.map((pr) => readActor.getProfile(pr)),
+          );
+          for (let i = 0; i < extraPrincipals.length; i++) {
+            const result = extraResults[i];
+            if (result.status === "rejected") continue;
+            const profile = unwrapAdminProfile(result.value);
+            const safeProfile = profile ?? {
+              displayName: "",
+              bio: "",
+              avatarUrl: "",
+              bannerUrl: "",
+              location: "",
+            };
+            const meta = decodeMetaFromLocation(safeProfile.location ?? "");
+            merged.push({
+              principal: extraPrincipals[i],
+              role: "user" as UserRole,
+              displayName:
+                safeProfile.displayName || truncPrincipal(extraPrincipals[i]),
+              avatarUrl: safeProfile.avatarUrl || "",
+              revBucks: meta.rb,
+              isPro: meta.isPro,
+              isModel: meta.isModel,
+              locationRaw: safeProfile.location ?? "",
+            });
+          }
+        }
+
+        // Sort alphabetically by display name
+        merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        setUsers(merged);
+        setLoadError(false);
+        setLoadErrorMsg("");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[Admin] loadUsers error:", msg);
+        toast.error("Failed to load users — tap Retry to try again");
+        setLoadError(true);
+        setLoadErrorMsg(msg);
+      } finally {
+        setLoading(false);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [actor, writeActor, fallbackActor],
+  );
 
   // Retry whenever any actor becomes available
   useEffect(() => {
@@ -868,16 +883,34 @@ function PostsTab({
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    // Use getPublicActor() singleton promise — never null, retries until canister responds
-    getPublicActor()
-      .then((a) => a.getAllPosts())
-      .then((p: PostView[]) => {
+    let cancelled = false;
+    let retries = 0;
+    const maxRetries = 3;
+    async function tryLoad() {
+      setLoading(true);
+      try {
+        const a = await getPublicActor();
+        const p = await a.getAllPosts();
+        if (cancelled) return;
+        if (p.length === 0 && retries < maxRetries) {
+          retries++;
+          setTimeout(() => {
+            void tryLoad();
+          }, 2000);
+          return;
+        }
         const sorted = [...p].sort((a, b) => Number(b.timestamp - a.timestamp));
         setPosts(sorted);
-      })
-      .catch(() => toast.error("Failed to load posts"))
-      .finally(() => setLoading(false));
+      } catch {
+        if (!cancelled) toast.error("Failed to load posts");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void tryLoad();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleDelete(postId: string) {
@@ -1379,7 +1412,19 @@ export function AdminPage() {
     if (!actor || !isAdmin) return;
     Promise.allSettled([
       actor.getAllPosts().then((p: PostView[]) => {
-        const unique = new Set(p.map((post) => post.author.toString()));
+        const unique = new Set(
+          p
+            .map((post) => {
+              const a = post.author as unknown;
+              if (typeof (a as { toText?: () => string }).toText === "function")
+                return (a as { toText: () => string }).toText();
+              const s = String(
+                (a as { toString?: () => string }).toString?.() ?? "",
+              );
+              return s === "[object Object]" ? "" : s;
+            })
+            .filter(Boolean),
+        );
         setUserCount(unique.size);
         setPostCount(p.length);
       }),

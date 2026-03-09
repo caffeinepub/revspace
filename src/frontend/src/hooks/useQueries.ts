@@ -206,11 +206,17 @@ function safePrincipalToString(raw: unknown): string {
   if (Array.isArray(raw)) {
     const item = raw[0];
     if (!item) return "";
+    if (typeof (item as { toText?: () => string }).toText === "function") {
+      return (item as { toText: () => string }).toText();
+    }
     if (typeof (item as { toString?: () => string }).toString === "function") {
       const s = (item as { toString: () => string }).toString();
       return s === "[object Object]" ? "" : s;
     }
     return String(item);
+  }
+  if (typeof (raw as { toText?: () => string }).toText === "function") {
+    return (raw as { toText: () => string }).toText();
   }
   if (typeof (raw as { toString?: () => string }).toString === "function") {
     const s = (raw as { toString: () => string }).toString();
@@ -228,6 +234,10 @@ function safePrincipalUnwrap(raw: unknown): Principal | undefined {
     return item as Principal;
   }
   if (typeof raw === "object") {
+    // If the object has .toText() it's a valid ICP Principal
+    if (typeof (raw as { toText?: () => string }).toText === "function") {
+      return raw as Principal;
+    }
     const s = String((raw as { toString?: () => string }).toString?.() ?? "");
     if (s === "[object Object]" || s === "") return undefined;
   }
